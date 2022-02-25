@@ -1,24 +1,35 @@
-# DB Replicator
+![replibyte cover](assets/replibyte%20-%20synchronize%20your%20cloud%20databases.svg)
 
-DB Replicator is a Golang application to load data from a production database to a staging or development one.
+Replibyte is a standalone Golang application to replicate your cloud databases from one place to the other.
 
 ---------
 
-**⚠️ THIS PROJECT IS NOT PRODUCTION READY YET!!**
+**⚠️ DEVELOPMENT IN PROGRESS - NOT PRODUCTION READY YET!!**
 
 ---------
 
 ## Motivation
 
-As a developer, synchronizing production database with a staging and development database is tedious. The goal of this application is to make database synchronization easy, safe and GDPR-compliant.
+At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases in one click. The problem is that when they clone them, the data from the databases are not duplicated. Cloning data can be tedious, and we end up reinventing the wheel. With RepliByte, the Qovery team wants to provide a comprehensive way to replicate cloud databases from one place to the other.
+
+## Use cases
+
+RepliByte is built to respond to the following use cases:
+
+| scenario                                | supported       |
+|-----------------------------------------|-----------------|
+| Synchronize full Postgres instance      | WIP             |
+| Synchronize specific Postgres databases | WIP             |
+| Synchronize specific Postgres tables    | WIP             |
+
+> Do you want to support an additional use-case? Feel free to contribute by opening an issue or submitting a PR.
 
 ## Features
 
-Here are some key features:
+Here are the features we plan to support
 
-- [ ] Sync data when the database is not under load
-- [ ] Version synced data
-- [ ] Obfuscate sensitive data (GDPR and SOC friendly)
+- [ ] Incremental data synchronization
+- [ ] Obfuscate sensitive data
 
 ## Connectors
 
@@ -45,25 +56,27 @@ Connector where to write the source data.
 ## Usage example
 
 ### Source
+
 Create your `prod-conf.yaml` configuration file to source your production database.
 
 ```yaml
 bind: 127.0.0.1
-port: 1337 
+port: 1337
 source:
-- type: postgres
-  connection_uri: $DATABASE_URL
-  cron: 0 3 * * * # every day at 3 am 
+  - type: postgres
+    connection_uri: $DATABASE_URL
+    cron: 0 3 * * * # every day at 3 am 
 bridge:
-- type: s3
-  bucket: $BUCKET_NAME
-  access_key_id: $ACCESS_KEY_ID
-  secret_access_key: $AWS_SECRET_ACCESS_KEY
+  - type: s3
+    bucket: $BUCKET_NAME
+    access_key_id: $ACCESS_KEY_ID
+    secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
 
 Run the app for the source
+
 ```shell
-dbreplicator -c prod-conf.yaml
+replibyte -c prod-conf.yaml
 ```
 
 ### Destination
@@ -74,37 +87,36 @@ Create your `staging-conf.yaml` configuration file to sync your production datab
 bind: 127.0.0.1
 port: 1338
 bridge:
-- type: s3
-  bucket: $BUCKET_NAME
-  access_key_id: $ACCESS_KEY_ID
-  secret_access_key: $AWS_SECRET_ACCESS_KEY
+  - type: s3
+    bucket: $BUCKET_NAME
+    access_key_id: $ACCESS_KEY_ID
+    secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
-- type: postgres
-  connection_uri: $DATABASE_URL
-  cron: 0 5 * * * # every day at 5 am
+  - type: postgres
+    connection_uri: $DATABASE_URL
+    cron: 0 5 * * * # every day at 5 am
 ```
 
 Run the app for the destination
+
 ```shell
-dbreplicator -c staging-conf.yaml
-```
-
-## API
-
-### Last sync status
-```shell
-curl -X GET http://localhost:1337/lastSyncStatus
-```
-
-Response:
-```json
-{
-  "index": 1,
-  "created_at": "2022-02-14T20:39:48:000Z",
-  "status": "OK"
-}
+replibyte -c staging-conf.yaml
 ```
 
 ## Design
 
 TODO
+
+# Contributions
+
+## How to contribute
+
+TODO
+
+## Local development
+
+Run
+
+```shell
+docker-compose up
+```
