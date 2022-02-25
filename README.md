@@ -22,36 +22,7 @@ RepliByte is built to respond to the following use cases:
 | Synchronize specific Postgres databases | WIP             |
 | Synchronize specific Postgres tables    | WIP             |
 
-> Do you want to support an additional use-case? Feel free to contribute by opening an issue or submitting a PR.
-
-## Features
-
-Here are the features we plan to support
-
-- [ ] Incremental data synchronization
-- [ ] Obfuscate sensitive data
-
-## Connectors
-
-![connection diagram](assets/diagram.svg)
-
-### Sources
-
-Connector where to read the data.
-
-- [ ] Postgres
-
-### Bridge
-
-Connector to make the bridge between the source and the destination.
-
-- [ ] S3
-
-### Destinations
-
-Connector where to write the source data.
-
-- [ ] Postgres
+> Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
 ## Usage example
 
@@ -103,15 +74,48 @@ Run the app for the destination
 replibyte -c staging-conf.yaml
 ```
 
+## Demo
+
+*coming soon*
+
+## Features
+
+Here are the features we plan to support
+
+- [ ] Incremental data synchronization
+- [ ] Obfuscate sensitive data
+
+## Connectors
+
+![connection diagram](assets/diagram.svg)
+
+### Sources
+
+Supported sources connectors:
+
+- [ ] Postgres (RDS compatible)
+
+### Bridge
+
+Connector to make the bridge between sources and destinations.
+
+- [ ] S3
+
+### Destinations
+
+Supported dest connectors:
+
+- [ ] Postgres (RDS compatible)
+
 ## Design
 
-TODO
+*coming soon*
 
-# Contributions
+# Contributing
 
 ## How to contribute
 
-TODO
+*coming soon*
 
 ## Local development
 
