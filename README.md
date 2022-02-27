@@ -1,6 +1,6 @@
 ![replibyte cover](assets/replibyte%20-%20synchronize%20your%20cloud%20databases.jpg)
 
-Replibyte is a standalone Golang application to replicate your cloud databases from one place to the other.
+Replibyte is a standalone application to replicate your cloud databases from one place to the other.
 
 ---------
 
