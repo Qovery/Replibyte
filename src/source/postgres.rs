@@ -73,3 +73,25 @@ pub fn get_tls() -> Result<MakeTlsConnector, Error> {
 
     Ok(MakeTlsConnector::new(connector))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{Database, Postgres};
+
+    fn get_postgres() -> Postgres<'static> {
+        Postgres::new("postgres://root:password@localhost:5432", false)
+    }
+
+    fn get_invalid_postgres() -> Postgres<'static> {
+        Postgres::new("postgres://root:wrongpassword@localhost:5432", false)
+    }
+
+    #[test]
+    fn connect() {
+        let mut p = get_postgres();
+        assert!(p.connect().is_ok());
+
+        let mut p = get_invalid_postgres();
+        assert!(p.connect().is_err());
+    }
+}

@@ -4,7 +4,7 @@ use crate::transform::Transformer;
 use crate::Source;
 use std::io::Error;
 
-trait Task {
+pub trait Task {
     fn run(&mut self) -> Result<(), Error>;
 }
 
