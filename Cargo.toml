@@ -1,11 +1,9 @@
-[package]
-name = "replibyte"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-postgres = "0.19.2"
-postgres-native-tls = "0.5.0"
-native-tls = "0.2.8"
+[workspace]
+members = [
+    "dump-parser",
+    "replibyte",
+]
+exclude = [
+    "db/*",
+    "assets/*",
+]

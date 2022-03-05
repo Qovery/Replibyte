@@ -1,6 +1,5 @@
 use crate::bridge::Bridge;
 use crate::destination::Destination;
-use crate::transform::Transformer;
 use crate::Source;
 use std::io::Error;
 
@@ -16,7 +15,6 @@ where
 {
     source: S,
     bridge: B,
-    transformer: Transformer,
 }
 
 impl<S, B> FullBackupTask<S, B>
@@ -24,12 +22,8 @@ where
     S: Source,
     B: Bridge,
 {
-    pub fn new(source: S, bridge: B, transformer: Transformer) -> Self {
-        FullBackupTask {
-            source,
-            bridge,
-            transformer,
-        }
+    pub fn new(source: S, bridge: B) -> Self {
+        FullBackupTask { source, bridge }
     }
 }
 
