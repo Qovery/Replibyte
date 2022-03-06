@@ -209,9 +209,9 @@ pub struct Tokenizer<'a> {
 
 impl<'a> Tokenizer<'a> {
     /// Create a new DUMP SQL tokenizer for the specified DUMP SQL statement
-    pub fn new(query: &'a str) -> Self {
+    pub fn new<S: Into<&'a str>>(query: S) -> Self {
         Self {
-            query,
+            query: query.into(),
             line: 1,
             col: 1,
         }
@@ -510,7 +510,7 @@ impl<'a> Tokenizer<'a> {
         let mut s = String::new();
         chars.next(); // consume the opening quote
 
-        // slash escaping is specific to MySQL dialect
+        // slash escaping is specific to some dialect
         let mut is_escaped = false;
         while let Some(&ch) = chars.peek() {
             match ch {
@@ -532,6 +532,7 @@ impl<'a> Tokenizer<'a> {
                 }
             }
         }
+
         self.tokenizer_error("Unterminated string literal")
     }
 
@@ -626,12 +627,23 @@ fn parse_quoted_ident(chars: &mut Peekable<Chars<'_>>, quote_end: char) -> (Stri
     (s, last_char)
 }
 
+pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usize) -> bool {
+    if let Some(token) = tokens.get(pos) {
+        return match token {
+            Token::Word(word) => word.keyword == keyword,
+            _ => false,
+        };
+    };
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use crate::postgres::tokenizer::{Token, Tokenizer, Whitespace, Word};
 
     #[test]
-    fn test_tokenizer_1() {
+    fn tokenizer_for_create_table_query() {
         let q = r"
 CREATE TABLE public.orders (
     order_id smallint NOT NULL
@@ -672,5 +684,22 @@ CREATE TABLE public.orders (
         ];
 
         assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn tokenizer_for_copy_from_stdin_query() {
+        let q = r"
+COPY public.categories (category_id, category_name, description, picture) FROM stdin;
+1	Beverages	Soft drinks, coffees, teas, beers, and ales	\\x
+2	Condiments	Sweet and savory sauces, relishes, spreads, and seasonings	\\x
+3	Confections	Desserts, candies, and sweet breads	\\x
+4	Dairy Products	Cheeses	\\x
+5	Grains/Cereals	Breads, crackers, pasta, and cereal	\\x
+6	Meat/Poultry	Prepared meats	\\x
+7	Produce	Dried fruit and bean curd	\\x
+8	Seafood	Seaweed and fish	\\x
+\.";
+
+        // TODO
     }
 }

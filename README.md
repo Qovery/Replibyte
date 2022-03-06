@@ -16,11 +16,11 @@ At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers c
 
 RepliByte is built to respond to the following use cases:
 
-| scenario                                | supported       |
-|-----------------------------------------|-----------------|
-| Synchronize full Postgres instance      | WIP             |
-| Synchronize specific Postgres databases | WIP             |
-| Synchronize specific Postgres tables    | WIP             |
+| scenario                                                             | supported       |
+|----------------------------------------------------------------------|-----------------|
+| Synchronize full Postgres instance and obfuscate sensitive data      | WIP             |
+| Synchronize specific Postgres databases and obfuscate sensitive data | WIP             |
+| Synchronize specific Postgres tables and obfuscate sensitive data    | WIP             |
 
 > Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
@@ -110,6 +110,10 @@ Supported dest connectors:
 ## Design
 
 *coming soon*
+
+## FAQ
+
+⬆️ *Open an issue if you have any question - I'll pick the most common questions and put them here with the answer*
 
 # Contributing
 

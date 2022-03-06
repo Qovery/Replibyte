@@ -6,5 +6,6 @@ pub enum Error {
 #[derive(Debug)]
 pub enum DumpFileError {
     DoesNotExist,
+    ReadError(std::io::Error),
     MalFormatted,
 }
