@@ -1,6 +1,6 @@
 use crate::DumpFileError;
 use crate::DumpFileError::ReadError;
-use std::fs::{read, File};
+use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str;
 

@@ -638,9 +638,20 @@ pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usi
     false
 }
 
+pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&str> {
+    if let Some(fifth_token) = tokens.get(pos) {
+        return match fifth_token {
+            Token::Word(word) => Some(word.value.as_str()),
+            _ => None,
+        };
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::postgres::tokenizer::{Token, Tokenizer, Whitespace, Word};
+    use crate::postgres::tokenizer::{Token, Tokenizer, Whitespace};
 
     #[test]
     fn tokenizer_for_create_table_query() {
@@ -700,6 +711,32 @@ COPY public.categories (category_id, category_name, description, picture) FROM s
 8	Seafood	Seaweed and fish	\\x
 \.";
 
-        // TODO
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = tokens_result.unwrap();
+
+        let expected: Vec<Token> = vec![];
+
+        // TODO assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn tokenizer_for_insert_query() {
+        let q = r"
+INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title)
+VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
+";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = tokens_result.unwrap();
+
+        let expected: Vec<Token> = vec![];
+
+        // TODO assert_eq!(tokens, expected);
     }
 }

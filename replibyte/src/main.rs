@@ -1,6 +1,5 @@
 use crate::bridge::s3::S3;
-use crate::database::Database;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use crate::source::postgres::Postgres;
 use crate::source::transformer::Transformer;

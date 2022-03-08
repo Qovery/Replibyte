@@ -1,5 +1,4 @@
 use crate::bridge::Bridge;
-use crate::destination::Destination;
 use crate::Source;
 use std::io::Error;
 

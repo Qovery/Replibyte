@@ -3,17 +3,17 @@
 Library to parse and edit database dump for Postgres, MySQL and MongoDB.
 
 ```rust
-let dp = DumpParser::new("./db/dump.sql", Type::Postgres);
+let db = Postgres::new("../db/postgres/fulldump-with-inserts.sql");
 
 // get type
-dp.dump_type(); // Postgres
+db.database_type(); // Postgres
 
 // list databases
-dp.databases();
+db.databases();
 
 // list tables
 let db = dp.get_database("db_name");
-db.tables("db_name");
+db.tables();
 
 // get table "table_name"
 let table = db.get_table("table_name");
@@ -25,5 +25,5 @@ for row in table.rows() {
     column.set_value(format!("{} name updated", column.value()));
 }
 
-let _ = dp.save("./db/dump-updated.sql");
+let _ = db.save("./db/dump-updated.sql");
 ```

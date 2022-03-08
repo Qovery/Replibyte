@@ -1,13 +1,9 @@
-use std::borrow::{Borrow, BorrowMut};
-use std::fs;
-use std::io::{Error, ErrorKind};
-use std::ops::Deref;
+use std::io::Error;
 
 use crate::connector::Connector;
 use crate::database::Database;
 use crate::source::transformer::Transformer;
 use crate::source::Source;
-use crate::types::Column;
 
 pub struct Postgres<'a> {
     current_row: u64,

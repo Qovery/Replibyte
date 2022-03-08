@@ -1,5 +1,6 @@
-use crate::errors::{DumpFileError, Error};
 use std::collections::HashSet;
+
+use crate::errors::DumpFileError;
 
 pub mod errors;
 pub mod postgres;
@@ -10,64 +11,44 @@ pub enum Type {
     Postgres,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
-pub struct LogicalDatabase<'a, DB: ?Sized>
+pub trait LogicalDatabase<'a, T>
 where
-    DB: Database,
+    T: Table,
 {
+    fn name(&self) -> &str;
+    fn tables(&self) -> Result<Vec<T>, DumpFileError>;
+}
+
+pub trait Table {
+    fn rows(&self) -> &'static Vec<Row>;
+}
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub struct Row {
+    columns: Vec<Column>,
+}
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub struct Column {
     name: String,
-    database: &'a DB,
-    tables: Vec<Table<'a>>,
-}
-
-impl<'a, DB> LogicalDatabase<'a, DB>
-where
-    DB: Database,
-{
-    pub fn new(name: String, database: &'a DB) -> Self {
-        LogicalDatabase {
-            name,
-            database,
-            tables: vec![],
-        }
-    }
-
-    pub fn tables(&self) -> &Vec<Table<'a>> {
-        &self.tables
-    }
-}
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-pub struct Table<'a> {
-    rows: Vec<Row<'a>>,
-}
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-pub struct Row<'a> {
-    columns: Vec<Column<'a>>,
-}
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-pub struct Column<'a> {
-    name: &'a str,
     value: Vec<u8>,
 }
 
-pub trait Database {
+pub trait Database<'a, LD, T>
+where
+    LD: LogicalDatabase<'a, T>,
+    T: Table,
+{
     fn database_type(&self) -> Type;
-    fn dump_file_path(&self) -> &str;
     /// list logical databases available
-    fn databases(&self) -> Result<HashSet<LogicalDatabase<Self>>, DumpFileError>;
+    fn databases(&self) -> Result<HashSet<LD>, DumpFileError>;
     /// find a logical database by name
-    fn get_database<'a, S: Into<&'a str>>(
-        &self,
-        name: S,
-    ) -> Result<Option<LogicalDatabase<Self>>, DumpFileError> {
+    fn get_database<S: Into<&'a str>>(&self, name: S) -> Result<Option<LD>, DumpFileError> {
         let databases = self.databases()?;
 
         let db_name = name.into();
         for db in databases {
-            if &db.name == &db_name {
+            if db.name() == db_name {
                 return Ok(Some(db));
             }
         }
@@ -76,10 +57,14 @@ pub trait Database {
     }
 }
 
+pub trait FromDumpFile {
+    fn dump_file_path(&self) -> &str;
+}
+
 #[cfg(test)]
 mod tests {
     use crate::postgres::Postgres;
-    use crate::{Database, Type};
+    use crate::{Database, LogicalDatabase, Type};
 
     #[test]
     fn parse_postgres() {
@@ -95,6 +80,16 @@ mod tests {
         let db = Postgres::new("../db/postgres/fulldump-with-inserts.sql");
 
         assert_eq!(db.databases().unwrap().len(), 1);
-        assert_eq!(db.get_database("public").unwrap().unwrap().name, "public");
+        assert_eq!(db.get_database("public").unwrap().unwrap().name(), "public");
+    }
+
+    #[test]
+    fn list_postgres_tables() {
+        let db = Postgres::new("../db/postgres/fulldump-with-inserts.sql");
+
+        let db = db.get_database("public").unwrap().unwrap();
+        let tables = db.tables().unwrap();
+
+        assert_eq!(tables.len(), 14);
     }
 }
