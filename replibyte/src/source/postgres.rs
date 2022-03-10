@@ -1,16 +1,17 @@
+use std::io::{BufReader, Error, ErrorKind};
+use std::process::{Command, Stdio};
+
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
     Token,
 };
 use dump_parser::utils::list_queries_from_dump_reader;
-use std::io::{BufReader, Error, ErrorKind};
-use std::process::{Command, Stdio};
 
 use crate::connector::Connector;
 use crate::database::Database;
-use crate::source::transformer::Transformer;
 use crate::source::Source;
+use crate::transformer::Transformer;
 use crate::types::{Column, Row};
 
 pub struct Postgres<'a> {
@@ -19,7 +20,6 @@ pub struct Postgres<'a> {
     database: &'a str,
     username: &'a str,
     password: &'a str,
-    transformer: Transformer,
 }
 
 impl<'a> Postgres<'a> {
@@ -36,7 +36,6 @@ impl<'a> Postgres<'a> {
             database,
             username,
             password,
-            transformer: Transformer::None,
         }
     }
 }
@@ -47,21 +46,17 @@ impl<'a> Connector for Postgres<'a> {
     }
 }
 
-impl<'a> Source for Postgres<'a> {
-    fn transformer(&self) -> &Transformer {
-        &self.transformer
-    }
-
-    fn set_transformer(&mut self, transformer: Transformer) {
-        self.transformer = transformer;
-    }
-}
+impl<'a> Source for Postgres<'a> {}
 
 impl<'a> Database for Postgres<'a> {
-    fn stream_rows<F: FnMut(Row)>(&self, mut row: F) -> Result<(), Error> {
+    fn stream_rows<T: Transformer, F: FnMut(Row)>(
+        &self,
+        transformer: &T,
+        mut row: F,
+    ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
-        let output = Command::new("pg_dump")
+        let mut process = Command::new("pg_dump")
             .env("PGPASSWORD", self.password)
             .args([
                 "--column-inserts",
@@ -74,20 +69,14 @@ impl<'a> Database for Postgres<'a> {
                 "-U",
                 self.username,
             ])
-            .stdin(Stdio::piped())
+            //.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
 
-        if let Some(err) = output.stderr {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error {:?}", err),
-            ));
-        }
-
-        let stdout = output
+        let stdout = process
             .stdout
+            .take()
             .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
 
         let reader = BufReader::new(stdout);
@@ -113,6 +102,8 @@ impl<'a> Database for Postgres<'a> {
                     let mut columns = vec![];
                     for (i, column_name) in column_names.iter().enumerate() {
                         let value_token = column_values.get(i).unwrap();
+
+                        // TODO transform column value by column name
 
                         let column = match value_token {
                             Token::Number(column_value, signed) => {
@@ -146,15 +137,27 @@ impl<'a> Database for Postgres<'a> {
                         columns.push(column);
                     }
 
-                    row(Row {
+                    row(transformer.transform(Row {
                         table_name: table_name.to_string(),
                         columns,
-                    })
+                    }))
                 }
             }
         }) {
             Ok(_) => {}
             Err(err) => panic!("{:?}", err),
+        }
+
+        match process.wait() {
+            Ok(exit_status) => {
+                if !exit_status.success() {
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        format!("command error: {:?}", exit_status.to_string()),
+                    ));
+                }
+            }
+            Err(err) => return Err(err),
         }
 
         Ok(())
@@ -164,6 +167,7 @@ impl<'a> Database for Postgres<'a> {
 #[cfg(test)]
 mod tests {
     use crate::database::Database;
+    use crate::transformer::NoTransformer;
     use crate::Postgres;
 
     fn get_postgres() -> Postgres<'static> {
@@ -177,9 +181,11 @@ mod tests {
     #[test]
     fn connect() {
         let p = get_postgres();
-        assert!(p.stream_rows(|_| {}).is_ok());
+        let t = NoTransformer::default();
+        assert!(p.stream_rows(&t, |_| {}).is_ok());
 
         let p = get_invalid_postgres();
-        assert!(p.stream_rows(|_| {}).is_err());
+        let t = NoTransformer::default();
+        assert!(p.stream_rows(&t, |_| {}).is_err());
     }
 }
