@@ -5,8 +5,7 @@ use crate::source::transformer::Transformer;
 pub mod postgres;
 pub mod transformer;
 
-pub trait Source: Connector + Database + Iterator {
+pub trait Source: Connector + Database {
     fn transformer(&self) -> &Transformer;
-    fn current_row(&self) -> u64;
-    fn set_current_row(&mut self, current_row: u64);
+    fn set_transformer(&mut self, transformer: Transformer);
 }

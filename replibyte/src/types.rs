@@ -1,15 +1,12 @@
-pub type Row = Vec<Column>;
-
-pub struct Column {
-    name: String,
-    value: String,
+pub struct Row {
+    pub table_name: String,
+    pub columns: Vec<Column>,
 }
 
-impl Column {
-    pub fn new<S: Into<String>, T: Into<String>>(name: S, value: T) -> Self {
-        Column {
-            name: name.into(),
-            value: value.into(),
-        }
-    }
+pub enum Column {
+    IntValue(String, i64),
+    UIntValue(String, u64),
+    StringValue(String, String),
+    CharValue(String, char),
+    None,
 }

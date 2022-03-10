@@ -1,14 +1,15 @@
 use crate::DumpFileError;
 use crate::DumpFileError::ReadError;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::str;
 
-pub fn list_queries_from_dump<'a, S: Into<&'a str>, F>(
+pub fn list_queries_from_dump_file<'a, S, F>(
     dump_file_path: S,
-    mut query: F,
+    query: F,
 ) -> Result<(), DumpFileError>
 where
+    S: Into<&'a str>,
     F: FnMut(&str),
 {
     let file = match File::open(dump_file_path.into()) {
@@ -16,12 +17,23 @@ where
         Err(_) => return Err(DumpFileError::DoesNotExist),
     };
 
-    let mut reader = BufReader::new(file);
+    let reader = BufReader::new(file);
+    list_queries_from_dump_reader(reader, query)
+}
+
+pub fn list_queries_from_dump_reader<R, F>(
+    mut dump_reader: BufReader<R>,
+    mut query: F,
+) -> Result<(), DumpFileError>
+where
+    R: Read,
+    F: FnMut(&str),
+{
     let mut count_empty_lines = 0;
     let mut buf_bytes: Vec<u8> = Vec::new();
 
     loop {
-        let bytes = reader.read_until(b'\n', &mut buf_bytes);
+        let bytes = dump_reader.read_until(b'\n', &mut buf_bytes);
         let total_bytes = match bytes {
             Ok(bytes) => bytes,
             Err(err) => return Err(ReadError(err)),
