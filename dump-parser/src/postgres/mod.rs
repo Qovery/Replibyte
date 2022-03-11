@@ -663,13 +663,13 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str>
 
     tokens
         .iter()
-        .skip_while(|token| match token {
-            Token::LParen => true,
-            _ => false,
+        .skip_while(|token| match **token {
+            Token::LParen => false,
+            _ => true,
         })
-        .take_while(|token| match token {
-            Token::RParen => true,
-            _ => false,
+        .take_while(|token| match **token {
+            Token::RParen => false,
+            _ => true,
         })
         .filter_map(|token| match token {
             Token::Word(word) => Some(word.value.as_str()), // column name
@@ -688,20 +688,20 @@ pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Tok
 
     tokens
         .iter()
-        .skip_while(|token| match token {
-            Token::RParen => true,
-            _ => false,
+        .skip_while(|token| match **token {
+            Token::RParen => false,
+            _ => true,
         })
-        .skip_while(|token| match token {
-            Token::LParen => true,
-            _ => false,
+        .skip_while(|token| match **token {
+            Token::LParen => false,
+            _ => true,
         })
-        .take_while(|token| match token {
-            Token::RParen => true,
-            _ => false,
+        .take_while(|token| match **token {
+            Token::RParen => false,
+            _ => true,
         })
         .filter_map(|token| match token {
-            Token::Comma => None,
+            Token::Comma | Token::Whitespace(_) | Token::LParen | Token::RParen => None,
             token => Some(token), // column value
         })
         .collect::<Vec<_>>()
@@ -732,7 +732,10 @@ pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
 
 #[cfg(test)]
 mod tests {
-    use crate::postgres::{Token, Tokenizer, Whitespace};
+    use crate::postgres::{
+        get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
+        trim_pre_whitespaces, Keyword, Token, Tokenizer, Whitespace,
+    };
 
     #[test]
     fn tokenizer_for_create_table_query() {
@@ -819,5 +822,55 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
         let expected: Vec<Token> = vec![];
 
         // TODO assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_get_column_names_from_insert_into_query() {
+        let q = r"
+INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title)
+VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
+";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        let column_names = get_column_names_from_insert_into_query(&tokens);
+
+        assert_eq!(
+            column_names,
+            vec![
+                "customer_id",
+                "company_name",
+                "contact_name",
+                "contact_title",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_get_column_values_from_insert_into_query() {
+        let q = r"
+INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title)
+VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
+";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        let column_values = get_column_values_from_insert_into_query(&tokens);
+
+        assert_eq!(
+            column_values,
+            vec![
+                &Token::Number("1".to_string(), false),
+                &Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
+                &Token::SingleQuotedString("Maria Anders".to_string()),
+                &Token::make_keyword("NULL"),
+            ]
+        );
     }
 }

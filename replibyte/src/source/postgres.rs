@@ -188,4 +188,14 @@ mod tests {
         let t = NoTransformer::default();
         assert!(p.stream_rows(&t, |_| {}).is_err());
     }
+
+    #[test]
+    fn list_rows() {
+        let p = get_postgres();
+        let t = NoTransformer::default();
+        p.stream_rows(&t, |row| {
+            assert!(row.table_name.len() > 0);
+            assert!(row.columns.len() > 0);
+        });
+    }
 }
