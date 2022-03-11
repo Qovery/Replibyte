@@ -4,8 +4,8 @@ pub struct Row {
 }
 
 pub enum Column {
-    IntValue(String, i64),
-    UIntValue(String, u64),
+    NumberValue(String, i128),
+    FloatNumberValue(String, f64),
     StringValue(String, String),
     CharValue(String, char),
     None,

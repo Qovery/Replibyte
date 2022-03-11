@@ -106,16 +106,16 @@ impl<'a> Database for Postgres<'a> {
                         // TODO transform column value by column name
 
                         let column = match value_token {
-                            Token::Number(column_value, signed) => {
-                                if *signed {
-                                    Column::IntValue(
+                            Token::Number(column_value, _) => {
+                                if column_value.contains(".") {
+                                    Column::FloatNumberValue(
                                         column_name.to_string(),
-                                        column_value.parse::<i64>().unwrap(),
+                                        column_value.parse::<f64>().unwrap(),
                                     )
                                 } else {
-                                    Column::UIntValue(
+                                    Column::NumberValue(
                                         column_name.to_string(),
-                                        column_value.parse::<u64>().unwrap(),
+                                        column_value.parse::<i128>().unwrap(),
                                     )
                                 }
                             }

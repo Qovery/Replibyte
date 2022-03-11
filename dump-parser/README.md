@@ -2,28 +2,28 @@
 
 Library to parse and edit database dump for Postgres, MySQL and MongoDB.
 
+
+Example for Postgres
 ```rust
-let db = Postgres::new("../db/postgres/fulldump-with-inserts.sql");
+let q = r"
+INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title)
+VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
+";
 
-// get type
-db.database_type(); // Postgres
+let mut tokenizer = Tokenizer::new(q);
+let tokens_result = tokenizer.tokenize();
+assert_eq!(tokens_result.is_ok(), true);
 
-// list databases
-db.databases();
+let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+let column_values = get_column_values_from_insert_into_query(&tokens);
 
-// list tables
-let db = dp.get_database("db_name");
-db.tables();
-
-// get table "table_name"
-let table = db.get_table("table_name");
-
-// list over table rows
-for row in table.rows() {
-    let mut column = row.get_column("name");
-    // update column
-    column.set_value(format!("{} name updated", column.value()));
-}
-
-let _ = db.save("./db/dump-updated.sql");
+assert_eq!(
+    column_values,
+    vec![
+        &Token::Number("1".to_string(), false),
+        &Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
+        &Token::SingleQuotedString("Maria Anders".to_string()),
+        &Token::make_keyword("NULL"),
+    ]
+);
 ```
