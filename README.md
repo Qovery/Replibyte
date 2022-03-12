@@ -36,7 +36,16 @@ port: 1337
 source:
   - type: postgres
     connection_uri: $DATABASE_URL
-    cron: 0 3 * * * # every day at 3 am 
+    cron: 0 3 * * * # every day at 3 am
+  transformation:
+    tables:
+      employees:
+        - column: last_name
+          type: string
+          transformer: random 
+        - column: birth_date
+          type: date
+          transformer: date-day
 bridge:
   - type: s3
     bucket: $BUCKET_NAME

@@ -1,11 +1,11 @@
 use crate::transformer::Transformer;
-use crate::types::Row;
+use crate::types::{OriginalRow, Row};
 use std::io::Error;
 
 pub trait Database {
-    fn stream_rows<T: Transformer, F: FnMut(Row)>(
+    fn stream_rows<F: FnMut(OriginalRow, Row)>(
         &self,
-        transformer: &T,
+        transformers: &Vec<Box<dyn Transformer + '_>>,
         row: F,
     ) -> Result<(), Error>;
 }

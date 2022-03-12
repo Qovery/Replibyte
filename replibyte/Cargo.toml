@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 dump-parser = { path = "../dump-parser" }
+rand = "0.8.5"
