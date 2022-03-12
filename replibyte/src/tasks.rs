@@ -1,4 +1,5 @@
 use crate::bridge::Bridge;
+use crate::transformer::Transformer;
 use crate::Source;
 use std::io::Error;
 
@@ -7,26 +8,31 @@ pub trait Task {
 }
 
 /// FullBackupTask is a wrapping struct to execute the synchronization between a *Source* and a *Bridge*
-pub struct FullBackupTask<S, B>
+pub struct FullBackupTask<'a, S, B>
 where
     S: Source,
     B: Bridge,
 {
     source: S,
+    transformers: &'a Vec<Box<dyn Transformer>>,
     bridge: B,
 }
 
-impl<S, B> FullBackupTask<S, B>
+impl<'a, S, B> FullBackupTask<'a, S, B>
 where
     S: Source,
     B: Bridge,
 {
-    pub fn new(source: S, bridge: B) -> Self {
-        FullBackupTask { source, bridge }
+    pub fn new(source: S, transformers: &'a Vec<Box<dyn Transformer>>, bridge: B) -> Self {
+        FullBackupTask {
+            source,
+            transformers,
+            bridge,
+        }
     }
 }
 
-impl<S, B> Task for FullBackupTask<S, B>
+impl<'a, S, B> Task for FullBackupTask<'a, S, B>
 where
     S: Source,
     B: Bridge,
@@ -36,8 +42,14 @@ where
         let _ = self.source.init()?;
 
         // start
-        // TODO initialize the destination
         // TODO initialize the bridge
+
+        let _ = self
+            .source
+            .stream_rows(self.transformers, |original_row, row| {
+                // TODO
+                println!("{}", row.table_name.as_str());
+            });
 
         // business execution
         // TODO find source last checkpoint

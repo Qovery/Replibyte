@@ -39,10 +39,47 @@ where
             Err(err) => return Err(ReadError(err)),
         };
 
-        if total_bytes <= 1 {
+        /* let mut alphanumeric_last_byte_idx: usize = 0;
+        for (i, buf_byte) in buf_bytes.iter().rev().enumerate() {
+            if *buf_byte == b'\n' {
+                // set the index for the last char
+                alphanumeric_last_byte_idx = buf_bytes.len() - i - 1;
+                break;
+            }
+        }*/
+
+        let idx = if buf_bytes.len() < 1 {
+            0
+        } else {
+            buf_bytes.len() - 1
+        };
+
+        // check end of line is a ';' char - it would mean it's the end of the query
+        let is_last_by_end_of_query = match buf_bytes.get(idx) {
+            Some(byte) => *byte == b';',
+            None => false,
+        };
+
+        if total_bytes <= 1 || is_last_by_end_of_query {
             if count_empty_lines == 0 && buf_bytes.len() > 1 {
                 let query_str = str::from_utf8(buf_bytes.as_slice()).unwrap(); // FIXME remove unwrap
-                query(query_str);
+
+                // split query_str by ';' in case of multiple queries are inside the string
+                let queries_str = query_str.split(";").collect::<Vec<&str>>();
+
+                if queries_str.len() == 1 {
+                    // there is a only one query inside the str
+                    query(query_str);
+                } else {
+                    // iterate and send all queries one by one
+                    for query_str in queries_str {
+                        let query_str = query_str.trim();
+                        if !query_str.is_empty() {
+                            let query_str = format!("{};", query_str);
+                            query(query_str.as_str());
+                        }
+                    }
+                }
             }
 
             let _ = buf_bytes.clear();
@@ -51,6 +88,8 @@ where
             count_empty_lines = 0;
         }
 
+        // 49 is an empirical number -
+        // not too large to avoid looping too much time, and not too small to avoid wrong end of query
         if count_empty_lines > 49 {
             // EOF?
             break;
