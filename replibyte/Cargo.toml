@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 dump-parser = { path = "../dump-parser" }
 rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+uriparse = "0.6"

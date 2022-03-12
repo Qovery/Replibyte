@@ -34,9 +34,8 @@ Create your `prod-conf.yaml` configuration file to source your production databa
 bind: 127.0.0.1
 port: 1337
 source:
-  - type: postgres
-    connection_uri: $DATABASE_URL
-    cron: 0 3 * * * # every day at 3 am
+  connection_uri: $DATABASE_URL
+  cron: 0 3 * * * # every day at 3 am
   transformation:
     tables:
       employees:
@@ -47,10 +46,10 @@ source:
           type: date
           transformer: date-day
 bridge:
-  - type: s3
-    bucket: $BUCKET_NAME
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+  type: s3
+  bucket: $BUCKET_NAME
+  access_key_id: $ACCESS_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
 
 Run the app for the source
@@ -72,9 +71,8 @@ bridge:
     access_key_id: $ACCESS_KEY_ID
     secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
-  - type: postgres
-    connection_uri: $DATABASE_URL
-    cron: 0 5 * * * # every day at 5 am
+  connection_uri: $DATABASE_URL
+  cron: 0 5 * * * # every day at 5 am
 ```
 
 Run the app for the destination
