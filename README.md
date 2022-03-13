@@ -110,6 +110,9 @@ replibyte -c staging-conf.yaml
 
 ## Features
 
+- [x] Full data synchronization
+- [x] Backup TB of data (read [Design](#design))
+
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
@@ -151,7 +154,21 @@ Supported dest connectors:
 
 ## Design
 
-*coming soon*
+RepliByte is built to replicate small and very large databases from one place to the other with a bridge as intermediary. 
+
+### How RepliByte works
+
+```mermaid
+sequenceDiagram
+    participant RepliByte
+    participant Source DB
+    participant S3 (Bridge)
+    RepliByte->>Source DB: Backup
+    loop Transformer
+        RepliByte->>RepliByte: Hide sensitive data
+    end
+    RepliByte->>S3 (Bridge): Upload Source DB data
+```
 
 ## FAQ
 
