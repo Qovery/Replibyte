@@ -27,9 +27,7 @@ fn main() -> Result<(), Error> {
         Err(err) => panic!("{:?}", err),
     };
 
-    // TODO match source or destination type
-    // TODO match transformers by name
-
+    // match transformers from conf
     let transformers = config
         .source
         .transformers

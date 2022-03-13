@@ -1,0 +1,60 @@
+on: [ push, pull_request ]
+
+name: Build and tests
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        rust-toolchain: [ stable ]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-toolchain }}
+          components: rustfmt
+          override: true
+
+      - name: Install Build Essentials
+        run: sudo apt-get install build-essential mingw-w64 gcc
+
+      - name: Verify versions
+        run: rustc --version && rustup --version && cargo --version
+
+      - name: Cache build artifacts
+        id: cache-cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust-toolchain }}
+
+      - name: Cache integration artifacts
+        id: cache-integration
+        uses: actions/cache@v2
+        with:
+          path: |
+            tests/integration/runner/node_modules
+          key: ${{ runner.os }}-integration-${{ matrix.rust-toolchain }}
+
+      - name: Build RepliByte
+        run: cargo build --release
+
+      - name: Test RepliByte
+        run: cargo test
+
+      # - name: Bench RepliByte
+      #   run: cargo bench
+
+      - name: Check RepliByte code style
+        run: cargo fmt -- --check
