@@ -1,5 +1,6 @@
 use serde;
 use serde::{Deserialize, Serialize};
+use std::env::VarError;
 use std::io::{Error, ErrorKind};
 use std::net::Ipv4Addr;
 use uriparse::{Scheme, URIReference, URIReferenceError};
@@ -13,8 +14,6 @@ pub struct Config {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Source {
-    #[serde(rename = "type")]
-    pub _type: String,
     pub connection_uri: String,
 }
 
@@ -107,7 +106,9 @@ fn get_database(uri_ref: &URIReference, default: Option<&str>) -> Result<String,
 }
 
 fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
-    let uri_ref = match URIReference::try_from(uri) {
+    let uri = substitute_env_var(uri)?;
+
+    let uri_ref = match URIReference::try_from(uri.as_str()) {
         Ok(uri_ref) => uri_ref,
         Err(err) => return Err(Error::new(ErrorKind::Other, format!("{:?}", err))),
     };
@@ -141,9 +142,41 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
     Ok(connection_uri)
 }
 
+/// take as input $KEY_ENV_VAR and convert it into a real value if the env var does exist
+/// otherwise return an Error
+fn substitute_env_var(env_var: &str) -> Result<String, Error> {
+    match env_var {
+        "" => Ok(String::new()),
+        env_var if env_var.starts_with("$") && env_var.len() > 1 => {
+            let key = &env_var[1..env_var.len()];
+            match std::env::var(key) {
+                Ok(value) => Ok(value),
+                Err(_) => Err(Error::new(
+                    ErrorKind::Other,
+                    format!("environment variable '{}' is missing", key),
+                )),
+            }
+        }
+        x => Ok(x.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::config::{parse_connection_uri, Source};
+    use crate::config::{parse_connection_uri, substitute_env_var, Source};
+
+    #[test]
+    fn substitute_env_variables() {
+        assert!(substitute_env_var("$DOES_NOT_EXIST").is_err());
+        assert_eq!(substitute_env_var("").unwrap(), "".to_string());
+        assert_eq!(substitute_env_var("toto").unwrap(), "toto".to_string());
+
+        std::env::set_var("THIS_IS_A_TEST", "here is my value");
+        assert_eq!(
+            substitute_env_var("$THIS_IS_A_TEST").unwrap(),
+            "here is my value"
+        );
+    }
 
     #[test]
     fn parse_postgres_connection_uri() {

@@ -19,7 +19,7 @@ pub mod transformer;
 mod types;
 
 fn main() -> Result<(), Error> {
-    // TODO parse and check yaml configuration file
+    // TODO implement CLI
 
     let file = File::open("examples/source-postgres.yaml")?; // FIXME
     let config: Config = match serde_yaml::from_reader(file) {
