@@ -11,7 +11,7 @@
 
 ---------
 
-**⚠️ DEVELOPMENT IN PROGRESS - NOT PRODUCTION READY YET!!**
+**⚠️ DEVELOPMENT IN PROGRESS - CONTRIBUTORS WANTED!! [JOIN DISCORD](https://discord.qovery.com)**
 
 ---------
 
@@ -33,21 +33,6 @@ RepliByte is built to respond to the following use cases:
 | ...                                                                  | ...       |
 
 > Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
-
-## What is not RepliByte
-
-### RepliByte is not an ETL
-
-RepliByte is not an ETL like [AirByte](https://github.com/airbytehq/airbyte), [AirFlow](https://airflow.apache.org/), Talend, and it will
-never be. If you need to synchronize versatile data sources, you are better choosing a classic ETL. RepliByte is a tool for software
-engineers to help them to synchronize data from the same databases. With RepliByte, you can only replicate data from the same type of
-databases. As mentioned above, the primary purpose of RepliByte is to duplicate into different environments. You can see RepliByte as a
-specific use case of an ETL, where an ETL is more generic.
-
-### RepliByte is not a database backup tool
-
-Even if you can use RepliByte as a database backup tool, we have not designed it this way. It might change in the future, but at the moment
-RepliByte has not been designed to make all the checks needed to guarantee that the backup is consistent.
 
 ## Usage example
 
@@ -104,14 +89,53 @@ Run the app for the destination
 replibyte -c staging-conf.yaml
 ```
 
-## Demo
+## How RepliByte works
 
-*coming soon*
+RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as
+intermediary (bridge). Here is an example of what happens while replicating a Postgres database.
+
+```mermaid
+sequenceDiagram
+    participant RepliByte
+    participant Postgres (Source)
+    participant AWS S3 (Bridge)
+    Postgres (Source)->>RepliByte: 1. Dump data
+    loop Transformer
+        RepliByte->>RepliByte: 2. Obfuscate sensitive data
+    end
+    RepliByte->>AWS S3 (Bridge): 3. Upload obfuscated dump data
+    RepliByte->>AWS S3 (Bridge): 4. Write index file
+```
+
+1. RepliByte connects to the *Postgres Source* database and make a full SQL dump of it.
+2. RepliByte receive the SQL dump, parse it, and obfuscate the sensitive data in real-time.
+3. RepliByte stream and upload the modified SQL dump in real-time on AWS S3.
+4. RepliByte keep track of the uploaded SQL dump by writing into an index file.
+
+---
+
+Once at least a replica from the source Postgres database is available on the S3 bucket, then RepliByte can use it and inject it into the
+destination Postgres.
+
+```mermaid
+sequenceDiagram
+    participant RepliByte
+    participant Postgres (Destination)
+    participant AWS S3 (Bridge)
+    AWS S3 (Bridge)->>RepliByte: 1. Read index file
+    AWS S3 (Bridge)->>RepliByte: 2. Download dump SQL file
+    RepliByte->>Postgres (Destination): 1. Restore dump SQL
+```
+
+1. RepliByte connects to the S3 bucket and read the index file to retrieve the latest SQL to download.
+2. RepliByte download the SQL dump in a stream bytes.
+3. RepliByte restore the SQL dump in the destination Postgres database in real-time.
 
 ## Features
 
 - [x] Full data synchronization
 - [x] Backup TB of data (read [Design](#design))
+- [x] Work on different VPC / network
 
 Here are the features we plan to support
 
@@ -120,19 +144,19 @@ Here are the features we plan to support
 
 ## Connectors
 
-![connection diagram](assets/diagram.svg)
-
 ### Sources
 
 Supported sources connectors:
 
-- [x] Postgres (RDS compatible)
+- [x] Postgres
+- [ ] MySQL (not started)
+- [ ] MongoDB (not started)
 
 ### Bridge
 
 Connector to make the bridge between sources and destinations.
 
-- [ ] S3
+- [ ] S3 (WIP)
 
 The S3 wire protocol is supported by most of the cloud providers. Here is a non-exhaustive list of S3 compatible services.
 
@@ -143,6 +167,7 @@ The S3 wire protocol is supported by most of the cloud providers. Here is a non-
 | Microsoft Azure        | [Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) | Yes            |
 | Digital Ocean          | [Spaces](https://www.digitalocean.com/products/spaces)                    | Yes            |
 | Scaleway               | [Object Storage](https://www.scaleway.com/en/object-storage/)             | Yes            |
+| ...                    | ...                                                                       | ...            |
 
 *Feel free to drop a PR to include another s3 compatible solution.*
 
@@ -150,25 +175,40 @@ The S3 wire protocol is supported by most of the cloud providers. Here is a non-
 
 Supported dest connectors:
 
-- [ ] Postgres (RDS compatible)
+- [ ] Postgres (WIP)
+- [ ] MySQL (not started)
+- [ ] MongoDB (not started)
 
 ## Design
 
-RepliByte is built to replicate small and very large databases from one place to the other with a bridge as intermediary. 
+Here are the design choices made for RepliByte:
 
-### How RepliByte works
+### Low Memory and CPU footprint
 
-```mermaid
-sequenceDiagram
-    participant RepliByte
-    participant Source DB
-    participant S3 (Bridge)
-    RepliByte->>Source DB: Backup
-    loop Transformer
-        RepliByte->>RepliByte: Hide sensitive data
-    end
-    RepliByte->>S3 (Bridge): Upload Source DB data
-```
+Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes
+and does not store anything on a local disk. 
+
+### Limitations
+
+*We'll put all the limitations we are facing here*
+
+- At the moment we have no benchmark - they will come as soon as we move forward.
+
+## What is not RepliByte
+
+### RepliByte is not an ETL
+
+RepliByte is not an ETL like [AirByte](https://github.com/airbytehq/airbyte), [AirFlow](https://airflow.apache.org/), Talend, and it will
+never be. If you need to synchronize versatile data sources, you are better choosing a classic ETL. RepliByte is a tool for software
+engineers to help them to synchronize data from the same databases. With RepliByte, you can only replicate data from the same type of
+databases. As mentioned above, the primary purpose of RepliByte is to duplicate into different environments. You can see RepliByte as a
+specific use case of an ETL, where an ETL is more generic.
+
+### RepliByte is not a database backup tool
+
+Even if you can use RepliByte as a database backup tool, we have not designed it this way. It might change in the future, but at the moment
+RepliByte has not been designed to make all the checks needed to guarantee that the backup is consistent.
+
 
 ## FAQ
 
