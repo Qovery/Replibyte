@@ -5,7 +5,7 @@
 
 <p align="center">
 <img src="https://img.shields.io/badge/stability-work_in_progress-lightgrey.svg?style=flat-square" alt="work in progress badge">
-<img src="https://github.com/Qovery/replibyte/workflows/build-and-test/badge.svg?style=flat-square" alt="Func tests">
+<img src="https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square" alt="Build and Tests">
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
