@@ -47,8 +47,8 @@ where
         let _ = self
             .source
             .stream_rows(self.transformers, |original_row, row| {
-                // TODO
-                println!("{}", row.table_name.as_str());
+                // TODO writing into S3 bucket row by row
+                println!("{:?}", row);
             });
 
         // business execution

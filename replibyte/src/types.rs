@@ -1,7 +1,16 @@
 pub type OriginalRow = Row;
 
+#[derive(Debug, Clone)]
+pub struct Row(pub Vec<u8>);
+
+impl Row {
+    pub fn query(&self) -> &Vec<u8> {
+        &self.0
+    }
+}
+
 #[derive(Clone)]
-pub struct Row {
+pub struct InsertIntoRow {
     pub table_name: String,
     pub columns: Vec<Column>,
 }

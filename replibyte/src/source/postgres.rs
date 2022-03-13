@@ -13,7 +13,7 @@ use crate::connector::Connector;
 use crate::database::Database;
 use crate::source::Source;
 use crate::transformer::Transformer;
-use crate::types::{Column, OriginalRow, Row};
+use crate::types::{Column, InsertIntoRow, OriginalRow, Row};
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -161,17 +161,32 @@ impl<'a> Database for Postgres<'a> {
                         columns.push(column);
                     }
 
+                    let database_name = get_word_value_at_position(&tokens, 4);
+
                     row(
-                        Row {
-                            table_name: table_name.to_string(),
-                            columns: original_columns,
-                        },
-                        Row {
-                            table_name: table_name.to_string(),
-                            columns,
-                        },
+                        to_row(
+                            database_name,
+                            InsertIntoRow {
+                                table_name: table_name.to_string(),
+                                columns: original_columns,
+                            },
+                        ),
+                        to_row(
+                            database_name,
+                            InsertIntoRow {
+                                table_name: table_name.to_string(),
+                                columns,
+                            },
+                        ),
                     )
                 }
+            } else {
+                // other rows than `INSERT INTO ...`
+                row(
+                    // there is no diff between the original and the modified one
+                    Row(query.as_bytes().to_vec()),
+                    Row(query.as_bytes().to_vec()),
+                )
             }
         }) {
             Ok(_) => {}
@@ -194,14 +209,61 @@ impl<'a> Database for Postgres<'a> {
     }
 }
 
+fn to_row(database: Option<&str>, row: InsertIntoRow) -> Row {
+    let mut column_names = Vec::with_capacity(row.columns.len());
+    let mut values = Vec::with_capacity(row.columns.len());
+
+    for column in row.columns {
+        match column {
+            Column::NumberValue(column_name, value) => {
+                column_names.push(column_name);
+                values.push(value.to_string());
+            }
+            Column::FloatNumberValue(column_name, value) => {
+                column_names.push(column_name);
+                values.push(value.to_string());
+            }
+            Column::StringValue(column_name, value) => {
+                column_names.push(column_name);
+                values.push(format!("'{}'", value.replace("'", "''")));
+            }
+            Column::CharValue(column_name, value) => {
+                column_names.push(column_name);
+                values.push(format!("'{}'", value));
+            }
+            Column::None(column_name) => {
+                column_names.push(column_name);
+                values.push("NULL".to_string());
+            }
+        }
+    }
+
+    let query = match database {
+        Some(database) => format!("INSERT INTO {}.", database),
+        None => "INSERT INTO ".to_string(),
+    };
+
+    let mut query = format!(
+        "{}{} ({}) VALUES ({});",
+        query,
+        row.table_name.as_str(),
+        column_names.join(", "),
+        values.join(", "),
+    );
+
+    Row(query.into_bytes())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::database::Database;
-    use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
-    use crate::types::Column;
-    use crate::Postgres;
     use std::collections::HashMap;
     use std::vec;
+
+    use crate::database::Database;
+    use crate::source::postgres::to_row;
+    use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
+    use crate::types::{Column, InsertIntoRow};
+    use crate::Postgres;
 
     fn get_postgres() -> Postgres<'static> {
         Postgres::new("localhost", 5432, "root", "root", "password")
@@ -230,10 +292,66 @@ mod tests {
         let p = get_postgres();
         let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
         let transformers = vec![t1];
-        p.stream_rows(&transformers, |_, row| {
-            assert!(row.table_name.len() > 0);
-            assert!(row.columns.len() > 0);
+        p.stream_rows(&transformers, |original_row, row| {
+            assert!(original_row.query().len() > 0);
+            assert!(row.query().len() > 0);
         });
+    }
+
+    #[test]
+    fn test_to_row() {
+        let row = to_row(
+            None,
+            InsertIntoRow {
+                table_name: "test".to_string(),
+                columns: vec![Column::StringValue(
+                    "first_name".to_string(),
+                    "romaric".to_string(),
+                )],
+            },
+        );
+
+        assert_eq!(
+            row.query(),
+            b"INSERT INTO test (first_name) VALUES ('romaric');"
+        );
+
+        let row = to_row(
+            Some("public"),
+            InsertIntoRow {
+                table_name: "test".to_string(),
+                columns: vec![
+                    Column::StringValue("first_name".to_string(), "romaric".to_string()),
+                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
+                ],
+            },
+        );
+
+        assert_eq!(
+            row.query(),
+            b"INSERT INTO public.test (first_name, height_in_meters) VALUES ('romaric', 1.78);"
+        );
+
+        let row = to_row(
+            Some("public"),
+            InsertIntoRow {
+                table_name: "test".to_string(),
+                columns: vec![
+                    Column::StringValue("first_name".to_string(), "romaric".to_string()),
+                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
+                    Column::StringValue(
+                        "description".to_string(),
+                        "I'll like to say... I don't know.".to_string(),
+                    ),
+                ],
+            },
+        );
+
+        assert_eq!(
+            row.query(),
+            b"INSERT INTO public.test (first_name, height_in_meters, description) \
+            VALUES ('romaric', 1.78, 'I''ll like to say... I don''t know.');"
+        );
     }
 
     #[test]
@@ -249,7 +367,7 @@ mod tests {
 
         let transformers = vec![t1, t2];
 
-        p.stream_rows(&transformers, |original_row, row| {
+        /*p.stream_rows(&transformers, |original_row, row| {
             assert!(row.table_name.len() > 0);
             assert!(row.columns.len() > 0);
 
@@ -290,6 +408,6 @@ mod tests {
                     }
                 }
             }
-        });
+        });*/
     }
 }
