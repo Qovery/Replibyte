@@ -36,15 +36,13 @@ port: 1337
 source:
   connection_uri: $DATABASE_URL
   cron: 0 3 * * * # every day at 3 am
-  transformation:
-    tables:
-      employees:
-        - column: last_name
-          type: string
-          transformer: random 
-        - column: birth_date
-          type: date
-          transformer: date-day
+  transformations:
+    - table: employees
+      columns:
+        - name: last_name
+          transformer: random
+        - name: birth_date
+          transformer: random-date
 bridge:
   type: s3
   bucket: $BUCKET_NAME

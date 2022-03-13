@@ -3,13 +3,6 @@ port: 1337
 source:
   connection_uri: postgres://root:password@localhost:5432/root
   cron: 0 3 * * * # every day at 3 am
-  transformers:
-    - table: employees
-      columns:
-        - name: last_name
-          transformer: random
-        #- name: birth_date
-        #  transformer: random-date
 bridge:
   type: s3
   bucket: replibyte-test

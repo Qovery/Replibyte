@@ -1,3 +1,4 @@
+use crate::{RandomTransformer, Transformer};
 use serde;
 use serde::{Deserialize, Serialize};
 use std::env::VarError;
@@ -9,17 +10,51 @@ use uriparse::{Scheme, URIReference, URIReferenceError};
 pub struct Config {
     pub bind: Ipv4Addr,
     pub port: u16,
-    pub source: Source,
+    pub source: SourceConfig,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Source {
+pub struct SourceConfig {
     pub connection_uri: String,
+    pub transformers: Vec<TransformerConfig>,
 }
 
-impl Source {
+impl SourceConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct TransformerConfig {
+    pub table: String,
+    pub columns: Vec<ColumnConfig>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct ColumnConfig {
+    pub name: String,
+    pub transformer: TransformerTypeConfig,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum TransformerTypeConfig {
+    #[serde(rename = "random")]
+    Random,
+    #[serde(rename = "random-date")]
+    RandomDate,
+}
+
+impl TransformerTypeConfig {
+    pub fn transformer(&self, table_name: &str, column_name: &str) -> Box<dyn Transformer> {
+        let transformer: Box<dyn Transformer> = match self {
+            TransformerTypeConfig::Random => {
+                Box::new(RandomTransformer::new(table_name, column_name))
+            }
+            TransformerTypeConfig::RandomDate => todo!(),
+        };
+
+        transformer
     }
 }
 
@@ -163,7 +198,7 @@ fn substitute_env_var(env_var: &str) -> Result<String, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{parse_connection_uri, substitute_env_var, Source};
+    use crate::config::{parse_connection_uri, substitute_env_var, SourceConfig};
 
     #[test]
     fn substitute_env_variables() {

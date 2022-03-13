@@ -30,15 +30,22 @@ fn main() -> Result<(), Error> {
     // TODO match source or destination type
     // TODO match transformers by name
 
-    let connection_uri = config.source.connection_uri()?;
-
-    let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
-    let t2: Box<dyn Transformer> = Box::new(RandomTransformer::new("fake", "fake_column"));
-    let transformers = vec![t1, t2];
+    let transformers = config
+        .source
+        .transformers
+        .iter()
+        .flat_map(|transformer| {
+            transformer.columns.iter().map(|column| {
+                column
+                    .transformer
+                    .transformer(transformer.table.as_str(), column.name.as_str())
+            })
+        })
+        .collect::<Vec<_>>();
 
     let bridge = S3::new();
 
-    match connection_uri {
+    match config.source.connection_uri()? {
         ConnectionUri::Postgres(host, port, username, password, database) => {
             let postgres = Postgres::new(
                 host.as_str(),
