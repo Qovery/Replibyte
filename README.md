@@ -46,8 +46,9 @@ port: 1337
 source:
   connection_uri: $DATABASE_URL
   cron: 0 3 * * * # every day at 3 am
-  transformations:
-    - table: employees
+  transformers:
+    - database: public
+      table: employees
       columns:
         - name: last_name
           transformer: random
@@ -136,11 +137,11 @@ sequenceDiagram
 - [x] Full data synchronization
 - [x] Backup TB of data (read [Design](#design))
 - [x] Work on different VPC / network
+- [x] Obfuscate sensitive data
 
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
-- [ ] Obfuscate sensitive data
 
 ## Connectors
 

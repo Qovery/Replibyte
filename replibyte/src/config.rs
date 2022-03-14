@@ -27,6 +27,7 @@ impl SourceConfig {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransformerConfig {
+    pub database: String,
     pub table: String,
     pub columns: Vec<ColumnConfig>,
 }
@@ -46,11 +47,18 @@ pub enum TransformerTypeConfig {
 }
 
 impl TransformerTypeConfig {
-    pub fn transformer(&self, table_name: &str, column_name: &str) -> Box<dyn Transformer> {
+    pub fn transformer(
+        &self,
+        database_name: &str,
+        table_name: &str,
+        column_name: &str,
+    ) -> Box<dyn Transformer> {
         let transformer: Box<dyn Transformer> = match self {
-            TransformerTypeConfig::Random => {
-                Box::new(RandomTransformer::new(table_name, column_name))
-            }
+            TransformerTypeConfig::Random => Box::new(RandomTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
             TransformerTypeConfig::RandomDate => todo!(),
         };
 

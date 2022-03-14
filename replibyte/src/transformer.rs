@@ -4,16 +4,23 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 
 pub trait Transformer {
+    fn database_name(&self) -> &str;
     fn table_name(&self) -> &str;
     fn column_name(&self) -> &str;
-    fn table_and_column_name(&self) -> String {
-        format!("{}.{}", self.table_name(), self.column_name())
+    fn database_and_table_and_column_name(&self) -> String {
+        format!(
+            "{}.{}.{}",
+            self.database_name(),
+            self.table_name(),
+            self.column_name()
+        )
     }
     fn transform(&self, column: Column) -> Column;
 }
 
 /// make no transformation
 pub struct NoTransformer {
+    database_name: String,
     table_name: String,
     column_name: String,
 }
@@ -21,6 +28,7 @@ pub struct NoTransformer {
 impl Default for NoTransformer {
     fn default() -> Self {
         NoTransformer {
+            database_name: String::from("database_name"),
             table_name: String::from("no_table_name"),
             column_name: String::from("no_name"),
         }
@@ -28,8 +36,9 @@ impl Default for NoTransformer {
 }
 
 impl NoTransformer {
-    pub fn new<S: Into<String>>(table_name: S, column_name: S) -> Self {
+    pub fn new<S: Into<String>>(database_name: S, table_name: S, column_name: S) -> Self {
         NoTransformer {
+            database_name: database_name.into(),
             table_name: table_name.into(),
             column_name: column_name.into(),
         }
@@ -37,6 +46,10 @@ impl NoTransformer {
 }
 
 impl Transformer for NoTransformer {
+    fn database_name(&self) -> &str {
+        self.database_name.as_str()
+    }
+
     fn table_name(&self) -> &str {
         self.table_name.as_str()
     }
@@ -52,13 +65,15 @@ impl Transformer for NoTransformer {
 
 /// This transformer generate a random element
 pub struct RandomTransformer {
+    database_name: String,
     table_name: String,
     column_name: String,
 }
 
 impl RandomTransformer {
-    pub fn new<S: Into<String>>(table_name: S, column_name: S) -> Self {
+    pub fn new<S: Into<String>>(database_name: S, table_name: S, column_name: S) -> Self {
         RandomTransformer {
+            database_name: database_name.into(),
             table_name: table_name.into(),
             column_name: column_name.into(),
         }
@@ -66,6 +81,10 @@ impl RandomTransformer {
 }
 
 impl Transformer for RandomTransformer {
+    fn database_name(&self) -> &str {
+        self.database_name.as_str()
+    }
+
     fn table_name(&self) -> &str {
         self.table_name.as_str()
     }

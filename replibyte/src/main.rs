@@ -34,9 +34,11 @@ fn main() -> Result<(), Error> {
         .iter()
         .flat_map(|transformer| {
             transformer.columns.iter().map(|column| {
-                column
-                    .transformer
-                    .transformer(transformer.table.as_str(), column.name.as_str())
+                column.transformer.transformer(
+                    transformer.database.as_str(),
+                    transformer.table.as_str(),
+                    column.name.as_str(),
+                )
             })
         })
         .collect::<Vec<_>>();

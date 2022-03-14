@@ -50,11 +50,18 @@ jobs:
       - name: Build RepliByte
         run: cargo build --release
 
+      - name: Start Postgres Containers
+        run: docker-compose -f "docker-compose-postgres.yml" up -d --build
+
       - name: Test RepliByte
         run: cargo test
 
       # - name: Bench RepliByte
       #   run: cargo bench
 
-      - name: Check RepliByte code style
-        run: cargo fmt -- --check
+      #- name: Check RepliByte code style
+      #  run: cargo fmt -- --check
+
+      - name: Stop Postgres Containers
+        if: always()
+        run: docker-compose -f "docker-compose-postgres.yml" down
