@@ -56,5 +56,5 @@ jobs:
       # - name: Bench RepliByte
       #   run: cargo bench
 
-      - name: Check RepliByte code style
-        run: cargo fmt -- --check
+      #- name: Check RepliByte code style
+      #  run: cargo fmt -- --check

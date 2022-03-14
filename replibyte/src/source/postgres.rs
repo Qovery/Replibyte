@@ -256,7 +256,9 @@ fn to_row(database: Option<&str>, row: InsertIntoRow) -> Row {
 
 #[cfg(test)]
 mod tests {
+    use serde_yaml::from_str;
     use std::collections::HashMap;
+    use std::str;
     use std::vec;
 
     use crate::database::Database;
@@ -337,11 +339,27 @@ mod tests {
             InsertIntoRow {
                 table_name: "test".to_string(),
                 columns: vec![
+                    Column::None("first_name".to_string()),
+                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
+                ],
+            },
+        );
+
+        assert_eq!(
+            row.query(),
+            b"INSERT INTO public.test (first_name, height_in_meters) VALUES (NULL, 1.78);"
+        );
+
+        let row = to_row(
+            Some("public"),
+            InsertIntoRow {
+                table_name: "test".to_string(),
+                columns: vec![
                     Column::StringValue("first_name".to_string(), "romaric".to_string()),
                     Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
                     Column::StringValue(
                         "description".to_string(),
-                        "I'll like to say... I don't know.".to_string(),
+                        "I'd like to say... I don't know.".to_string(),
                     ),
                 ],
             },
@@ -350,7 +368,7 @@ mod tests {
         assert_eq!(
             row.query(),
             b"INSERT INTO public.test (first_name, height_in_meters, description) \
-            VALUES ('romaric', 1.78, 'I''ll like to say... I don''t know.');"
+            VALUES ('romaric', 1.78, 'I''d like to say... I don''t know.');"
         );
     }
 
@@ -367,47 +385,18 @@ mod tests {
 
         let transformers = vec![t1, t2];
 
-        /*p.stream_rows(&transformers, |original_row, row| {
-            assert!(row.table_name.len() > 0);
-            assert!(row.columns.len() > 0);
+        p.stream_rows(&transformers, |original_row, row| {
+            assert!(row.query().len() > 0);
+            assert!(row.query().len() > 0);
 
-            let mut original_columns_by_column_name = original_row
-                .columns
-                .iter()
-                .map(|c| (c.name(), c))
-                .collect::<HashMap<_, _>>();
+            let query_str = str::from_utf8(row.query()).unwrap();
 
-            for column in row.columns {
-                if row.table_name.as_str() == table_name
-                    && column.name() == column_name_to_obfuscate
-                {
-                    // check value changed from original column
-                    let original_column =
-                        original_columns_by_column_name.get(column.name()).unwrap();
-
-                    let original_value = original_column.string_value().unwrap();
-
-                    // check that the original value and the new one have the same length
-                    assert_eq!(original_value.len(), column.string_value().unwrap().len());
-
-                    // check that the original value and the new one are not equal
-                    assert_ne!(original_value, column.string_value().unwrap());
-                } else {
-                    // check value is unchanged from the original
-                    let original_column =
-                        original_columns_by_column_name.get(column.name()).unwrap();
-
-                    match original_column {
-                        Column::NumberValue(_, v) => assert_eq!(column.number_value().unwrap(), v),
-                        Column::FloatNumberValue(_, v) => {
-                            assert_eq!(column.float_number_value().unwrap(), v)
-                        }
-                        Column::StringValue(_, v) => assert_eq!(column.string_value().unwrap(), v),
-                        Column::CharValue(_, v) => assert_eq!(column.char_value().unwrap(), v),
-                        Column::None(v) => {}
-                    }
-                }
+            if query_str.contains(table_name) && query_str.starts_with("INSERT INTO") {
+                assert_ne!(row.query(), original_row.query());
+                // TODO to complete to better check the column change only
+            } else {
+                assert_eq!(row.query(), original_row.query());
             }
-        });*/
+        });
     }
 }
