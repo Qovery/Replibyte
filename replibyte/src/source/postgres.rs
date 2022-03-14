@@ -83,12 +83,16 @@ impl<'a> Database for Postgres<'a> {
         let reader = BufReader::new(stdout);
 
         // create a map variable with Transformer by column_name
-        let mut transformer_by_table_and_column_name: HashMap<String, &Box<dyn Transformer>> =
-            HashMap::with_capacity(transformers.len());
+        let mut transformer_by_db_and_table_and_column_name: HashMap<
+            String,
+            &Box<dyn Transformer>,
+        > = HashMap::with_capacity(transformers.len());
 
         for transformer in transformers {
-            let _ = transformer_by_table_and_column_name
-                .insert(transformer.table_and_column_name(), transformer);
+            let _ = transformer_by_db_and_table_and_column_name.insert(
+                transformer.database_and_table_and_column_name(),
+                transformer,
+            );
         }
 
         // TODO we need to check that there is no duplicate
@@ -99,86 +103,90 @@ impl<'a> Database for Postgres<'a> {
             if match_keyword_at_position(Keyword::Insert, &tokens, 0)
                 && match_keyword_at_position(Keyword::Into, &tokens, 2)
             {
-                if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
-                    // find database name by filtering out all queries starting with
-                    // INSERT INTO <database>.<table> (...)
-                    // INSERT       -> position 0
-                    // INTO         -> position 2
-                    // <table>      -> position 6
-                    // L Paren      -> position X?
-                    // R Paren      -> position X?
+                if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
+                    if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+                        // find database name by filtering out all queries starting with
+                        // INSERT INTO <database>.<table> (...)
+                        // INSERT       -> position 0
+                        // INTO         -> position 2
+                        // <table>      -> position 6
+                        // L Paren      -> position X?
+                        // R Paren      -> position X?
 
-                    let column_names = get_column_names_from_insert_into_query(&tokens);
-                    let column_values = get_column_values_from_insert_into_query(&tokens);
+                        let column_names = get_column_names_from_insert_into_query(&tokens);
+                        let column_values = get_column_values_from_insert_into_query(&tokens);
 
-                    let mut original_columns = vec![];
-                    let mut columns = vec![];
+                        let mut original_columns = vec![];
+                        let mut columns = vec![];
 
-                    for (i, column_name) in column_names.iter().enumerate() {
-                        let value_token = column_values.get(i).unwrap();
+                        for (i, column_name) in column_names.iter().enumerate() {
+                            let value_token = column_values.get(i).unwrap();
 
-                        let column = match value_token {
-                            Token::Number(column_value, _) => {
-                                if column_value.contains(".") {
-                                    Column::FloatNumberValue(
-                                        column_name.to_string(),
-                                        column_value.parse::<f64>().unwrap(),
-                                    )
-                                } else {
-                                    Column::NumberValue(
-                                        column_name.to_string(),
-                                        column_value.parse::<i128>().unwrap(),
-                                    )
+                            let column = match value_token {
+                                Token::Number(column_value, _) => {
+                                    if column_value.contains(".") {
+                                        Column::FloatNumberValue(
+                                            column_name.to_string(),
+                                            column_value.parse::<f64>().unwrap(),
+                                        )
+                                    } else {
+                                        Column::NumberValue(
+                                            column_name.to_string(),
+                                            column_value.parse::<i128>().unwrap(),
+                                        )
+                                    }
                                 }
-                            }
-                            Token::Char(column_value) => {
-                                Column::CharValue(column_name.to_string(), column_value.clone())
-                            }
-                            Token::SingleQuotedString(column_value) => {
-                                Column::StringValue(column_name.to_string(), column_value.clone())
-                            }
-                            Token::NationalStringLiteral(column_value) => {
-                                Column::StringValue(column_name.to_string(), column_value.clone())
-                            }
-                            Token::HexStringLiteral(column_value) => {
-                                Column::StringValue(column_name.to_string(), column_value.clone())
-                            }
-                            _ => Column::None(column_name.to_string()),
-                        };
+                                Token::Char(column_value) => {
+                                    Column::CharValue(column_name.to_string(), column_value.clone())
+                                }
+                                Token::SingleQuotedString(column_value) => Column::StringValue(
+                                    column_name.to_string(),
+                                    column_value.clone(),
+                                ),
+                                Token::NationalStringLiteral(column_value) => Column::StringValue(
+                                    column_name.to_string(),
+                                    column_value.clone(),
+                                ),
+                                Token::HexStringLiteral(column_value) => Column::StringValue(
+                                    column_name.to_string(),
+                                    column_value.clone(),
+                                ),
+                                _ => Column::None(column_name.to_string()),
+                            };
 
-                        // get the right transformer for the right column name
-                        let original_column = column.clone();
+                            // get the right transformer for the right column name
+                            let original_column = column.clone();
 
-                        let table_and_column_name = format!("{}.{}", table_name, *column_name);
-                        let column = match transformer_by_table_and_column_name
-                            .get(table_and_column_name.as_str())
-                        {
-                            Some(transformer) => transformer.transform(column), // apply transformation on the column
-                            None => column,
-                        };
+                            let db_and_table_and_column_name =
+                                format!("{}.{}.{}", database_name, table_name, *column_name);
+                            let column = match transformer_by_db_and_table_and_column_name
+                                .get(db_and_table_and_column_name.as_str())
+                            {
+                                Some(transformer) => transformer.transform(column), // apply transformation on the column
+                                None => column,
+                            };
 
-                        original_columns.push(original_column);
-                        columns.push(column);
+                            original_columns.push(original_column);
+                            columns.push(column);
+                        }
+
+                        row(
+                            to_row(
+                                Some(database_name),
+                                InsertIntoRow {
+                                    table_name: table_name.to_string(),
+                                    columns: original_columns,
+                                },
+                            ),
+                            to_row(
+                                Some(database_name),
+                                InsertIntoRow {
+                                    table_name: table_name.to_string(),
+                                    columns,
+                                },
+                            ),
+                        )
                     }
-
-                    let database_name = get_word_value_at_position(&tokens, 4);
-
-                    row(
-                        to_row(
-                            database_name,
-                            InsertIntoRow {
-                                table_name: table_name.to_string(),
-                                columns: original_columns,
-                            },
-                        ),
-                        to_row(
-                            database_name,
-                            InsertIntoRow {
-                                table_name: table_name.to_string(),
-                                columns,
-                            },
-                        ),
-                    )
                 }
             } else {
                 // other rows than `INSERT INTO ...`
@@ -376,12 +384,16 @@ mod tests {
     fn list_rows_and_hide_last_name() {
         let p = get_postgres();
 
+        let database_name = "public";
         let table_name = "employees";
         let column_name_to_obfuscate = "last_name";
 
         let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
-        let t2: Box<dyn Transformer> =
-            Box::new(RandomTransformer::new(table_name, column_name_to_obfuscate));
+        let t2: Box<dyn Transformer> = Box::new(RandomTransformer::new(
+            database_name,
+            table_name,
+            column_name_to_obfuscate,
+        ));
 
         let transformers = vec![t1, t2];
 
@@ -391,7 +403,10 @@ mod tests {
 
             let query_str = str::from_utf8(row.query()).unwrap();
 
-            if query_str.contains(table_name) && query_str.starts_with("INSERT INTO") {
+            if query_str.contains(database_name)
+                && query_str.contains(table_name)
+                && query_str.starts_with("INSERT INTO")
+            {
                 assert_ne!(row.query(), original_row.query());
                 // TODO to complete to better check the column change only
             } else {
