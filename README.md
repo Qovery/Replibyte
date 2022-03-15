@@ -142,7 +142,7 @@ sequenceDiagram
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
-- [ ] Auto-clean up bridge data 
+- [ ] Auto-clean up bridge data
 
 ## Connectors
 
@@ -188,13 +188,31 @@ Here are the design choices made for RepliByte:
 ### Low Memory and CPU footprint
 
 Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes
-and does not store anything on a local disk. 
+and does not store anything on a local disk.
 
 ### Limitations
 
 *We'll put all the limitations we are facing here*
 
 - At the moment we have no benchmark - they will come as soon as we move forward.
+
+### Index file structure
+
+An index file describe the structure of your backups and all of them.
+
+Here is the manifest file that you can find at the root of your target `Bridge` (E.g: S3).
+
+```json
+{
+  "backups": [
+    {
+      "directory": "timestamp",
+      "size": 1024000,
+      "created_at": "iso8601 date format"
+    }
+  ]
+}
+```
 
 ## What is not RepliByte
 
@@ -210,7 +228,6 @@ specific use case of an ETL, where an ETL is more generic.
 
 Even if you can use RepliByte as a database backup tool, we have not designed it this way. It might change in the future, but at the moment
 RepliByte has not been designed to make all the checks needed to guarantee that the backup is consistent.
-
 
 ## FAQ
 
@@ -235,7 +252,6 @@ cargo test
 RepliByte is in its early stage of development and need some time to be usable in production. We need some help, and you are welcome to
 contribute. To better synchronize consider joining our #replibyte channel on our [Discord](https://discord.qovery.com). Otherwise, you can
 pick any open issues and contribute.
-
 
 ### Where should I start?
 

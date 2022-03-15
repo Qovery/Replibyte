@@ -1,12 +1,12 @@
 use std::io::Error;
 
 use crate::transformer::Transformer;
-use crate::types::{OriginalRow, Row};
+use crate::types::{OriginalQuery, Query};
 
 pub trait Database {
-    fn stream_rows<F: FnMut(OriginalRow, Row)>(
+    fn stream_dump_queries<F: FnMut(OriginalQuery, Query)>(
         &self,
         transformers: &Vec<Box<dyn Transformer + '_>>,
-        row: F,
+        query_callback: F,
     ) -> Result<(), Error>;
 }

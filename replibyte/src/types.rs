@@ -1,16 +1,16 @@
-pub type OriginalRow = Row;
+pub type OriginalQuery = Query;
 
 #[derive(Debug, Clone)]
-pub struct Row(pub Vec<u8>);
+pub struct Query(pub Vec<u8>);
 
-impl Row {
-    pub fn query(&self) -> &Vec<u8> {
+impl Query {
+    pub fn data(&self) -> &Vec<u8> {
         &self.0
     }
 }
 
 #[derive(Clone)]
-pub struct InsertIntoRow {
+pub struct InsertIntoQuery {
     pub table_name: String,
     pub columns: Vec<Column>,
 }

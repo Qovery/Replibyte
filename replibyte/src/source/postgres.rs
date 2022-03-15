@@ -13,7 +13,7 @@ use crate::connector::Connector;
 use crate::database::Database;
 use crate::source::Source;
 use crate::transformer::Transformer;
-use crate::types::{Column, InsertIntoRow, OriginalRow, Row};
+use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -50,10 +50,10 @@ impl<'a> Connector for Postgres<'a> {
 impl<'a> Source for Postgres<'a> {}
 
 impl<'a> Database for Postgres<'a> {
-    fn stream_rows<F: FnMut(OriginalRow, Row)>(
+    fn stream_dump_queries<F: FnMut(OriginalQuery, Query)>(
         &self,
         transformers: &Vec<Box<dyn Transformer + '_>>,
-        mut row: F,
+        mut query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
@@ -170,17 +170,17 @@ impl<'a> Database for Postgres<'a> {
                             columns.push(column);
                         }
 
-                        row(
-                            to_row(
+                        query_callback(
+                            to_query(
                                 Some(database_name),
-                                InsertIntoRow {
+                                InsertIntoQuery {
                                     table_name: table_name.to_string(),
                                     columns: original_columns,
                                 },
                             ),
-                            to_row(
+                            to_query(
                                 Some(database_name),
-                                InsertIntoRow {
+                                InsertIntoQuery {
                                     table_name: table_name.to_string(),
                                     columns,
                                 },
@@ -190,10 +190,10 @@ impl<'a> Database for Postgres<'a> {
                 }
             } else {
                 // other rows than `INSERT INTO ...`
-                row(
+                query_callback(
                     // there is no diff between the original and the modified one
-                    Row(query.as_bytes().to_vec()),
-                    Row(query.as_bytes().to_vec()),
+                    Query(query.as_bytes().to_vec()),
+                    Query(query.as_bytes().to_vec()),
                 )
             }
         }) {
@@ -217,11 +217,11 @@ impl<'a> Database for Postgres<'a> {
     }
 }
 
-fn to_row(database: Option<&str>, row: InsertIntoRow) -> Row {
-    let mut column_names = Vec::with_capacity(row.columns.len());
-    let mut values = Vec::with_capacity(row.columns.len());
+fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
+    let mut column_names = Vec::with_capacity(query.columns.len());
+    let mut values = Vec::with_capacity(query.columns.len());
 
-    for column in row.columns {
+    for column in query.columns {
         match column {
             Column::NumberValue(column_name, value) => {
                 column_names.push(column_name);
@@ -246,20 +246,20 @@ fn to_row(database: Option<&str>, row: InsertIntoRow) -> Row {
         }
     }
 
-    let query = match database {
+    let query_prefix = match database {
         Some(database) => format!("INSERT INTO {}.", database),
         None => "INSERT INTO ".to_string(),
     };
 
-    let mut query = format!(
+    let mut query_string = format!(
         "{}{} ({}) VALUES ({});",
-        query,
-        row.table_name.as_str(),
+        query_prefix,
+        query.table_name.as_str(),
         column_names.join(", "),
         values.join(", "),
     );
 
-    Row(query.into_bytes())
+    Query(query_string.into_bytes())
 }
 
 #[cfg(test)]
@@ -270,9 +270,9 @@ mod tests {
     use std::vec;
 
     use crate::database::Database;
-    use crate::source::postgres::to_row;
+    use crate::source::postgres::to_query;
     use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
-    use crate::types::{Column, InsertIntoRow};
+    use crate::types::{Column, InsertIntoQuery};
     use crate::Postgres;
 
     fn get_postgres() -> Postgres<'static> {
@@ -289,12 +289,12 @@ mod tests {
 
         let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
         let transformers = vec![t1];
-        assert!(p.stream_rows(&transformers, |_, _| {}).is_ok());
+        assert!(p.stream_dump_queries(&transformers, |_, _| {}).is_ok());
 
         let p = get_invalid_postgres();
         let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
         let transformers = vec![t1];
-        assert!(p.stream_rows(&transformers, |_, _| {}).is_err());
+        assert!(p.stream_dump_queries(&transformers, |_, _| {}).is_err());
     }
 
     #[test]
@@ -302,17 +302,17 @@ mod tests {
         let p = get_postgres();
         let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
         let transformers = vec![t1];
-        p.stream_rows(&transformers, |original_row, row| {
-            assert!(original_row.query().len() > 0);
-            assert!(row.query().len() > 0);
+        p.stream_dump_queries(&transformers, |original_query, query| {
+            assert!(original_query.data().len() > 0);
+            assert!(query.data().len() > 0);
         });
     }
 
     #[test]
     fn test_to_row() {
-        let row = to_row(
+        let query = to_query(
             None,
-            InsertIntoRow {
+            InsertIntoQuery {
                 table_name: "test".to_string(),
                 columns: vec![Column::StringValue(
                     "first_name".to_string(),
@@ -322,13 +322,13 @@ mod tests {
         );
 
         assert_eq!(
-            row.query(),
+            query.data(),
             b"INSERT INTO test (first_name) VALUES ('romaric');"
         );
 
-        let row = to_row(
+        let query = to_query(
             Some("public"),
-            InsertIntoRow {
+            InsertIntoQuery {
                 table_name: "test".to_string(),
                 columns: vec![
                     Column::StringValue("first_name".to_string(), "romaric".to_string()),
@@ -338,13 +338,13 @@ mod tests {
         );
 
         assert_eq!(
-            row.query(),
+            query.data(),
             b"INSERT INTO public.test (first_name, height_in_meters) VALUES ('romaric', 1.78);"
         );
 
-        let row = to_row(
+        let query = to_query(
             Some("public"),
-            InsertIntoRow {
+            InsertIntoQuery {
                 table_name: "test".to_string(),
                 columns: vec![
                     Column::None("first_name".to_string()),
@@ -354,13 +354,13 @@ mod tests {
         );
 
         assert_eq!(
-            row.query(),
+            query.data(),
             b"INSERT INTO public.test (first_name, height_in_meters) VALUES (NULL, 1.78);"
         );
 
-        let row = to_row(
+        let query = to_query(
             Some("public"),
-            InsertIntoRow {
+            InsertIntoQuery {
                 table_name: "test".to_string(),
                 columns: vec![
                     Column::StringValue("first_name".to_string(), "romaric".to_string()),
@@ -374,7 +374,7 @@ mod tests {
         );
 
         assert_eq!(
-            row.query(),
+            query.data(),
             b"INSERT INTO public.test (first_name, height_in_meters, description) \
             VALUES ('romaric', 1.78, 'I''d like to say... I don''t know.');"
         );
@@ -397,20 +397,20 @@ mod tests {
 
         let transformers = vec![t1, t2];
 
-        p.stream_rows(&transformers, |original_row, row| {
-            assert!(row.query().len() > 0);
-            assert!(row.query().len() > 0);
+        p.stream_dump_queries(&transformers, |original_query, query| {
+            assert!(query.data().len() > 0);
+            assert!(query.data().len() > 0);
 
-            let query_str = str::from_utf8(row.query()).unwrap();
+            let query_str = str::from_utf8(query.data()).unwrap();
 
             if query_str.contains(database_name)
                 && query_str.contains(table_name)
                 && query_str.starts_with("INSERT INTO")
             {
-                assert_ne!(row.query(), original_row.query());
+                assert_ne!(query.data(), original_query.data());
                 // TODO to complete to better check the column change only
             } else {
-                assert_eq!(row.query(), original_row.query());
+                assert_eq!(query.data(), original_query.data());
             }
         });
     }

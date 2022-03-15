@@ -1,6 +1,5 @@
 use crate::types::Column;
-use rand::distributions::{Alphanumeric, Standard};
-use rand::rngs::ThreadRng;
+use rand::distributions::Alphanumeric;
 use rand::Rng;
 
 pub trait Transformer {
