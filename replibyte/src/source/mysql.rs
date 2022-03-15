@@ -58,8 +58,8 @@ impl<'a> Database for Mysql<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
-        let mut process = Command::new("pg_dump")
-            .env("PGPASSWORD", self.password)
+        let mut process = Command::new("mysqldump")
+            .env("MYSQLPASSWORD", self.password)
             .args([
                 "--column-inserts",
                 "-h",
