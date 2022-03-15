@@ -1,0 +1,18 @@
+bind: 127.0.0.1
+port: 1337
+source:
+  connection_uri: mysql://root:password@localhost:5432/root
+  cron: 0 3 * * * # every day at 3 am
+  transformers:
+    - database: public
+      table: employees
+      columns:
+        - name: last_name
+          transformer: random
+        #- name: birth_date
+        #  transformer: random-date
+bridge:
+  type: s3
+  bucket: replibyte-test
+  access_key_id: xxx
+  secret_access_key: yyy

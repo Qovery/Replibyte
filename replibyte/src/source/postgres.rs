@@ -273,7 +273,7 @@ mod tests {
     use crate::source::postgres::to_row;
     use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
     use crate::types::{Column, InsertIntoRow};
-    use crate::Postgres;
+    use crate::source::postgres::Postgres;
 
     fn get_postgres() -> Postgres<'static> {
         Postgres::new("localhost", 5432, "root", "root", "password")

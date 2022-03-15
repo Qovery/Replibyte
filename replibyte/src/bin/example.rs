@@ -1,27 +1,14 @@
-use crate::bridge::s3::S3;
-use crate::config::{Config, ConnectionUri};
+use replibyte::bridge::s3::S3;
+use replibyte::config::{Config, ConnectionUri};
+use replibyte::source::postgres::Postgres;
+use replibyte::tasks::{FullBackupTask, Task};
 use std::fs::File;
 use std::io::Error;
-
-use crate::source::postgres::Postgres;
-use crate::source::Source;
-use crate::tasks::{FullBackupTask, Task};
-use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
-
-mod bridge;
-mod config;
-mod connector;
-mod database;
-mod destination;
-mod source;
-mod tasks;
-pub mod transformer;
-mod types;
 
 fn main() -> Result<(), Error> {
     // TODO implement CLI
 
-    let file = File::open("examples/source-postgres.yaml")?; // FIXME
+    let file = File::open("../../../examples/source-postgres.yaml")?; // FIXME
     let config: Config = match serde_yaml::from_reader(file) {
         Ok(config) => config,
         Err(err) => panic!("{:?}", err),

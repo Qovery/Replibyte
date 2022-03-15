@@ -1,6 +1,6 @@
 use crate::bridge::Bridge;
 use crate::transformer::Transformer;
-use crate::Source;
+use crate::source::Source;
 use std::io::Error;
 
 pub trait Task {

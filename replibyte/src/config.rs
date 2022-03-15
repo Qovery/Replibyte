@@ -1,4 +1,4 @@
-use crate::{RandomTransformer, Transformer};
+use crate::transformer::{RandomTransformer, Transformer};
 use serde;
 use serde::{Deserialize, Serialize};
 use std::env::VarError;
@@ -164,7 +164,7 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
             get_password(&uri_ref)?,
             get_database(&uri_ref, Some("public"))?,
         ),
-        Some(err) if err.as_str().to_lowercase() == "mysql" => ConnectionUri::Postgres(
+        Some(err) if err.as_str().to_lowercase() == "mysql" => ConnectionUri::Mysql(
             get_host(&uri_ref)?,
             get_port(&uri_ref, 3306)?,
             get_username(&uri_ref)?,

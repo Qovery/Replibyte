@@ -89,7 +89,7 @@ impl<'a> Database for Mysql<'a> {
 
         for transformer in transformers {
             let _ = transformer_by_table_and_column_name
-                .insert(transformer.table_and_column_name(), transformer);
+                .insert(transformer.database_and_table_and_column_name(), transformer);
         }
 
         // TODO we need to check that there is no duplicate
