@@ -302,13 +302,12 @@ mod tests {
         let p = get_postgres();
         let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
         let transformers = vec![t1];
-        println!("aca");
-        p.stream_rows(&transformers, |original_row, row| {
-            println!("pase");
-            assert!(false);
+        let result = p.stream_rows(&transformers, |original_row, row| {
             assert!(original_row.query().len() > 0);
             assert!(row.query().len() > 0);
         });
+
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -355,7 +354,7 @@ mod tests {
 
         let transformers = vec![t1, t2];
 
-        p.stream_rows(&transformers, |original_row, row| {
+        let result = p.stream_rows(&transformers, |original_row, row| {
             assert!(row.query().len() > 0);
             assert!(row.query().len() > 0);
 
@@ -371,5 +370,6 @@ mod tests {
                 assert_eq!(row.query(), original_row.query());
             }
         });
+        assert!(result.is_ok());
     }
 }
