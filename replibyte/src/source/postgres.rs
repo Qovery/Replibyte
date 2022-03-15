@@ -80,7 +80,6 @@ impl<'a> Database for Postgres<'a> {
 		    .take()
 		    .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
 
-		println!("{}", stdout);
 		let reader = BufReader::new(stdout);
 
 		// create a map variable with Transformer by column_name
@@ -319,22 +318,6 @@ impl<'a> Database for Postgres<'a> {
             InsertIntoRow {
                 table_name: "test".to_string(),
                 columns: vec![
-                    Column::None("first_name".to_string()),
-                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
-                ],
-            },
-        );
-
-        assert_eq!(
-            row.query(),
-            b"INSERT INTO public.test (first_name, height_in_meters) VALUES (NULL, 1.78);"
-        );
-
-        let row = to_row(
-            Some("public"),
-            InsertIntoRow {
-                table_name: "test".to_string(),
-                columns: vec![
                     Column::StringValue("first_name".to_string(), "romaric".to_string()),
                     Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
                     Column::NumberValue("height_in_centimeters".to_string(), 178),
@@ -351,7 +334,7 @@ impl<'a> Database for Postgres<'a> {
         assert_eq!(
             row.query(),
             b"INSERT INTO public.test (first_name, height_in_meters, height_in_centimeters, description, checked, nullish) \
-            VALUES ('romaric', 1.78, 178, 'I''ll like to say... I don''t know.', 'Y', NULL);"
+            VALUES ('romaric', 1.78, 178, 'I''d like to say... I don''t know.', 'Y', NULL);"
         );
     }
 
