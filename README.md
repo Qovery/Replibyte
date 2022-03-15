@@ -142,6 +142,7 @@ sequenceDiagram
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
+- [ ] Auto-clean up bridge data 
 
 ## Connectors
 
@@ -235,7 +236,18 @@ RepliByte is in its early stage of development and need some time to be usable i
 contribute. To better synchronize consider joining our #replibyte channel on our [Discord](https://discord.qovery.com). Otherwise, you can
 pick any open issues and contribute.
 
-Any questions? drop us an email to `github+replibyte {at} qovery {dot} com`
+
+### Where should I start?
+
+Check the open [issues](https://github.com/Qovery/replibyte/issues) and their priority.
+
+### How can I contact you?
+
+3 options:
+
+1. Open an [issue](https://github.com/Qovery/replibyte/issues).
+2. Join our #replibyte channel on [our discord](https://discord.qovery.com).
+3. Drop us an email to `github+replibyte {at} qovery {dot} com`.
 
 ## Live Coding Session
 
