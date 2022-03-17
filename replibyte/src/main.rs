@@ -1,12 +1,13 @@
-use crate::bridge::s3::S3;
-use crate::config::{Config, ConnectionUri};
 use std::fs::File;
 use std::io::Error;
+use std::path::PathBuf;
 
+use crate::bridge::s3::S3;
+use crate::config::{Config, ConnectionUri};
 use crate::source::postgres::Postgres;
 use crate::source::Source;
 use crate::tasks::{FullBackupTask, Task};
-use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
+use clap::Parser;
 
 mod bridge;
 mod config;
@@ -15,13 +16,21 @@ mod database;
 mod destination;
 mod source;
 mod tasks;
-pub mod transformer;
+mod transformer;
 mod types;
 
-fn main() -> Result<(), Error> {
-    // TODO implement CLI
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
+    config: PathBuf,
+    // TODO list available transformers
+}
 
-    let file = File::open("examples/source-postgres.yaml")?; // FIXME
+fn main() -> Result<(), Error> {
+    let args = Args::parse();
+
+    let file = File::open(args.config)?; // FIXME
     let config: Config = match serde_yaml::from_reader(file) {
         Ok(config) => config,
         Err(err) => panic!("{:?}", err),

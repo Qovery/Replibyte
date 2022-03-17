@@ -1,10 +1,10 @@
-use crate::{RandomTransformer, Transformer};
+use crate::transformer::random::RandomTransformer;
+use crate::transformer::Transformer;
 use serde;
 use serde::{Deserialize, Serialize};
-use std::env::VarError;
 use std::io::{Error, ErrorKind};
 use std::net::Ipv4Addr;
-use uriparse::{Scheme, URIReference, URIReferenceError};
+use uriparse::URIReference;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
@@ -206,7 +206,7 @@ fn substitute_env_var(env_var: &str) -> Result<String, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{parse_connection_uri, substitute_env_var, SourceConfig};
+    use crate::config::{parse_connection_uri, substitute_env_var};
 
     #[test]
     fn substitute_env_variables() {

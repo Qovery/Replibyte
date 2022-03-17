@@ -1,5 +1,7 @@
 pub type OriginalQuery = Query;
 
+pub type Queries = Vec<Query>;
+
 #[derive(Debug, Clone)]
 pub struct Query(pub Vec<u8>);
 

@@ -251,7 +251,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
         None => "INSERT INTO ".to_string(),
     };
 
-    let mut query_string = format!(
+    let query_string = format!(
         "{}{} ({}) VALUES ({});",
         query_prefix,
         query.table_name.as_str(),
@@ -264,14 +264,14 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
-    use serde_yaml::from_str;
-    use std::collections::HashMap;
     use std::str;
     use std::vec;
 
     use crate::database::Database;
     use crate::source::postgres::to_query;
-    use crate::transformer::{NoTransformer, RandomTransformer, Transformer};
+    use crate::transformer::random::RandomTransformer;
+    use crate::transformer::transient::TransientTransformer;
+    use crate::transformer::Transformer;
     use crate::types::{Column, InsertIntoQuery};
     use crate::Postgres;
 
@@ -287,12 +287,12 @@ mod tests {
     fn connect() {
         let p = get_postgres();
 
-        let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         assert!(p.stream_dump_queries(&transformers, |_, _| {}).is_ok());
 
         let p = get_invalid_postgres();
-        let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         assert!(p.stream_dump_queries(&transformers, |_, _| {}).is_err());
     }
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn list_rows() {
         let p = get_postgres();
-        let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         p.stream_dump_queries(&transformers, |original_query, query| {
             assert!(original_query.data().len() > 0);
@@ -388,7 +388,7 @@ mod tests {
         let table_name = "employees";
         let column_name_to_obfuscate = "last_name";
 
-        let t1: Box<dyn Transformer> = Box::new(NoTransformer::default());
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let t2: Box<dyn Transformer> = Box::new(RandomTransformer::new(
             database_name,
             table_name,

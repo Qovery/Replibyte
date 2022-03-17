@@ -206,7 +206,7 @@ Here is the manifest file that you can find at the root of your target `Bridge` 
 {
   "backups": [
     {
-      "directory": "timestamp",
+      "directory_name": "timestamp",
       "size": 1024000,
       "created_at": "iso8601 date format"
     }
