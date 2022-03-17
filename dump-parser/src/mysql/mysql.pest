@@ -1,0 +1,82 @@
+file = { table_definition | insert_statement | row_value_expression_list }
+
+insert_statement = { INSERT ~ INTO ~ insertion_target ~ insert_column_and_source ~ VALUES ~ row_value_expression_list ~ semicolon }
+row_value_expression_list = { left_paren ~ table_row_value_expression ~ right_paren }
+table_row_value_expression = { row_value_constructor ~ ( comma ~ row_value_constructor )* }
+row_value_constructor = {
+    numeric_value_expression |
+    character_string_literal |
+    NULL
+}
+numeric_value_expression = { digit+ }
+character_string_literal = { quote ~ character_representation* ~ quote }
+character_representation = { ASCII_ALPHANUMERIC }
+insertion_target = { identifier }
+insert_column_and_source = { left_paren ~ column_name_list ~ right_paren }
+column_name_list = { identifier ~ ( comma ~ identifier )* }
+
+key_word = {
+    CREATE |
+    TABLE
+}
+
+table_definition = { CREATE ~ TABLE ~ table_name ~ table_element_list ~ semicolon }
+table_name = { identifier }
+table_element_list = { left_paren ~ table_element ~ right_paren }
+CREATE = { ^"create" }
+TABLE = { ^"table" }
+INSERT = { ^"insert" }
+INTO = { ^"into" }
+VALUES = { ^"values" }
+
+table_element = { column_name ~ exact_numeric_type ~ column_constraint_definition* }
+column_name = { identifier }
+identifier = @{ ASCII_ALPHA ~ identifier_part* }
+identifier_part = { ASCII_ALPHANUMERIC | "_" }
+column_constraint_definition = { column_constraint }
+column_constraint = { NOT ~ NULL }
+NOT = { ^"not" }
+NULL = { ^"null" }
+
+exact_numeric_type = {
+    ^"smallint"
+}
+
+sql_language_character = { simple_latin_letter | digit | sql_special_character }
+
+simple_latin_letter = { ASCII_ALPHA }
+digit = { ASCII_DIGIT }
+sql_special_character = {
+    "\"" |
+    "%" |
+    "&" |
+    quote |
+    left_paren |
+    right_paren |
+    "*" |
+    "+" |
+    comma |
+    "-" |
+    "." |
+    "/" |
+    ":" |
+    semicolon |
+    "<" |
+    "=" |
+    ">" |
+    "?" |
+    "[" |
+    "]" |
+    "^" |
+    "_" |
+    "|" |
+    "{" |
+    "}"
+}
+
+quote = { "'" }
+left_paren = { "(" }
+right_paren = { ")" }
+comma = { "," }
+semicolon = { ";" }
+WHITESPACE = _{ " " }

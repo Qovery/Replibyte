@@ -4,6 +4,7 @@ use crate::errors::DumpFileError;
 
 pub mod errors;
 pub mod postgres;
+pub mod mysql;
 pub mod utils;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
