@@ -148,6 +148,12 @@ Here are the features we plan to support
 - [ ] MySQL (Coming Soon)
 - [ ] MongoDB (Coming Soon)
 
+### Supported Transformers
+
+A transformer is useful to change / hide the value of a column. RepliByte provides pre-made transformers.
+
+Check out the [list of our available Transformers](TRANSFORMERS.md)
+
 ### RepliByte Bridge
 
 The S3 wire protocol, used by RepliByte bridge, is supported by most cloud providers. Here is a non-exhaustive list of S3 compatible services.

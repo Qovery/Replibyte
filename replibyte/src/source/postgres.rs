@@ -43,6 +43,7 @@ impl<'a> Postgres<'a> {
 
 impl<'a> Connector for Postgres<'a> {
     fn init(&mut self) -> Result<(), Error> {
+        // TODO check pg_dump binary available
         Ok(())
     }
 }
