@@ -1,3 +1,4 @@
+use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::random::RandomTransformer;
 use crate::transformer::Transformer;
 use serde;
@@ -44,6 +45,8 @@ pub enum TransformerTypeConfig {
     Random,
     #[serde(rename = "random-date")]
     RandomDate,
+    #[serde(rename = "first-name")]
+    FirstName,
 }
 
 impl TransformerTypeConfig {
@@ -55,6 +58,11 @@ impl TransformerTypeConfig {
     ) -> Box<dyn Transformer> {
         let transformer: Box<dyn Transformer> = match self {
             TransformerTypeConfig::Random => Box::new(RandomTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::FirstName => Box::new(FirstNameTransformer::new(
                 database_name,
                 table_name,
                 column_name,

@@ -16,3 +16,4 @@ aws-sdk-s3 = "0.9.0"
 dump-parser = { path = "../dump-parser" }
 clap = { version = "3.1", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
+fake = "2.4"

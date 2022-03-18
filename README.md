@@ -52,6 +52,8 @@ source:
           transformer: random
         - name: birth_date
           transformer: random-date
+        - name: first_name
+          transformer: first-name
 bridge:
   type: s3
   bucket: $BUCKET_NAME
