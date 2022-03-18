@@ -11,7 +11,7 @@ row_value_constructor = {
 numeric_value_expression = { digit+ }
 character_string_literal = { quote ~ character_representation* ~ quote }
 character_representation = { ASCII_ALPHANUMERIC }
-insertion_target = { identifier }
+insertion_target = { local_or_schema_qualified_name }
 insert_column_and_source = { left_paren ~ column_name_list ~ right_paren }
 column_name_list = { identifier ~ ( comma ~ identifier )* }
 
@@ -21,7 +21,8 @@ key_word = {
 }
 
 table_definition = { CREATE ~ TABLE ~ table_name ~ table_element_list ~ semicolon }
-table_name = { identifier }
+table_name = { local_or_schema_qualified_name }
+local_or_schema_qualified_name = { ( identifier ~ period )? ~ identifier }
 table_element_list = { left_paren ~ table_element ~ right_paren }
 CREATE = { ^"create" }
 TABLE = { ^"table" }
@@ -57,7 +58,7 @@ sql_special_character = {
     "+" |
     comma |
     "-" |
-    "." |
+    period |
     "/" |
     ":" |
     semicolon |
@@ -78,5 +79,6 @@ quote = { "'" }
 left_paren = { "(" }
 right_paren = { ")" }
 comma = { "," }
+period = { "." }
 semicolon = { ";" }
 WHITESPACE = _{ " " }

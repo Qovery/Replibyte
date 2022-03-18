@@ -21,11 +21,11 @@ mod tests {
 
     #[test]
     fn create_table_statement() {
-        print_tokens("CREATE TABLE public ( order_id smallint NOT NULL );");
+        print_tokens("CREATE TABLE public.orders ( order_id smallint NOT NULL );");
     }
 
     #[test]
     fn insert_into_statement() {
-        print_tokens("INSERT INTO public (customer_id, company_name, contact_name, contact_title) VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);");
+        print_tokens("INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title) VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);");
     }
 }
