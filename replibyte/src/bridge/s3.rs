@@ -1,13 +1,9 @@
 use std::io::{Error, ErrorKind};
 
 use aws_config::provider_config::ProviderConfig;
-use aws_sdk_s3::error::CreateBucketError;
 use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration};
-use aws_sdk_s3::output::CreateBucketOutput;
-use aws_sdk_s3::types::SdkError;
 use aws_sdk_s3::Client;
 use aws_types::os_shim_internal::Env;
-use dump_parser::postgres::Keyword::Into;
 use log::{error, info};
 
 use crate::bridge::{Bridge, IndexFile};
