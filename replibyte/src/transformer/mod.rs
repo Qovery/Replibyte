@@ -3,7 +3,10 @@ use crate::types::Column;
 pub mod random;
 pub mod transient;
 
-pub const TRANSFORMERS: [&str; 2] = ["transient", "random"];
+pub enum Transformers {
+    Random,
+    Transient,
+}
 
 /// Trait to implement to create a custom Transformer.
 pub trait Transformer {

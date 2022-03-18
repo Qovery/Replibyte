@@ -89,3 +89,7 @@ fabric.properties
 # vendor/
 
 /target/
+
+# Configuration files
+prod-conf.yaml
+.prod-conf.yaml

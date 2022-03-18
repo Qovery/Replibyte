@@ -1,7 +1,7 @@
 use crate::transformer::Transformer;
 use crate::types::Column;
 
-/// make no transformation
+/// This transformer will not make any changes.
 pub struct TransientTransformer {
     database_name: String,
     table_name: String,
@@ -19,11 +19,14 @@ impl Default for TransientTransformer {
 }
 
 impl TransientTransformer {
-    pub fn new<S: Into<String>>(database_name: S, table_name: S, column_name: S) -> Self {
+    pub fn new<S>(database_name: S, table_name: S, column_name: S) -> Self
+    where
+        S: Into<String>,
+    {
         TransientTransformer {
-            database_name: database_name.into(),
             table_name: table_name.into(),
             column_name: column_name.into(),
+            database_name: database_name.into(),
         }
     }
 }

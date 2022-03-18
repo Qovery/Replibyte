@@ -1,5 +1,4 @@
 use std::fs::File;
-use std::io::Error;
 use std::path::PathBuf;
 
 use crate::bridge::s3::S3;
@@ -24,19 +23,18 @@ mod types;
 struct Args {
     #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
     config: PathBuf,
-    // TODO list available transformers
+    // TODO: List available transformers
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let file = File::open(args.config)?; // FIXME
-    let config: Config = match serde_yaml::from_reader(file) {
-        Ok(config) => config,
-        Err(err) => panic!("{:?}", err),
-    };
+    let bridge = S3::new();
+    // ! TODO: Fix this line.
+    let file = File::open(args.config)?;
+    let config: Config = serde_yaml::from_reader(file)?;
 
-    // match transformers from conf
+    // Match the transformers from the config
     let transformers = config
         .source
         .transformers
@@ -52,8 +50,6 @@ fn main() -> Result<(), Error> {
         })
         .collect::<Vec<_>>();
 
-    let bridge = S3::new();
-
     match config.source.connection_uri()? {
         ConnectionUri::Postgres(host, port, username, password, database) => {
             let postgres = Postgres::new(
@@ -64,13 +60,15 @@ fn main() -> Result<(), Error> {
                 password.as_str(),
             );
 
-            let mut task = FullBackupTask::new(postgres, &transformers, bridge);
-            task.run()
+            let task = FullBackupTask::new(postgres, &transformers, bridge);
+            task.run()?
         }
         ConnectionUri::Mysql(host, port, username, password, database) => {
             todo!()
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
