@@ -1,67 +1,7 @@
+use crate::transformer::Transformer;
 use crate::types::Column;
-use rand::distributions::{Alphanumeric, Standard};
-use rand::rngs::ThreadRng;
+use rand::distributions::Alphanumeric;
 use rand::Rng;
-
-pub trait Transformer {
-    fn database_name(&self) -> &str;
-    fn table_name(&self) -> &str;
-    fn column_name(&self) -> &str;
-    fn database_and_table_and_column_name(&self) -> String {
-        format!(
-            "{}.{}.{}",
-            self.database_name(),
-            self.table_name(),
-            self.column_name()
-        )
-    }
-    fn transform(&self, column: Column) -> Column;
-}
-
-/// make no transformation
-pub struct NoTransformer {
-    database_name: String,
-    table_name: String,
-    column_name: String,
-}
-
-impl Default for NoTransformer {
-    fn default() -> Self {
-        NoTransformer {
-            database_name: String::from("database_name"),
-            table_name: String::from("no_table_name"),
-            column_name: String::from("no_name"),
-        }
-    }
-}
-
-impl NoTransformer {
-    pub fn new<S: Into<String>>(database_name: S, table_name: S, column_name: S) -> Self {
-        NoTransformer {
-            database_name: database_name.into(),
-            table_name: table_name.into(),
-            column_name: column_name.into(),
-        }
-    }
-}
-
-impl Transformer for NoTransformer {
-    fn database_name(&self) -> &str {
-        self.database_name.as_str()
-    }
-
-    fn table_name(&self) -> &str {
-        self.table_name.as_str()
-    }
-
-    fn column_name(&self) -> &str {
-        self.column_name.as_str()
-    }
-
-    fn transform(&self, column: Column) -> Column {
-        column
-    }
-}
 
 /// This transformer generate a random element
 pub struct RandomTransformer {
@@ -81,6 +21,14 @@ impl RandomTransformer {
 }
 
 impl Transformer for RandomTransformer {
+    fn id(&self) -> &str {
+        "random"
+    }
+
+    fn description(&self) -> &str {
+        "Randomize value but keep the same length (string only). [AAA]->[BBB]"
+    }
+
     fn database_name(&self) -> &str {
         self.database_name.as_str()
     }

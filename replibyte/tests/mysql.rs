@@ -1,7 +1,6 @@
 use replibyte::bridge::s3::S3;
 use replibyte::config::{Config, ConnectionUri};
 use replibyte::source::mysql::Mysql;
-use replibyte::tasks::{FullBackupTask, Task};
 use std::fs::File;
 use std::path::Path;
 
@@ -12,7 +11,7 @@ fn test_source_connection_uri() {
 
     let config: Config = serde_yaml::from_reader(file).expect("unexpected structure of source");
 
-    let transformers = config
+    let _transformers = config
         .source
         .transformers
         .iter()
@@ -27,21 +26,18 @@ fn test_source_connection_uri() {
         })
         .collect::<Vec<_>>();
 
-    let bridge = S3::new();
+    let _bridge = S3::new();
 
     match config.source.connection_uri().expect("invalid URI scheme") {
         ConnectionUri::Mysql(host, port, username, password, database) => {
-            let mysql = Mysql::new(
+            let _mysql = Mysql::new(
                 host.as_str(),
                 port,
                 database.as_str(),
                 username.as_str(),
                 password.as_str(),
             );
-            println!("{:?}", mysql);
-
-            let mut task = FullBackupTask::new(mysql, &transformers, bridge);
-            task.run().expect("synchronization failure");
+            todo!();
         }
         _ => panic!("not mysql connection URI"),
     }
