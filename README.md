@@ -1,4 +1,4 @@
-![replibyte cover](assets/replibyte%20-%20synchronize%20your%20cloud%20databases.jpg)
+<p align="center"> <img src="assets/RepliByte.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">The Simplest Way To Synchronize Your Cloud Databases</h3>
 <p align="center">Replibyte is a standalone application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
@@ -17,15 +17,17 @@
 
 ## Motivation
 
-At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases just with one click. However, the cloning process can be tedious and time-consuming and we end up copying the information multiple times. With RepliByte, the Qovery team wants to provide a comprehensive way to seed cloud databases from one place to another.
+At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases just with one
+click. However, the cloning process can be tedious and time-consuming, and we end up copying the information multiple times. With RepliByte,
+the Qovery team wants to provide a comprehensive way to seed cloud databases from one place to another.
 
-<!-- The problem is that when they clone them, the data from the databases are duplicated Cloning data can be tedious, and we end up reinventing
-the wheel. With RepliByte, the Qovery team wants to provide a comprehensive way to replicate cloud databases from one place to the other. -->
+The long-term motivation behind RepliByte is to provide a way to clone any database in real-time. This project starts small, but has big
+ambition!
 
 ## Use cases
 
 | Scenario                                                                | Supported |
-| ----------------------------------------------------------------------- | --------- |
+|-------------------------------------------------------------------------|-----------|
 | Synchronize the _whole_ Postgres instance and generate fake information | WIP       |
 | Synchronize specific Postgres _tables_ and generate fake information    | WIP       |
 | Synchronize specific Postgres _databases_ and generate fake information | WIP       |
@@ -92,7 +94,8 @@ replibyte -c staging-conf.yaml
 
 ## How RepliByte works
 
-RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as intermediary (bridge). Here is an example of what happens while replicating a Postgres database.
+RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as
+intermediary (bridge). Here is an example of what happens while replicating a Postgres database.
 
 ```mermaid
 sequenceDiagram
@@ -114,7 +117,8 @@ sequenceDiagram
 
 ---
 
-Once at least a replica from the source Postgres database is available in the S3 bucket, RepliByte can use and inject it into the destination PostgresSQL database.
+Once at least a replica from the source Postgres database is available in the S3 bucket, RepliByte can use and inject it into the
+destination PostgresSQL database.
 
 ```mermaid
 sequenceDiagram
@@ -158,10 +162,11 @@ Check out the [list of our available Transformers](TRANSFORMERS.md)
 
 ### RepliByte Bridge
 
-The S3 wire protocol, used by RepliByte bridge, is supported by most cloud providers. Here is a non-exhaustive list of S3 compatible services.
+The S3 wire protocol, used by RepliByte bridge, is supported by most cloud providers. Here is a non-exhaustive list of S3 compatible
+services.
 
 | Cloud Service Provider | S3 service name                                                           | S3 compatible  |
-| ---------------------- | ------------------------------------------------------------------------- | -------------- |
+|------------------------|---------------------------------------------------------------------------|----------------|
 | Amazon Web Services    | [S3](https://aws.amazon.com/s3/)                                          | Yes (Original) |
 | Google Cloud Platform  | [Cloud Storage](https://cloud.google.com/storage)                         | Yes            |
 | Microsoft Azure        | [Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) | Yes            |
@@ -182,7 +187,8 @@ Currently, we support the following connectors for RepliByte bridge:
 
 ### Low Memory and CPU footprint
 
-Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes and does not store anything on a local disk.
+Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes
+and does not store anything on a local disk.
 
 ### Limitations
 
@@ -229,8 +235,9 @@ RepliByte has not been designed to make all the checks needed to guarantee that 
 
 ## Local development
 
-For local development, you will need to install [Docker](https://www.docker.com/) and run `docker-compose up` to start the local
-databases. At the moment, `docker-compose` includes 2 Postgres database instances. One source and one destination database. In the future, we will provide more options.
+For local development, you will need to install [Docker](https://www.docker.com/) and run `docker-compose up` to start the local databases.
+At the moment, `docker-compose` includes 2 Postgres database instances. One source and one destination database. In the future, we will
+provide more options.
 
 Once your Docker instances are running, you can run the RepliByte tests, to check if everything is configured correctly:
 
