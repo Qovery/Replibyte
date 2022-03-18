@@ -7,12 +7,14 @@ source:
     - database: public
       table: employees
       columns:
+        - name: fist_name
+          transformer: first-name
         - name: last_name
           transformer: random
         #- name: birth_date
         #  transformer: random-date
 bridge:
-  type: s3
   bucket: replibyte-test
-  access_key_id: xxx
-  secret_access_key: yyy
+  region: us-east-1
+  access_key_id: $AWS_ACCESS_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY

@@ -12,6 +12,39 @@ pub struct Config {
     pub bind: Ipv4Addr,
     pub port: u16,
     pub source: SourceConfig,
+    pub bridge: BridgeConfig,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct BridgeConfig {
+    // At the moment we do support only S3 as B,
+    // in a near future we'll need to make it generic
+    pub bucket: String,
+    pub region: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+}
+
+impl BridgeConfig {
+    /// decode and return the bucket value
+    pub fn bucket(&self) -> Result<String, Error> {
+        substitute_env_var(self.bucket.as_str())
+    }
+
+    /// decode and return the region value
+    pub fn region(&self) -> Result<String, Error> {
+        substitute_env_var(self.region.as_str())
+    }
+
+    /// decode and return the access_key_id value
+    pub fn access_key_id(&self) -> Result<String, Error> {
+        substitute_env_var(self.access_key_id.as_str())
+    }
+
+    /// decode and return the secret_access_key value
+    pub fn secret_access_key(&self) -> Result<String, Error> {
+        substitute_env_var(self.secret_access_key.as_str())
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

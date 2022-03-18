@@ -13,6 +13,7 @@ mod config;
 mod connector;
 mod database;
 mod destination;
+mod runtime;
 mod source;
 mod tasks;
 mod transformer;
@@ -29,10 +30,16 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let bridge = S3::new();
     // ! TODO: Fix this line.
     let file = File::open(args.config)?;
     let config: Config = serde_yaml::from_reader(file)?;
+
+    let bridge = S3::new(
+        config.bridge.bucket()?,
+        config.bridge.region()?,
+        config.bridge.access_key_id()?,
+        config.bridge.secret_access_key()?,
+    );
 
     // Match the transformers from the config
     let transformers = config

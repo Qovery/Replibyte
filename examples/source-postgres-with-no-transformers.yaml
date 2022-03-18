@@ -4,7 +4,7 @@ source:
   connection_uri: postgres://root:password@localhost:5432/root
   cron: 0 3 * * * # every day at 3 am
 bridge:
-  type: s3
   bucket: replibyte-test
-  access_key_id: xxx
-  secret_access_key: yyy
+  region: us-east-1
+  access_key_id: $AWS_ACCESS_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY

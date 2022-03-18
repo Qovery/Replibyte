@@ -12,7 +12,7 @@ source:
         #- name: birth_date
         #  transformer: random-date
 bridge:
-  type: s3
   bucket: $BUCKET_NAME
-  access_key_id: $ACCESS_KEY_ID
+  region: us-east-1
+  access_key_id: $AWS_ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
