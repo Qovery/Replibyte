@@ -4,11 +4,11 @@ use std::io::Error;
 
 pub mod s3;
 
-struct IndexFile {
+pub struct IndexFile {
     backups: Vec<Backup>,
 }
 
-struct Backup {
+pub struct Backup {
     directory_name: String,
     size: usize,
     created_at: u64,
