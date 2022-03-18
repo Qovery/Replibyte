@@ -9,34 +9,32 @@
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
----------
+---
 
 **⚠️ DEVELOPMENT IN PROGRESS - CONTRIBUTORS WANTED!! [JOIN DISCORD](https://discord.qovery.com)**
 
----------
+---
 
 ## Motivation
 
-At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases in one click. The
-problem is that when they clone them, the data from the databases are not duplicated. Cloning data can be tedious, and we end up reinventing
-the wheel. With RepliByte, the Qovery team wants to provide a comprehensive way to replicate cloud databases from one place to the other.
+At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases just with one click. However, the cloning process can be tedious and time-consuming and we end up copying the information multiple times. With RepliByte, the Qovery team wants to provide a comprehensive way to seed cloud databases from one place to another.
+
+<!-- The problem is that when they clone them, the data from the databases are duplicated Cloning data can be tedious, and we end up reinventing
+the wheel. With RepliByte, the Qovery team wants to provide a comprehensive way to replicate cloud databases from one place to the other. -->
 
 ## Use cases
 
-RepliByte is built to respond to the following use cases:
-
-| scenario                                                             | supported |
-|----------------------------------------------------------------------|-----------|
-| Synchronize full Postgres instance and obfuscate sensitive data      | WIP       |
-| Synchronize specific Postgres databases and obfuscate sensitive data | WIP       |
-| Synchronize specific Postgres tables and obfuscate sensitive data    | WIP       |
-| ...                                                                  | ...       |
+| Scenario                                                                | Supported |
+| ----------------------------------------------------------------------- | --------- |
+| Synchronize the _whole_ Postgres instance and generate fake information | WIP       |
+| Synchronize specific Postgres _tables_ and generate fake information    | WIP       |
+| Synchronize specific Postgres _databases_ and generate fake information | WIP       |
 
 > Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
 ## Usage example
 
-### Source
+### Configuration
 
 Create your `prod-conf.yaml` configuration file to source your production database.
 
@@ -92,8 +90,7 @@ replibyte -c staging-conf.yaml
 
 ## How RepliByte works
 
-RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as
-intermediary (bridge). Here is an example of what happens while replicating a Postgres database.
+RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as intermediary (bridge). Here is an example of what happens while replicating a Postgres database.
 
 ```mermaid
 sequenceDiagram
@@ -108,15 +105,14 @@ sequenceDiagram
     RepliByte->>AWS S3 (Bridge): 4. Write index file
 ```
 
-1. RepliByte connects to the *Postgres Source* database and make a full SQL dump of it.
-2. RepliByte receive the SQL dump, parse it, and obfuscate the sensitive data in real-time.
-3. RepliByte stream and upload the modified SQL dump in real-time on AWS S3.
-4. RepliByte keep track of the uploaded SQL dump by writing into an index file.
+1. RepliByte connects to the _Postgres Source_ database and makes a full SQL dump of it.
+2. RepliByte receives the SQL dump, parse it, and generates random/fake information in real-time.
+3. RepliByte streams and uploads the modified SQL dump in real-time on AWS S3.
+4. RepliByte keeps track of the uploaded SQL dump by writing it into an index file.
 
 ---
 
-Once at least a replica from the source Postgres database is available on the S3 bucket, then RepliByte can use it and inject it into the
-destination Postgres.
+Once at least a replica from the source Postgres database is available in the S3 bucket, RepliByte can use and inject it into the destination PostgresSQL database.
 
 ```mermaid
 sequenceDiagram
@@ -128,16 +124,16 @@ sequenceDiagram
     RepliByte->>Postgres (Destination): 1. Restore dump SQL
 ```
 
-1. RepliByte connects to the S3 bucket and read the index file to retrieve the latest SQL to download.
-2. RepliByte download the SQL dump in a stream bytes.
-3. RepliByte restore the SQL dump in the destination Postgres database in real-time.
+1. RepliByte connects to the S3 bucket and reads the index file to retrieve the latest SQL to download.
+2. RepliByte downloads the SQL dump in a stream bytes.
+3. RepliByte restores the SQL dump in the destination Postgres database in real-time.
 
 ## Features
 
-- [x] Full data synchronization
+- [x] Complete data synchronization
 - [x] Backup TB of data (read [Design](#design))
-- [x] Work on different VPC / network
-- [x] Obfuscate sensitive data
+- [x] Work on different VPC/network
+- [x] Generate random/fake information
 
 Here are the features we plan to support
 
@@ -146,55 +142,43 @@ Here are the features we plan to support
 
 ## Connectors
 
-### Sources
+### Supported Connector Sources
 
-Supported sources connectors:
+- [x] PostgreSQL
+- [ ] MySQL (Coming Soon)
+- [ ] MongoDB (Coming Soon)
 
-- [x] Postgres
-- [ ] MySQL (not started)
-- [ ] MongoDB (not started)
+### RepliByte Bridge
 
-### Bridge
-
-Connector to make the bridge between sources and destinations.
-
-- [ ] S3 (WIP)
-
-The S3 wire protocol is supported by most of the cloud providers. Here is a non-exhaustive list of S3 compatible services.
+The S3 wire protocol, used by RepliByte bridge, is supported by most cloud providers. Here is a non-exhaustive list of S3 compatible services.
 
 | Cloud Service Provider | S3 service name                                                           | S3 compatible  |
-|------------------------|---------------------------------------------------------------------------|----------------|
+| ---------------------- | ------------------------------------------------------------------------- | -------------- |
 | Amazon Web Services    | [S3](https://aws.amazon.com/s3/)                                          | Yes (Original) |
-| Google Cloud Platform  | [Cloud Storage](https://cloud.google.com/storage)                         | Yes            |  
+| Google Cloud Platform  | [Cloud Storage](https://cloud.google.com/storage)                         | Yes            |
 | Microsoft Azure        | [Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) | Yes            |
 | Digital Ocean          | [Spaces](https://www.digitalocean.com/products/spaces)                    | Yes            |
 | Scaleway               | [Object Storage](https://www.scaleway.com/en/object-storage/)             | Yes            |
-| ...                    | ...                                                                       | ...            |
 
-*Feel free to drop a PR to include another s3 compatible solution.*
+> Feel free to drop a PR to include another S3 compatible solution.
 
-### Destinations
+### Supported Connectors
 
-Supported dest connectors:
+Currently, we support the following connectors for RepliByte bridge:
 
 - [ ] Postgres (WIP)
-- [ ] MySQL (not started)
-- [ ] MongoDB (not started)
+- [ ] MySQL (Coming Soon)
+- [ ] MongoDB (Coming Soon)
 
 ## Design
 
-Here are the design choices made for RepliByte:
-
 ### Low Memory and CPU footprint
 
-Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes
-and does not store anything on a local disk.
+Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes and does not store anything on a local disk.
 
 ### Limitations
 
-*We'll put all the limitations we are facing here*
-
-- At the moment we have no benchmark - they will come as soon as we move forward.
+- No benchmarks - we will create them as we move forward with the project.
 
 ### Index file structure
 
@@ -206,8 +190,8 @@ Here is the manifest file that you can find at the root of your target `Bridge` 
 {
   "backups": [
     {
-      "directory_name": "timestamp",
       "size": 1024000,
+      "directory_name": "timestamp",
       "created_at": "iso8601 date format"
     }
   ]
@@ -231,17 +215,16 @@ RepliByte has not been designed to make all the checks needed to guarantee that 
 
 ## FAQ
 
-⬆️ *Open an issue if you have any question - I'll pick the most common questions and put them here with the answer*
+⬆️ _Open an issue if you have any question - I'll pick the most common questions and put them here with the answer_
 
 # Contributing
 
 ## Local development
 
-To develop in local, you need to install and run [Docker](https://www.docker.com/) and then run `docker-compose up` to start local
-databases. At the moment, the docker-compose includes 2 postgres database instances. One source and one destination. In the future, we'll
-provide more options.
+For local development, you will need to install [Docker](https://www.docker.com/) and run `docker-compose up` to start the local
+databases. At the moment, `docker-compose` includes 2 Postgres database instances. One source and one destination database. In the future, we will provide more options.
 
-Once your docker instances are running, you can run the RepliByte tests.
+Once your Docker instances are running, you can run the RepliByte tests, to check if everything is configured correctly:
 
 ```shell
 cargo test
@@ -273,4 +256,4 @@ RepliByte and explain how to develop in Rust. Feel free to [join the sessions](h
 ## Thanks
 
 Thanks to all people sharing their ideas to make RepliByte better. We do appreciate it. I would also thank [AirByte](https://airbyte.com/),
-a great product and a trustworthy source of inspiration for this project.  
+a great product and a trustworthy source of inspiration for this project.
