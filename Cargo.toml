@@ -1,9 +1,3 @@
 [workspace]
-members = [
-    "dump-parser",
-    "replibyte",
-]
-exclude = [
-    "db/*",
-    "assets/*",
-]
+exclude = ["db/*", "assets/*"]
+members = ["dump-parser", "replibyte"]
