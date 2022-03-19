@@ -1,3 +1,4 @@
+use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::random::RandomTransformer;
 use crate::transformer::Transformer;
@@ -129,6 +130,8 @@ pub enum TransformerTypeConfig {
     RandomDate,
     #[serde(rename = "first-name")]
     FirstName,
+    #[serde(rename = "email")]
+    Email,
 }
 
 impl TransformerTypeConfig {
@@ -145,6 +148,11 @@ impl TransformerTypeConfig {
                 column_name,
             )),
             TransformerTypeConfig::FirstName => Box::new(FirstNameTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::Email => Box::new(EmailTransformer::new(
                 database_name,
                 table_name,
                 column_name,

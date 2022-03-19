@@ -111,6 +111,8 @@ source:
           transformer: random-date
         - name: first_name
           transformer: first-name
+        - name: email
+          transformer: email
 bridge:
   bucket: $BUCKET_NAME
   access_key_id: $ACCESS_KEY_ID
