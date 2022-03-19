@@ -9,7 +9,7 @@ pub trait Bridge: Connector + Send + Sync {
     /// Getting Index file with all the backups information
     fn index_file(&self) -> Result<IndexFile, Error>;
     fn save(&self, index_file: &IndexFile) -> Result<(), Error>;
-    fn upload(&self, file_part: u16, queries: &Queries) -> Result<(), Error>;
+    fn upload(&self, file_part: u16, queries: Queries) -> Result<(), Error>;
     fn download<F>(&self, query_callback: F) -> Result<(), Error>
     where
         F: FnMut(Query);

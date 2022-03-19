@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::io::{Error, ErrorKind};
 
 use aws_config::provider_config::ProviderConfig;
@@ -10,15 +11,17 @@ use aws_types::os_shim_internal::Env;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
-use crate::bridge::{Bridge, IndexFile};
+use crate::bridge::{Backup, Bridge, IndexFile};
 use crate::connector::Connector;
 use crate::runtime::block_on;
 use crate::types::{Queries, Query};
+use crate::utils::epoch_millis;
 
 const INDEX_FILE_NAME: &str = "metadata.json";
 
 pub struct S3 {
     bucket: String,
+    root_key: String,
     region: String,
     client: Client,
 }
@@ -46,6 +49,7 @@ impl S3 {
 
         S3 {
             bucket: bucket.into().to_string(),
+            root_key: format!("backup-{}", epoch_millis()),
             region,
             client: Client::new(&sdk_config),
         }
@@ -89,9 +93,47 @@ impl Bridge for S3 {
         .map_err(|err| Error::from(err))
     }
 
-    fn upload(&self, file_part: u16, queries: &Queries) -> Result<(), Error> {
-        // TODO: Implement upload logic
-        Ok(())
+    fn upload(&self, file_part: u16, queries: Queries) -> Result<(), Error> {
+        let data = queries
+            .into_iter()
+            .flat_map(|query| query.0)
+            .collect::<Vec<_>>();
+
+        let data_size = data.len();
+        let key = format!("{}/{}.dump", self.root_key.as_str(), file_part);
+
+        info!("upload object '{}' part {} on", key.as_str(), file_part);
+
+        let _ = create_object(&self.client, self.bucket.as_str(), key.as_str(), data)?;
+
+        // update index file
+        let mut index_file = self.index_file()?;
+
+        let mut new_backup = Backup {
+            directory_name: self.root_key.clone(),
+            size: 0,
+            created_at: epoch_millis(),
+        };
+
+        // find or create Backup
+        let mut backup = index_file
+            .backups
+            .iter_mut()
+            .find(|b| b.directory_name.as_str() == self.root_key.as_str())
+            .unwrap_or(&mut new_backup);
+
+        if backup.size == 0 {
+            // it means it's a new backup.
+            // We need to add it into the index_file.backups
+            new_backup.size = data_size;
+            index_file.backups.push(new_backup);
+        } else {
+            // update total backup size
+            backup.size = backup.size + data_size;
+        }
+
+        // save index file
+        self.save(&index_file)
     }
 
     fn download<F>(&self, query_callback: F) -> Result<(), Error>
@@ -282,6 +324,7 @@ mod tests {
     use crate::bridge::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
     use crate::bridge::{Backup, Bridge};
     use crate::connector::Connector;
+    use crate::utils::epoch_millis;
     use crate::S3;
 
     const BUCKET_NAME: &str = "replibyte-test";
@@ -407,7 +450,7 @@ mod tests {
         index_file.backups.push(Backup {
             directory_name: "backup-1".to_string(),
             size: 0,
-            created_at: SystemTime::now().elapsed().unwrap().as_millis(),
+            created_at: epoch_millis(),
         });
 
         assert!(s3.save(&index_file).is_ok());

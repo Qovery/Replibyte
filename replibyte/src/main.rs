@@ -18,6 +18,7 @@ mod source;
 mod tasks;
 mod transformer;
 mod types;
+mod utils;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -28,6 +29,7 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let args = Args::parse();
 
     // ! TODO: Fix this line.

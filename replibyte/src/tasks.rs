@@ -51,8 +51,8 @@ where
         // initialize the source
         let _ = self.source.init()?;
 
-        // start
-        // TODO initialize the bridge
+        // initialize the bridge
+        let _ = self.bridge.init()?;
 
         let (tx, rx) = mpsc::sync_channel::<Message>(1);
         let bridge = self.bridge;
@@ -72,9 +72,11 @@ where
                     Err(err) => panic!("{:?}", err), // FIXME what should I do here?
                 };
 
-                let _ = match bridge.upload(chunk_part, &queries) {
+                let _ = match bridge.upload(chunk_part, queries) {
                     Ok(_) => {}
-                    Err(err) => {} // FIXME what should we do?
+                    Err(err) => {
+                        panic!("{:?}", err);
+                    } // FIXME what should we do?
                 };
             }
         });
