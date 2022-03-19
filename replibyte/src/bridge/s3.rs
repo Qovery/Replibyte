@@ -96,7 +96,11 @@ impl Bridge for S3 {
     fn upload(&self, file_part: u16, queries: Queries) -> Result<(), Error> {
         let data = queries
             .into_iter()
-            .flat_map(|query| query.0)
+            .flat_map(|query| {
+                let mut bytes = query.0;
+                bytes.push(b'\n');
+                bytes
+            })
             .collect::<Vec<_>>();
 
         let data_size = data.len();
