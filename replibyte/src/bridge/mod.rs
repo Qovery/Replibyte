@@ -24,5 +24,5 @@ pub struct IndexFile {
 pub struct Backup {
     directory_name: String,
     size: usize,
-    created_at: u64,
+    created_at: u128,
 }
