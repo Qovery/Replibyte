@@ -1,4 +1,14 @@
-file = { table_definition | insert_statement | row_value_expression_list }
+file = { table_definition | insert_statement | row_value_expression_list | query_specification }
+
+query_specification = { SELECT ~ select_list ~ table_expression }
+select_list = { asterisk | ( select_sublist ~ ( comma ~ select_sublist )* ) }
+select_sublist = { derived_column }
+derived_column = { value_expression ~ as_clause? }
+value_expression = { ANY }
+as_clause = { AS? ~ column_name }
+table_expression = { from_clause }
+from_clause = { FROM ~ table_reference_list }
+table_reference_list = { table_name }
 
 insert_statement = { INSERT ~ INTO ~ insertion_target ~ insert_column_and_source ~ VALUES ~ row_value_expression_list ~ semicolon }
 row_value_expression_list = { left_paren ~ table_row_value_expression ~ right_paren }
@@ -29,6 +39,9 @@ TABLE = { ^"table" }
 INSERT = { ^"insert" }
 INTO = { ^"into" }
 VALUES = { ^"values" }
+SELECT = { ^"select" }
+AS = { ^"as" }
+FROM = { ^"from" }
 
 table_element = { column_name ~ exact_numeric_type ~ column_constraint_definition* }
 column_name = { identifier }
@@ -54,7 +67,7 @@ sql_special_character = {
     quote |
     left_paren |
     right_paren |
-    "*" |
+    asterisk |
     "+" |
     comma |
     "-" |
@@ -78,6 +91,7 @@ sql_special_character = {
 quote = { "'" }
 left_paren = { "(" }
 right_paren = { ")" }
+asterisk = { "*" }
 comma = { "," }
 period = { "." }
 semicolon = { ";" }

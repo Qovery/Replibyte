@@ -30,6 +30,7 @@ mod tests {
 
     test_tokenize_statement! {
         create_table: "CREATE TABLE public.orders ( order_id smallint NOT NULL );",
-        insert_into: "INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title) VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);"
+        insert_into: "INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title) VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);",
+        select_star: "SELECT * FROM departments;"
     }
 }
