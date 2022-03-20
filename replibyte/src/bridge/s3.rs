@@ -315,12 +315,7 @@ fn list_objects<'a>(
     bucket: &'a str,
     path: Option<&'a str>,
 ) -> Result<Vec<Object>, S3Error<'a>> {
-    let full_bucket_path = match path {
-        Some(p) => format!("{}/{}", bucket, p),
-        None => bucket.to_string(),
-    };
-
-    let objects = block_on(client.list_objects_v2().bucket(full_bucket_path)..send());
+    let objects = block_on(client.list_objects_v2().bucket(bucket).send());
     let objects = match objects {
         Ok(objects) => objects,
         Err(err) => {
@@ -329,7 +324,23 @@ fn list_objects<'a>(
         }
     };
 
-    Ok(objects.contents.unwrap_or(Vec::new()))
+    // FIXME max objects listed is 1000 -> pagination?
+
+    let objects = objects.contents.unwrap_or(Vec::new());
+    if path.is_none() {
+        return Ok(objects);
+    }
+
+    let path = path.unwrap();
+    let objects = objects
+        .into_iter()
+        .filter(|object| match object.key() {
+            Some(key) => key.starts_with(path),
+            None => false,
+        })
+        .collect::<Vec<_>>();
+
+    Ok(objects)
 }
 
 fn delete_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<(), S3Error<'a>> {

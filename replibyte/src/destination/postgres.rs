@@ -72,6 +72,7 @@ impl<'a> Connector for Postgres<'a> {
 impl<'a> Destination for Postgres<'a> {
     fn insert(&self, data: Vec<u8>) -> Result<(), Error> {
         let s_port = self.port.to_string();
+        let queries = std::str::from_utf8(data.as_slice()).unwrap();
 
         let mut process = Command::new("psql")
             .env("PGPASSWORD", self.password)
@@ -85,7 +86,7 @@ impl<'a> Destination for Postgres<'a> {
                 "-U",
                 self.username,
                 "-c",
-                std::str::from_utf8(data.as_slice()).unwrap(),
+                queries,
             ])
             .stdin(Stdio::piped())
             .spawn()?;
