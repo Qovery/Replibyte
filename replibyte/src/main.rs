@@ -3,7 +3,7 @@ extern crate prettytable;
 
 use std::fs::File;
 use std::io::{Error, ErrorKind};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use clap::Parser;
 use timeago::Formatter;
@@ -11,8 +11,8 @@ use timeago::Formatter;
 use utils::to_human_readable_unit;
 
 use crate::bridge::s3::S3;
-use crate::bridge::Bridge;
-use crate::cli::{BackupCommand, RestoreCommand, SubCommand, CLI};
+use crate::bridge::{Bridge, DownloadOptions};
+use crate::cli::{BackupCommand, SubCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::source::postgres::Postgres as SourcePostgres;
@@ -121,37 +121,42 @@ fn main() -> anyhow::Result<()> {
                 }
             },
         },
-        SubCommand::Restore(cmd) => match cmd {
-            RestoreCommand::Latest => match config.destination {
-                Some(destination) => {
-                    match destination.connection_uri()? {
-                        ConnectionUri::Postgres(host, port, username, password, database) => {
-                            let postgres = DestinationPostgres::new(
-                                host.as_str(),
-                                port,
-                                database.as_str(),
-                                username.as_str(),
-                                password.as_str(),
-                                true,
-                            );
+        SubCommand::Restore(cmd) => match config.destination {
+            Some(destination) => {
+                match destination.connection_uri()? {
+                    ConnectionUri::Postgres(host, port, username, password, database) => {
+                        let postgres = DestinationPostgres::new(
+                            host.as_str(),
+                            port,
+                            database.as_str(),
+                            username.as_str(),
+                            password.as_str(),
+                            true,
+                        );
 
-                            let task = FullRestoreTask::new(postgres, bridge);
-                            task.run()?
-                        }
-                        ConnectionUri::Mysql(host, port, username, password, database) => {
-                            todo!()
-                        }
+                        let options = match cmd.value.as_str() {
+                            "latest" => DownloadOptions::Latest,
+                            v => DownloadOptions::Backup {
+                                name: v.to_string(),
+                            },
+                        };
+
+                        let task = FullRestoreTask::new(postgres, bridge, options);
+                        task.run()?
                     }
+                    ConnectionUri::Mysql(host, port, username, password, database) => {
+                        todo!()
+                    }
+                }
 
-                    println!("Restore successful!")
-                }
-                None => {
-                    return Err(anyhow::Error::from(Error::new(
-                        ErrorKind::Other,
-                        "missing <destination> object in the configuration file",
-                    )));
-                }
-            },
+                println!("Restore successful!")
+            }
+            None => {
+                return Err(anyhow::Error::from(Error::new(
+                    ErrorKind::Other,
+                    "missing <destination> object in the configuration file",
+                )));
+            }
         },
     };
 

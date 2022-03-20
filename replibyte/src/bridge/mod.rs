@@ -10,7 +10,7 @@ pub trait Bridge: Connector + Send + Sync {
     fn index_file(&self) -> Result<IndexFile, Error>;
     fn save(&self, index_file: &IndexFile) -> Result<(), Error>;
     fn upload(&self, file_part: u16, data: Bytes) -> Result<(), Error>;
-    fn download<F>(&self, data_callback: F) -> Result<(), Error>
+    fn download<F>(&self, options: &DownloadOptions, data_callback: F) -> Result<(), Error>
     where
         F: FnMut(Bytes);
 }
@@ -25,4 +25,10 @@ pub struct Backup {
     pub directory_name: String,
     pub size: usize,
     pub created_at: u128,
+}
+
+#[derive(Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq, Clone)]
+pub enum DownloadOptions {
+    Latest,
+    Backup { name: String },
 }

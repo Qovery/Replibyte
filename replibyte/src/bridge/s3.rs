@@ -8,7 +8,7 @@ use aws_types::os_shim_internal::Env;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
-use crate::bridge::{Backup, Bridge, IndexFile};
+use crate::bridge::{Backup, Bridge, DownloadOptions, IndexFile};
 use crate::connector::Connector;
 use crate::runtime::block_on;
 use crate::types::Bytes;
@@ -128,28 +128,44 @@ impl Bridge for S3 {
         self.save(&index_file)
     }
 
-    fn download<F>(&self, mut data_callback: F) -> Result<(), Error>
+    fn download<'a, F>(&self, options: &DownloadOptions, mut data_callback: F) -> Result<(), Error>
     where
         F: FnMut(Bytes),
     {
         let mut index_file = self.index_file()?;
 
-        index_file
-            .backups
-            .sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        let backup = match options {
+            DownloadOptions::Latest => {
+                index_file
+                    .backups
+                    .sort_by(|a, b| a.created_at.cmp(&b.created_at));
 
-        if let None = index_file.backups.last() {
-            return Ok(());
-        }
-
-        // get last backup
-        // TODO: make configurable the backup choice
-        let last_backup = index_file.backups.last().unwrap();
+                match index_file.backups.last() {
+                    Some(backup) => backup,
+                    None => return Err(Error::new(ErrorKind::Other, "No backups available.")),
+                }
+            }
+            DownloadOptions::Backup { name } => {
+                match index_file
+                    .backups
+                    .iter()
+                    .find(|backup| backup.directory_name.as_str() == name.as_str())
+                {
+                    Some(backup) => backup,
+                    None => {
+                        return Err(Error::new(
+                            ErrorKind::Other,
+                            format!("Can't find backup with name '{}'", name),
+                        ))
+                    }
+                }
+            }
+        };
 
         for object in list_objects(
             &self.client,
             self.bucket.as_str(),
-            Some(last_backup.directory_name.as_str()),
+            Some(backup.directory_name.as_str()),
         )? {
             let data = get_object(&self.client, self.bucket.as_str(), object.key().unwrap())?;
             data_callback(data);

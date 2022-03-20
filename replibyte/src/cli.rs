@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgEnum, Args, Parser, Subcommand};
 
 /// RepliByte is a tool to synchronize cloud databases and fake sensitive data, just pass `-h`
 #[derive(Parser, Debug)]
@@ -21,8 +21,7 @@ pub enum SubCommand {
     #[clap(subcommand)]
     Backup(BackupCommand),
     /// all restore commands
-    #[clap(subcommand)]
-    Restore(RestoreCommand),
+    Restore(RestoreArgs),
 }
 
 /// all backup commands
@@ -35,8 +34,9 @@ pub enum BackupCommand {
 }
 
 /// all restore commands
-#[derive(Subcommand, Debug)]
-pub enum RestoreCommand {
-    /// restore latest backup -- use <list> command to list available restore
-    Latest,
+#[derive(Args, Debug)]
+pub struct RestoreArgs {
+    /// restore backup -- set `latest` or `<backup name>` - use `backup list` command to list all backups available
+    #[clap(short, long, value_name = "latest | <backup name>")]
+    pub value: String,
 }

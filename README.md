@@ -81,11 +81,11 @@ PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am
 ```
 
 ```shell
-replibyte -c prod-conf.yaml restore latest
+replibyte -c prod-conf.yaml restore -v latest
 
 OR 
 
-replibyte -c prod-conf.yaml restore backup-1647706359405
+replibyte -c prod-conf.yaml restore -v backup-1647706359405
 ```
 
 ### Configuration

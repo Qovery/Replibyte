@@ -1,7 +1,8 @@
-use crate::connector::Connector;
-use crate::destination::Destination;
 use std::io::{Error, ErrorKind};
 use std::process::{Command, Stdio};
+
+use crate::connector::Connector;
+use crate::destination::Destination;
 
 pub struct Postgres<'a> {
     host: &'a str,
