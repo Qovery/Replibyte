@@ -72,7 +72,7 @@ replibyte -c prod-conf.yaml backup run
 Backup from local Postgres dump file into S3
 
 ```shell
-cat dump.sql | ./target/release/replibyte -c prod-conf.yaml backup run -s postgres -i
+cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
 ```
 
 Restore your Postgres databases from S3
