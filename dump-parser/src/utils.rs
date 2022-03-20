@@ -4,6 +4,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::str;
 
+const LINE_SEPARATOR: char = ';';
+const LINE_SEPARATOR_PLACEHOLDER: &str = "<<TMP>>";
+
 pub fn list_queries_from_dump_file<'a, S, F>(
     dump_file_path: S,
     comment_chars: &str,
@@ -84,12 +87,18 @@ where
             let _ = buf_bytes.append(&mut line_buf_bytes);
         }
 
-        if total_bytes <= 1 || is_last_by_end_of_query {
+        let last_char_of_buf_bytes_is_end_of_query = match buf_bytes.last() {
+            Some(char_byte) => *char_byte == b';',
+            None => false,
+        };
+
+        if (total_bytes <= 1 && last_char_of_buf_bytes_is_end_of_query) || is_last_by_end_of_query {
             if count_empty_lines == 0 && buf_bytes.len() > 1 {
                 let query_str = str::from_utf8(buf_bytes.as_slice()).unwrap(); // FIXME remove unwrap
 
                 // split query_str by ';' in case of multiple queries are inside the string
-                let queries_str = query_str.split(";").collect::<Vec<&str>>();
+                let query_string = query_str.replace(";'", LINE_SEPARATOR_PLACEHOLDER);
+                let queries_str = query_string.split(";").collect::<Vec<&str>>();
 
                 if queries_str.len() == 1 {
                     // there is a only one query inside the str
@@ -97,7 +106,7 @@ where
                 } else {
                     // iterate and send all queries one by one
                     for query_str in queries_str {
-                        let query_str = query_str.trim();
+                        let query_str = query_str.trim().replace(LINE_SEPARATOR_PLACEHOLDER, ";'");
                         if !query_str.is_empty() {
                             let query_str = format!("{};", query_str);
                             query(query_str.as_str());

@@ -348,13 +348,16 @@ fn list_objects<'a>(
     }
 
     let path = path.unwrap();
-    let objects = objects
+    let mut objects = objects
         .into_iter()
         .filter(|object| match object.key() {
             Some(key) => key.starts_with(path),
             None => false,
         })
         .collect::<Vec<_>>();
+
+    // sort by key
+    objects.sort();
 
     Ok(objects)
 }

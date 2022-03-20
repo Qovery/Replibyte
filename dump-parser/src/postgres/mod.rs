@@ -713,7 +713,10 @@ pub fn get_tokens_from_query_str(query: &str) -> Vec<Token> {
 
     let tokens = match tokenizer.tokenize() {
         Ok(tokens) => tokens,
-        Err(err) => panic!("{:?}", err),
+        Err(err) => {
+            println!("failing query: '{}'", query);
+            panic!("{:?}", err)
+        }
     };
 
     trim_pre_whitespaces(tokens)
@@ -779,6 +782,42 @@ CREATE TABLE public.orders (
         ];
 
         assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn tokenizer_for_create_table_2() {
+        let q = r"
+CREATE TABLE public.application (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    name text NOT NULL,
+    build_mode text NOT NULL,
+    cpu integer NOT NULL,
+    ram integer NOT NULL,
+    dockerfile_path text,
+    root_path text,
+    start_timeout_sec integer NOT NULL,
+    min_nb_instances integer NOT NULL,
+    max_nb_instances integer NOT NULL,
+    environment_id uuid NOT NULL,
+    buildpack_language text,
+    auto_preview_enabled boolean DEFAULT false NOT NULL,
+    CONSTRAINT application_build_mode_check CHECK ((build_mode <> ''::text)),
+    CONSTRAINT application_check CHECK ((max_nb_instances >= min_nb_instances)),
+    CONSTRAINT application_min_nb_instances_check CHECK ((min_nb_instances > 0)),
+    CONSTRAINT application_name_check CHECK ((name <> ''::text))
+);";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = tokens_result.unwrap();
+
+        let expected: Vec<Token> = vec![];
+
+        // TODO assert_eq!(tokens, expected);
     }
 
     #[test]
