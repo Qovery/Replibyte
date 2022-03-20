@@ -16,6 +16,7 @@ use crate::cli::{BackupCommand, SubCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::source::postgres::Postgres as SourcePostgres;
+use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::Source;
 use crate::tasks::full_backup::FullBackupTask;
 use crate::tasks::full_restore::FullRestoreTask;
@@ -76,7 +77,7 @@ fn main() -> anyhow::Result<()> {
             BackupCommand::List => {
                 let _ = list_backups(&bridge)?;
             }
-            BackupCommand::Launch => match config.source {
+            BackupCommand::Run(args) => match config.source {
                 Some(source) => {
                     // Match the transformers from the config
                     let transformers = source
@@ -93,21 +94,40 @@ fn main() -> anyhow::Result<()> {
                         })
                         .collect::<Vec<_>>();
 
-                    match source.connection_uri()? {
-                        ConnectionUri::Postgres(host, port, username, password, database) => {
-                            let postgres = SourcePostgres::new(
-                                host.as_str(),
-                                port,
-                                database.as_str(),
-                                username.as_str(),
-                                password.as_str(),
-                            );
+                    match args.source_type.as_ref().map(|x| x.as_str()) {
+                        None => match source.connection_uri()? {
+                            ConnectionUri::Postgres(host, port, username, password, database) => {
+                                let postgres = SourcePostgres::new(
+                                    host.as_str(),
+                                    port,
+                                    database.as_str(),
+                                    username.as_str(),
+                                    password.as_str(),
+                                );
 
-                            let task = FullBackupTask::new(postgres, &transformers, bridge);
-                            task.run()?
+                                let task = FullBackupTask::new(postgres, &transformers, bridge);
+                                task.run()?
+                            }
+                            ConnectionUri::Mysql(host, port, username, password, database) => {
+                                todo!()
+                            }
+                        },
+                        Some(v) if v == "postgres" || v == "postgresql" => {
+                            if args.input {
+                                let postgres = PostgresStdin::default();
+                                let task = FullBackupTask::new(postgres, &transformers, bridge);
+                                task.run()?
+                            } else if args.file.is_some() {
+                                todo!();
+                            } else {
+                                todo!();
+                            }
                         }
-                        ConnectionUri::Mysql(host, port, username, password, database) => {
-                            todo!()
+                        Some(v) => {
+                            return Err(anyhow::Error::from(Error::new(
+                                ErrorKind::Other,
+                                format!("source type '{}' not recognized", v),
+                            )));
                         }
                     }
 

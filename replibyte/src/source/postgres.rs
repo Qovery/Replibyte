@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{BufReader, Error, ErrorKind};
+use std::io::{BufReader, Error, ErrorKind, Read};
 use std::process::{Command, Stdio};
 
 use dump_parser::postgres::{
@@ -14,7 +14,7 @@ use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
 
-const COMMENT_CHARS: &str = "--";
+pub const COMMENT_CHARS: &str = "--";
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -70,7 +70,6 @@ impl<'a> Source for Postgres<'a> {
                 "-U",
                 self.username,
             ])
-            //.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
@@ -82,124 +81,7 @@ impl<'a> Source for Postgres<'a> {
 
         let reader = BufReader::new(stdout);
 
-        // create a map variable with Transformer by column_name
-        let mut transformer_by_db_and_table_and_column_name: HashMap<
-            String,
-            &Box<dyn Transformer>,
-        > = HashMap::with_capacity(transformers.len());
-
-        for transformer in transformers {
-            let _ = transformer_by_db_and_table_and_column_name.insert(
-                transformer.database_and_table_and_column_name(),
-                transformer,
-            );
-        }
-
-        // TODO we need to check that there is no duplicate
-
-        match list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
-            let tokens = get_tokens_from_query_str(query);
-
-            if match_keyword_at_position(Keyword::Insert, &tokens, 0)
-                && match_keyword_at_position(Keyword::Into, &tokens, 2)
-            {
-                if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-                    if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
-                        // find database name by filtering out all queries starting with
-                        // INSERT INTO <database>.<table> (...)
-                        // INSERT       -> position 0
-                        // INTO         -> position 2
-                        // <table>      -> position 6
-                        // L Paren      -> position X?
-                        // R Paren      -> position X?
-
-                        let column_names = get_column_names_from_insert_into_query(&tokens);
-                        let column_values = get_column_values_from_insert_into_query(&tokens);
-
-                        let mut original_columns = vec![];
-                        let mut columns = vec![];
-
-                        for (i, column_name) in column_names.iter().enumerate() {
-                            let value_token = column_values.get(i).unwrap();
-
-                            let column = match value_token {
-                                Token::Number(column_value, _) => {
-                                    if column_value.contains(".") {
-                                        Column::FloatNumberValue(
-                                            column_name.to_string(),
-                                            column_value.parse::<f64>().unwrap(),
-                                        )
-                                    } else {
-                                        Column::NumberValue(
-                                            column_name.to_string(),
-                                            column_value.parse::<i128>().unwrap(),
-                                        )
-                                    }
-                                }
-                                Token::Char(column_value) => {
-                                    Column::CharValue(column_name.to_string(), column_value.clone())
-                                }
-                                Token::SingleQuotedString(column_value) => Column::StringValue(
-                                    column_name.to_string(),
-                                    column_value.clone(),
-                                ),
-                                Token::NationalStringLiteral(column_value) => Column::StringValue(
-                                    column_name.to_string(),
-                                    column_value.clone(),
-                                ),
-                                Token::HexStringLiteral(column_value) => Column::StringValue(
-                                    column_name.to_string(),
-                                    column_value.clone(),
-                                ),
-                                _ => Column::None(column_name.to_string()),
-                            };
-
-                            // get the right transformer for the right column name
-                            let original_column = column.clone();
-
-                            let db_and_table_and_column_name =
-                                format!("{}.{}.{}", database_name, table_name, *column_name);
-                            let column = match transformer_by_db_and_table_and_column_name
-                                .get(db_and_table_and_column_name.as_str())
-                            {
-                                Some(transformer) => transformer.transform(column), // apply transformation on the column
-                                None => column,
-                            };
-
-                            original_columns.push(original_column);
-                            columns.push(column);
-                        }
-
-                        query_callback(
-                            to_query(
-                                Some(database_name),
-                                InsertIntoQuery {
-                                    table_name: table_name.to_string(),
-                                    columns: original_columns,
-                                },
-                            ),
-                            to_query(
-                                Some(database_name),
-                                InsertIntoQuery {
-                                    table_name: table_name.to_string(),
-                                    columns,
-                                },
-                            ),
-                        )
-                    }
-                }
-            } else {
-                // other rows than `INSERT INTO ...`
-                query_callback(
-                    // there is no diff between the original and the modified one
-                    Query(query.as_bytes().to_vec()),
-                    Query(query.as_bytes().to_vec()),
-                )
-            }
-        }) {
-            Ok(_) => {}
-            Err(err) => panic!("{:?}", err),
-        }
+        read_and_transform(reader, transformers, query_callback);
 
         match process.wait() {
             Ok(exit_status) => {
@@ -214,6 +96,125 @@ impl<'a> Source for Postgres<'a> {
         }
 
         Ok(())
+    }
+}
+
+/// consume reader and apply transformation on INSERT INTO queries if needed
+pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
+    reader: BufReader<R>,
+    transformers: &Vec<Box<dyn Transformer + '_>>,
+    mut query_callback: F,
+) {
+    // create a map variable with Transformer by column_name
+    let mut transformer_by_db_and_table_and_column_name: HashMap<String, &Box<dyn Transformer>> =
+        HashMap::with_capacity(transformers.len());
+
+    for transformer in transformers {
+        let _ = transformer_by_db_and_table_and_column_name.insert(
+            transformer.database_and_table_and_column_name(),
+            transformer,
+        );
+    }
+
+    match list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
+        let tokens = get_tokens_from_query_str(query);
+
+        if match_keyword_at_position(Keyword::Insert, &tokens, 0)
+            && match_keyword_at_position(Keyword::Into, &tokens, 2)
+        {
+            if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
+                if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+                    // find database name by filtering out all queries starting with
+                    // INSERT INTO <database>.<table> (...)
+                    // INSERT       -> position 0
+                    // INTO         -> position 2
+                    // <table>      -> position 6
+                    // L Paren      -> position X?
+                    // R Paren      -> position X?
+
+                    let column_names = get_column_names_from_insert_into_query(&tokens);
+                    let column_values = get_column_values_from_insert_into_query(&tokens);
+
+                    let mut original_columns = vec![];
+                    let mut columns = vec![];
+
+                    for (i, column_name) in column_names.iter().enumerate() {
+                        let value_token = column_values.get(i).unwrap();
+
+                        let column = match value_token {
+                            Token::Number(column_value, _) => {
+                                if column_value.contains(".") {
+                                    Column::FloatNumberValue(
+                                        column_name.to_string(),
+                                        column_value.parse::<f64>().unwrap(),
+                                    )
+                                } else {
+                                    Column::NumberValue(
+                                        column_name.to_string(),
+                                        column_value.parse::<i128>().unwrap(),
+                                    )
+                                }
+                            }
+                            Token::Char(column_value) => {
+                                Column::CharValue(column_name.to_string(), column_value.clone())
+                            }
+                            Token::SingleQuotedString(column_value) => {
+                                Column::StringValue(column_name.to_string(), column_value.clone())
+                            }
+                            Token::NationalStringLiteral(column_value) => {
+                                Column::StringValue(column_name.to_string(), column_value.clone())
+                            }
+                            Token::HexStringLiteral(column_value) => {
+                                Column::StringValue(column_name.to_string(), column_value.clone())
+                            }
+                            _ => Column::None(column_name.to_string()),
+                        };
+
+                        // get the right transformer for the right column name
+                        let original_column = column.clone();
+
+                        let db_and_table_and_column_name =
+                            format!("{}.{}.{}", database_name, table_name, *column_name);
+                        let column = match transformer_by_db_and_table_and_column_name
+                            .get(db_and_table_and_column_name.as_str())
+                        {
+                            Some(transformer) => transformer.transform(column), // apply transformation on the column
+                            None => column,
+                        };
+
+                        original_columns.push(original_column);
+                        columns.push(column);
+                    }
+
+                    query_callback(
+                        to_query(
+                            Some(database_name),
+                            InsertIntoQuery {
+                                table_name: table_name.to_string(),
+                                columns: original_columns,
+                            },
+                        ),
+                        to_query(
+                            Some(database_name),
+                            InsertIntoQuery {
+                                table_name: table_name.to_string(),
+                                columns,
+                            },
+                        ),
+                    )
+                }
+            }
+        } else {
+            // other rows than `INSERT INTO ...`
+            query_callback(
+                // there is no diff between the original and the modified one
+                Query(query.as_bytes().to_vec()),
+                Query(query.as_bytes().to_vec()),
+            )
+        }
+    }) {
+        Ok(_) => {}
+        Err(err) => panic!("{:?}", err),
     }
 }
 

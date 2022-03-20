@@ -66,7 +66,13 @@ Example with Postgres as a *Source* and *Destination* database **AND** S3 as a *
 Backup your Postgres databases into S3
 
 ```shell
-replibyte -c prod-conf.yaml backup launch
+replibyte -c prod-conf.yaml backup run
+```
+
+Backup from local Postgres dump file into S3
+
+```shell
+cat dump.sql | ./target/release/replibyte -c prod-conf.yaml backup run -s postgres -i
 ```
 
 Restore your Postgres databases from S3
@@ -188,6 +194,7 @@ sequenceDiagram
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
+- [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
 
 ## Connectors
@@ -197,6 +204,7 @@ Here are the features we plan to support
 - [x] PostgreSQL
 - [ ] MySQL (Coming Soon)
 - [ ] MongoDB (Coming Soon)
+- [x] Local dump file (Yes for PostgreSQL) 
 
 ### Supported Transformers
 
@@ -224,6 +232,7 @@ services.
 - [x] PostgreSQL
 - [ ] MySQL (Coming Soon)
 - [ ] MongoDB (Coming Soon)
+- [ ] Local dump file (Coming soon)
 
 ## Design
 
@@ -246,9 +255,9 @@ Here is the manifest file that you can find at the root of your target `Bridge` 
 {
   "backups": [
     {
-      "size": 1024000,
-      "directory_name": "timestamp",
-      "created_at": "iso8601 date format"
+      "size": 1024000, // in bytes
+      "directory_name": "backup-{epoch timestamp}",
+      "created_at": "epoch timestamp"
     }
   ]
 }
