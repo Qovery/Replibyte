@@ -216,6 +216,7 @@ services.
 | Microsoft Azure        | [Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) | Yes            |
 | Digital Ocean          | [Spaces](https://www.digitalocean.com/products/spaces)                    | Yes            |
 | Scaleway               | [Object Storage](https://www.scaleway.com/en/object-storage/)             | Yes            |
+| Minio                  | [Object Storage](https://min.io/)                                         | Yes            |
 
 > Feel free to drop a PR to include another S3 compatible solution.
 
@@ -298,14 +299,15 @@ RepliByte has not been designed to make all the checks needed to guarantee that 
 
 ## Local development
 
-For local development, you will need to install [Docker](https://www.docker.com/) and run `docker-compose up` to start the local databases.
-At the moment, `docker-compose` includes 2 Postgres database instances. One source and one destination database. In the future, we will
-provide more options.
+For local development, you will need to install [Docker](https://www.docker.com/) and run `docker compose -f ./docker-compose-postgres-minio.yml` to start the local databases.
+At the moment, `docker-compose` includes 2 Postgres database instances and a [Minio](https://min.io/) bridge. One source, one destination database and one bridge. In the future, we will provide more options.
+
+The Minio console is accessible at http://localhost:9001.
 
 Once your Docker instances are running, you can run the RepliByte tests, to check if everything is configured correctly:
 
 ```shell
-cargo test
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin cargo test
 ```
 
 ## How to contribute

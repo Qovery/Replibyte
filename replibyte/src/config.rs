@@ -45,6 +45,7 @@ pub struct BridgeConfig {
     pub region: String,
     pub access_key_id: String,
     pub secret_access_key: String,
+    pub endpoint: Option<String>,
 }
 
 impl BridgeConfig {
@@ -66,6 +67,15 @@ impl BridgeConfig {
     /// decode and return the secret_access_key value
     pub fn secret_access_key(&self) -> Result<String, Error> {
         substitute_env_var(self.secret_access_key.as_str())
+    }
+
+    /// decode and return the endpoint value
+    pub fn endpoint(&self) -> Option<Result<String, Error>> {
+        if let Some(endpoint) = &self.endpoint {
+            Some(substitute_env_var(endpoint.as_str()))
+        } else {
+            None
+        }
     }
 }
 
