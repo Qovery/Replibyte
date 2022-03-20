@@ -7,7 +7,7 @@ use pest_derive::Parser;
 pub struct SQLParser;
 
 #[cfg(test)]
-mod tests {
+mod tests_mysql {
     macro_rules! test_tokenize_statement {
         ( $( $name:ident : $s:literal),* ) => {
             $(
@@ -31,6 +31,12 @@ mod tests {
     test_tokenize_statement! {
         create_table: "CREATE TABLE public.orders ( order_id smallint NOT NULL );",
         insert_into: "INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title) VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);",
-        select_star: "SELECT * FROM departments;"
+        select_star: "SELECT * FROM departments;",
+        create_database: "CREATE DATABASE mysql;",
+        backtick: "CREATE DATABASE `mysql`;",
+        use_statement: "USE `mysql`;",
+        drop_table: "DROP TABLE IF EXISTS `columnspriv`;"
     }
 }
+// TODO dump chinook
+// TODO stream test case directly from dump file

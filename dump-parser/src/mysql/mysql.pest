@@ -1,4 +1,10 @@
-file = { table_definition | insert_statement | row_value_expression_list | query_specification }
+file = {
+    table_definition |
+    insert_statement |
+    row_value_expression_list |
+    query_specification |
+    mysql_dialect
+}
 
 query_specification = { SELECT ~ select_list ~ table_expression }
 select_list = { asterisk | ( select_sublist ~ ( comma ~ select_sublist )* ) }
@@ -96,3 +102,24 @@ comma = { "," }
 period = { "." }
 semicolon = { ";" }
 WHITESPACE = _{ " " }
+
+mysql_dialect = {
+    create_database_statement |
+    drop_table_statement |
+    use_statement
+}
+
+// MySQL Extensions to Standard SQL
+create_database_statement = { CREATE ~ DATABASE ~ ( mysql_identifier | identifier ) ~ semicolon }
+mysql_identifier = { backtick ~ identifier ~ backtick }
+DATABASE = { ^"database" }
+backtick = { "`" }
+
+drop_table_statement = { DROP_TABLE ~ IF ~ EXISTS ~ mysql_identifier ~ semicolon }
+DROP_TABLE = { ^"drop"  ~ TABLE }
+IF = { ^"if" }
+EXISTS = { ^"exists" }
+
+// Utility Statements
+use_statement = { USE ~ mysql_identifier ~ semicolon }
+USE = { ^"use" }
