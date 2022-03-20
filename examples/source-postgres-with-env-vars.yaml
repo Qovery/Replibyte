@@ -1,8 +1,5 @@
-bind: 127.0.0.1
-port: 1337
 source:
   connection_uri: $DATABASE_URL
-  cron: 0 3 * * * # every day at 3 am
   transformers:
     - database: public
       table: employees

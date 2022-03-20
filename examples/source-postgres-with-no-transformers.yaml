@@ -1,8 +1,5 @@
-bind: 127.0.0.1
-port: 1337
 source:
   connection_uri: postgres://root:password@localhost:5432/root
-  cron: 0 3 * * * # every day at 3 am
 bridge:
   bucket: replibyte-test
   region: us-east-2

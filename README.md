@@ -1,7 +1,7 @@
 <p align="center"> <img src="assets/RepliByte_.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">The Simplest Way To Synchronize Your Cloud Databases</h3>
-<p align="center">Replibyte is a standalone application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
+<p align="center">Replibyte is an application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
 
 <p align="center">
 <img src="https://img.shields.io/badge/stability-work_in_progress-lightgrey.svg?style=flat-square" alt="work in progress badge">
@@ -15,37 +15,86 @@
 
 ---
 
-## Motivation
+## Install
 
-At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases just with one
-click. However, the cloning process can be tedious and time-consuming, and we end up copying the information multiple times. With RepliByte,
-the Qovery team wants to provide a comprehensive way to seed cloud databases from one place to another.
+*The installation from the package managers is coming soon*
 
-The long-term motivation behind RepliByte is to provide a way to clone any database in real-time. This project starts small, but has big
-ambition!
+### Requirements for Postgres
 
-## Use cases
+You need to have **pg_dump** and **psql** binaries installed on your machine. [Download Postgres](https://www.postgresql.org/download/).
 
-| Scenario                                                                | Supported |
-|-------------------------------------------------------------------------|-----------|
-| Synchronize the _whole_ Postgres instance and generate fake information | WIP       |
-| Synchronize specific Postgres _tables_ and generate fake information    | WIP       |
-| Synchronize specific Postgres _databases_ and generate fake information | WIP       |
+```shell
+git clone https://github.com/Qovery/replibyte.git
 
-> Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
+# you need to install rust compiler before
+cargo build --release
 
-## Usage example
+# feel free to move the binary elsewhere
+./target/release/replibyte
+```
+
+[//]: # (For MacOS)
+
+[//]: # (```)
+
+[//]: # (# Add Replibyte brew repository)
+
+[//]: # (brew tap Qovery/replibyte)
+
+[//]: # ()
+
+[//]: # (# Install the CLI)
+
+[//]: # (brew install replibyte)
+
+[//]: # (```)
+
+[//]: # ()
+
+[//]: # (For Linux)
+
+[//]: # (```)
+
+[//]: # (bash)
+
+[//]: # (```)
+
+## Usage
+
+Example with Postgres as a *Source* and *Destination* database **AND** S3 as a *Bridge* (cf [configuration file](#Configuration))
+
+Backup your Postgres databases into S3
+
+```shell
+replibyte backup -c prod-conf.yaml
+```
+
+Restore your Postgres databases from S3
+
+```shell
+replibyte backup list -c prod-conf.yaml
+
+name                    size    when
+backup-1647706359405    154MB   Yesterday at 03:00 am
+backup-1647731334517    152MB   2 days ago at 03:00 am
+backup-1647734369306    149MB   3 days ago at 03:00 am
+```
+
+```shell
+replibyte restore latest -c prod-conf.yaml
+
+OR 
+
+replibyte restore backup-1647706359405 -c prod-conf.yaml
+```
 
 ### Configuration
 
 Create your `prod-conf.yaml` configuration file to source your production database.
 
 ```yaml
-bind: 127.0.0.1
-port: 1337
 source:
   connection_uri: $DATABASE_URL
-  cron: 0 3 * * * # every day at 3 am
   transformers:
     - database: public
       table: employees
@@ -73,15 +122,12 @@ replibyte -c prod-conf.yaml
 Create your `staging-conf.yaml` configuration file to sync your production database with your staging database.
 
 ```yaml
-bind: 127.0.0.1
-port: 1338
 bridge:
-    bucket: $BUCKET_NAME
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+  bucket: $BUCKET_NAME
+  access_key_id: $ACCESS_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
   connection_uri: $DATABASE_URL
-  cron: 0 5 * * * # every day at 5 am
 ```
 
 Run the app for the destination
@@ -146,7 +192,7 @@ Here are the features we plan to support
 
 ## Connectors
 
-### Supported Connector Sources
+### Supported Source connectors
 
 - [x] PostgreSQL
 - [ ] MySQL (Coming Soon)
@@ -173,11 +219,9 @@ services.
 
 > Feel free to drop a PR to include another S3 compatible solution.
 
-### Supported Connectors
+### Supported Destination connectors
 
-Currently, we support the following connectors for RepliByte bridge:
-
-- [ ] Postgres (WIP)
+- [x] PostgreSQL
 - [ ] MySQL (Coming Soon)
 - [ ] MongoDB (Coming Soon)
 
@@ -185,12 +229,12 @@ Currently, we support the following connectors for RepliByte bridge:
 
 ### Low Memory and CPU footprint
 
-Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data. RepliByte replicate the data in a stream of bytes
-and does not store anything on a local disk.
+Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data (we are working on a benchmark). RepliByte
+replicate the data in a stream of bytes and does not store anything on a local disk.
 
 ### Limitations
 
-- No benchmarks - we will create them as we move forward with the project.
+- Tested with Postgres 13 and 14. It should work with prior versions.
 
 ### Index file structure
 
@@ -209,6 +253,27 @@ Here is the manifest file that you can find at the root of your target `Bridge` 
   ]
 }
 ```
+
+## Motivation
+
+At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases just with one
+click. However, the cloning process can be tedious and time-consuming, and we end up copying the information multiple times. With RepliByte,
+the Qovery team wants to provide a comprehensive way to seed cloud databases from one place to another.
+
+The long-term motivation behind RepliByte is to provide a way to clone any database in real-time. This project starts small, but has big
+ambition!
+
+## Use cases
+
+| Scenario                                                                          | Supported |
+|-----------------------------------------------------------------------------------|-----------|
+| Synchronize the whole Postgres instance                                           | Yes       |
+| Synchronize the whole Postgres instance and replace sensitive data with fake data | Yes       |
+| Synchronize specific Postgres tables and replace sensitive data with fake data    | WIP       |
+| Synchronize specific Postgres databases and replace sensitive data with fake data | WIP       |
+| Migrate from one database hosting platform to the other                           | Yes       |
+
+> Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
 ## What is not RepliByte
 

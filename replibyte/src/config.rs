@@ -9,8 +9,8 @@ use uriparse::URIReference;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
-    pub bind: Ipv4Addr,
-    pub port: u16,
+    // pub bind: Ipv4Addr,
+    // pub port: u16,
     pub source: Option<SourceConfig>,
     pub bridge: BridgeConfig,
     pub destination: Option<DestinationConfig>,
