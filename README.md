@@ -66,13 +66,13 @@ Example with Postgres as a *Source* and *Destination* database **AND** S3 as a *
 Backup your Postgres databases into S3
 
 ```shell
-replibyte backup -c prod-conf.yaml
+replibyte -c prod-conf.yaml backup launch
 ```
 
 Restore your Postgres databases from S3
 
 ```shell
-replibyte backup list -c prod-conf.yaml
+replibyte -c prod-conf.yaml backup list
 
 type          name                    size    when
 PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am
@@ -81,11 +81,11 @@ PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am
 ```
 
 ```shell
-replibyte restore latest -c prod-conf.yaml
+replibyte -c prod-conf.yaml restore latest
 
 OR 
 
-replibyte restore backup-1647706359405 -c prod-conf.yaml
+replibyte -c prod-conf.yaml restore backup-1647706359405
 ```
 
 ### Configuration

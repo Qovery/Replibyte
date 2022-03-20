@@ -1,7 +1,6 @@
 use std::io::Error;
 
 use crate::connector::Connector;
-use crate::types::Queries;
 
 pub mod postgres;
 

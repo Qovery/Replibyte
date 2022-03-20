@@ -11,7 +11,7 @@ use crate::bridge::s3::S3Error::FailedObjectUpload;
 use crate::bridge::{Backup, Bridge, IndexFile};
 use crate::connector::Connector;
 use crate::runtime::block_on;
-use crate::types::{Bytes, Query};
+use crate::types::Bytes;
 use crate::utils::epoch_millis;
 
 const INDEX_FILE_NAME: &str = "metadata.json";

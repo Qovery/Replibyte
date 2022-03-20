@@ -1,18 +1,29 @@
+#[macro_use]
+extern crate prettytable;
+
 use std::fs::File;
-use std::path::PathBuf;
+use std::io::{Error, ErrorKind};
+use std::time::{Duration, SystemTime};
 
 use clap::Parser;
+use timeago::Formatter;
+
+use utils::to_human_readable_unit;
 
 use crate::bridge::s3::S3;
-use crate::config::{Config, ConnectionUri, ConnectorConfig};
+use crate::bridge::Bridge;
+use crate::cli::{BackupCommand, RestoreCommand, SubCommand, CLI};
+use crate::config::{Config, ConnectionUri};
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::Source;
 use crate::tasks::full_backup::FullBackupTask;
 use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::Task;
+use crate::utils::{epoch_millis, table};
 
 mod bridge;
+mod cli;
 mod config;
 mod connector;
 mod destination;
@@ -23,19 +34,32 @@ mod transformer;
 mod types;
 mod utils;
 
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
-    #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
-    config: PathBuf,
-    // TODO: List available transformers
+fn list_backups(s3: &S3) -> Result<(), Error> {
+    let mut index_file = s3.index_file()?;
+    index_file.backups.sort_by(|a, b| a.cmp(b).reverse());
+
+    let mut table = table();
+    table.set_titles(row!["name", "size", "when"]);
+    let formatter = Formatter::new();
+    let now = epoch_millis();
+
+    for backup in index_file.backups {
+        table.add_row(row![
+            backup.directory_name.as_str(),
+            to_human_readable_unit(backup.size),
+            formatter.convert(Duration::from_millis((now - backup.created_at) as u64)),
+        ]);
+    }
+
+    table.printstd();
+
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let args = Args::parse();
+    let args = CLI::parse();
 
-    // ! TODO: Fix this line.
     let file = File::open(args.config)?;
     let config: Config = serde_yaml::from_reader(file)?;
 
@@ -46,60 +70,90 @@ fn main() -> anyhow::Result<()> {
         config.bridge.secret_access_key()?,
     );
 
-    match config.connector()? {
-        ConnectorConfig::Source(source) => {
-            // Match the transformers from the config
-            let transformers = source
-                .transformers
-                .iter()
-                .flat_map(|transformer| {
-                    transformer.columns.iter().map(|column| {
-                        column.transformer.transformer(
-                            transformer.database.as_str(),
-                            transformer.table.as_str(),
-                            column.name.as_str(),
-                        )
-                    })
-                })
-                .collect::<Vec<_>>();
+    let sub_commands: &SubCommand = &args.sub_commands;
+    match sub_commands {
+        SubCommand::Backup(cmd) => match cmd {
+            BackupCommand::List => {
+                let _ = list_backups(&bridge)?;
+            }
+            BackupCommand::Launch => match config.source {
+                Some(source) => {
+                    // Match the transformers from the config
+                    let transformers = source
+                        .transformers
+                        .iter()
+                        .flat_map(|transformer| {
+                            transformer.columns.iter().map(|column| {
+                                column.transformer.transformer(
+                                    transformer.database.as_str(),
+                                    transformer.table.as_str(),
+                                    column.name.as_str(),
+                                )
+                            })
+                        })
+                        .collect::<Vec<_>>();
 
-            match source.connection_uri()? {
-                ConnectionUri::Postgres(host, port, username, password, database) => {
-                    let postgres = SourcePostgres::new(
-                        host.as_str(),
-                        port,
-                        database.as_str(),
-                        username.as_str(),
-                        password.as_str(),
-                    );
+                    match source.connection_uri()? {
+                        ConnectionUri::Postgres(host, port, username, password, database) => {
+                            let postgres = SourcePostgres::new(
+                                host.as_str(),
+                                port,
+                                database.as_str(),
+                                username.as_str(),
+                                password.as_str(),
+                            );
 
-                    let task = FullBackupTask::new(postgres, &transformers, bridge);
-                    task.run()?
+                            let task = FullBackupTask::new(postgres, &transformers, bridge);
+                            task.run()?
+                        }
+                        ConnectionUri::Mysql(host, port, username, password, database) => {
+                            todo!()
+                        }
+                    }
+
+                    println!("Backup successful!")
                 }
-                ConnectionUri::Mysql(host, port, username, password, database) => {
-                    todo!()
+                None => {
+                    return Err(anyhow::Error::from(Error::new(
+                        ErrorKind::Other,
+                        "missing <source> object in the configuration file",
+                    )));
                 }
-            }
-        }
-        ConnectorConfig::Destination(destination) => match destination.connection_uri()? {
-            ConnectionUri::Postgres(host, port, username, password, database) => {
-                let postgres = DestinationPostgres::new(
-                    host.as_str(),
-                    port,
-                    database.as_str(),
-                    username.as_str(),
-                    password.as_str(),
-                    true,
-                );
-
-                let task = FullRestoreTask::new(postgres, bridge);
-                task.run()?
-            }
-            ConnectionUri::Mysql(host, port, username, password, database) => {
-                todo!()
-            }
+            },
         },
-    }
+        SubCommand::Restore(cmd) => match cmd {
+            RestoreCommand::Latest => match config.destination {
+                Some(destination) => {
+                    match destination.connection_uri()? {
+                        ConnectionUri::Postgres(host, port, username, password, database) => {
+                            let postgres = DestinationPostgres::new(
+                                host.as_str(),
+                                port,
+                                database.as_str(),
+                                username.as_str(),
+                                password.as_str(),
+                                true,
+                            );
+
+                            let task = FullRestoreTask::new(postgres, bridge);
+                            task.run()?
+                        }
+                        ConnectionUri::Mysql(host, port, username, password, database) => {
+                            todo!()
+                        }
+                    }
+
+                    println!("Restore successful!")
+                }
+                None => {
+                    return Err(anyhow::Error::from(Error::new(
+                        ErrorKind::Other,
+                        "missing <destination> object in the configuration file",
+                    )));
+                }
+            },
+        },
+    };
 
     Ok(())
 }

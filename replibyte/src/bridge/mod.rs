@@ -1,5 +1,5 @@
 use crate::connector::Connector;
-use crate::types::{Bytes, Queries, Query};
+use crate::types::Bytes;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 
@@ -17,12 +17,12 @@ pub trait Bridge: Connector + Send + Sync {
 
 #[derive(Serialize, Deserialize)]
 pub struct IndexFile {
-    backups: Vec<Backup>,
+    pub backups: Vec<Backup>,
 }
 
 #[derive(Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Backup {
-    directory_name: String,
-    size: usize,
-    created_at: u128,
+    pub directory_name: String,
+    pub size: usize,
+    pub created_at: u128,
 }

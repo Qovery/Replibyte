@@ -5,9 +5,7 @@ use std::thread;
 use crate::bridge::Bridge;
 use crate::destination::Destination;
 use crate::tasks::{Message, Task};
-use crate::transformer::Transformer;
-use crate::types::{Bytes, Queries};
-use crate::Source;
+use crate::types::Bytes;
 
 /// FullRestoreTask is a wrapping struct to execute the synchronization between a *Bridge* and a *Source*.
 pub struct FullRestoreTask<D, B>

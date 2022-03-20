@@ -4,7 +4,6 @@ use crate::transformer::Transformer;
 use serde;
 use serde::{Deserialize, Serialize};
 use std::io::{Error, ErrorKind};
-use std::net::Ipv4Addr;
 use uriparse::URIReference;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

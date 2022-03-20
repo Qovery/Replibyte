@@ -1,7 +1,6 @@
 pub mod full_backup;
 pub mod full_restore;
 
-use crate::types::Queries;
 use std::io::Error;
 
 pub trait Task {
