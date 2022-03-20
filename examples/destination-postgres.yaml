@@ -1,0 +1,10 @@
+bind: 127.0.0.1
+port: 1337
+destination:
+  connection_uri: postgres://root:password@localhost:5453/root
+  cron: 0 5 * * * # every day at 5 am
+bridge:
+  bucket: replibyte-test
+  region: us-east-2
+  access_key_id: $AWS_ACCESS_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY

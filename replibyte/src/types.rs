@@ -1,6 +1,18 @@
+pub type Bytes = Vec<u8>;
 pub type OriginalQuery = Query;
 
 pub type Queries = Vec<Query>;
+
+pub fn to_bytes(queries: Queries) -> Bytes {
+    queries
+        .into_iter()
+        .flat_map(|query| {
+            let mut bytes = query.0;
+            bytes.push(b'\n');
+            bytes
+        })
+        .collect::<Vec<_>>()
+}
 
 #[derive(Debug, Clone)]
 pub struct Query(pub Vec<u8>);

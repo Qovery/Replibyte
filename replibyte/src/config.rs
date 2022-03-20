@@ -11,8 +11,31 @@ use uriparse::URIReference;
 pub struct Config {
     pub bind: Ipv4Addr,
     pub port: u16,
-    pub source: SourceConfig,
+    pub source: Option<SourceConfig>,
     pub bridge: BridgeConfig,
+    pub destination: Option<DestinationConfig>,
+}
+
+pub enum ConnectorConfig<'a> {
+    Source(&'a SourceConfig),
+    Destination(&'a DestinationConfig),
+}
+
+impl Config {
+    pub fn connector(&self) -> Result<ConnectorConfig, Error> {
+        if let Some(source) = &self.source {
+            return Ok(ConnectorConfig::Source(source));
+        }
+
+        if let Some(destination) = &self.destination {
+            return Ok(ConnectorConfig::Destination(destination));
+        }
+
+        Err(Error::new(
+            ErrorKind::Other,
+            "<source> or <destination> is mandatory",
+        ))
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -54,6 +77,17 @@ pub struct SourceConfig {
 }
 
 impl SourceConfig {
+    pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
+        parse_connection_uri(self.connection_uri.as_str())
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct DestinationConfig {
+    pub connection_uri: String,
+}
+
+impl DestinationConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }

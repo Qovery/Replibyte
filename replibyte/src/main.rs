@@ -1,17 +1,20 @@
 use std::fs::File;
 use std::path::PathBuf;
 
-use crate::bridge::s3::S3;
-use crate::config::{Config, ConnectionUri};
-use crate::source::postgres::Postgres;
-use crate::source::Source;
-use crate::tasks::{FullBackupTask, Task};
 use clap::Parser;
+
+use crate::bridge::s3::S3;
+use crate::config::{Config, ConnectionUri, ConnectorConfig};
+use crate::destination::postgres::Postgres as DestinationPostgres;
+use crate::source::postgres::Postgres as SourcePostgres;
+use crate::source::Source;
+use crate::tasks::full_backup::FullBackupTask;
+use crate::tasks::full_restore::FullRestoreTask;
+use crate::tasks::Task;
 
 mod bridge;
 mod config;
 mod connector;
-mod database;
 mod destination;
 mod runtime;
 mod source;
@@ -43,38 +46,59 @@ fn main() -> anyhow::Result<()> {
         config.bridge.secret_access_key()?,
     );
 
-    // Match the transformers from the config
-    let transformers = config
-        .source
-        .transformers
-        .iter()
-        .flat_map(|transformer| {
-            transformer.columns.iter().map(|column| {
-                column.transformer.transformer(
-                    transformer.database.as_str(),
-                    transformer.table.as_str(),
-                    column.name.as_str(),
-                )
-            })
-        })
-        .collect::<Vec<_>>();
+    match config.connector()? {
+        ConnectorConfig::Source(source) => {
+            // Match the transformers from the config
+            let transformers = source
+                .transformers
+                .iter()
+                .flat_map(|transformer| {
+                    transformer.columns.iter().map(|column| {
+                        column.transformer.transformer(
+                            transformer.database.as_str(),
+                            transformer.table.as_str(),
+                            column.name.as_str(),
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
 
-    match config.source.connection_uri()? {
-        ConnectionUri::Postgres(host, port, username, password, database) => {
-            let postgres = Postgres::new(
-                host.as_str(),
-                port,
-                database.as_str(),
-                username.as_str(),
-                password.as_str(),
-            );
+            match source.connection_uri()? {
+                ConnectionUri::Postgres(host, port, username, password, database) => {
+                    let postgres = SourcePostgres::new(
+                        host.as_str(),
+                        port,
+                        database.as_str(),
+                        username.as_str(),
+                        password.as_str(),
+                    );
 
-            let task = FullBackupTask::new(postgres, &transformers, bridge);
-            task.run()?
+                    let task = FullBackupTask::new(postgres, &transformers, bridge);
+                    task.run()?
+                }
+                ConnectionUri::Mysql(host, port, username, password, database) => {
+                    todo!()
+                }
+            }
         }
-        ConnectionUri::Mysql(host, port, username, password, database) => {
-            todo!()
-        }
+        ConnectorConfig::Destination(destination) => match destination.connection_uri()? {
+            ConnectionUri::Postgres(host, port, username, password, database) => {
+                let postgres = DestinationPostgres::new(
+                    host.as_str(),
+                    port,
+                    database.as_str(),
+                    username.as_str(),
+                    password.as_str(),
+                    true,
+                );
+
+                let task = FullRestoreTask::new(postgres, bridge);
+                task.run()?
+            }
+            ConnectionUri::Mysql(host, port, username, password, database) => {
+                todo!()
+            }
+        },
     }
 
     Ok(())

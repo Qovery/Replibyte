@@ -1,21 +1,14 @@
-use crate::bridge::Bridge;
-use crate::transformer::Transformer;
-use crate::types::Queries;
-use crate::Source;
 use std::io::Error;
 use std::sync::mpsc;
 use std::thread;
 
-pub trait Task {
-    fn run(self) -> Result<(), Error>;
-}
+use crate::bridge::Bridge;
+use crate::tasks::{Message, Task};
+use crate::transformer::Transformer;
+use crate::types::{to_bytes, Queries};
+use crate::Source;
 
-/// inter-thread message for Source and Bridge
-#[derive(Debug, Clone)]
-enum Message {
-    Data { chunk_part: u16, queries: Queries },
-    EOF,
-}
+type DataMessage = (u16, Queries);
 
 /// FullBackupTask is a wrapping struct to execute the synchronization between a *Source* and a *Bridge*
 pub struct FullBackupTask<'a, S, B>
@@ -54,25 +47,21 @@ where
         // initialize the bridge
         let _ = self.bridge.init()?;
 
-        let (tx, rx) = mpsc::sync_channel::<Message>(1);
+        let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(1);
         let bridge = self.bridge;
 
         let join_handle = thread::spawn(move || {
             // managing Bridge (S3) upload here
             let bridge = bridge;
 
-            // TODO get the value of rx and upload to bridge
             loop {
                 let (chunk_part, queries) = match rx.recv() {
-                    Ok(Message::Data {
-                        chunk_part,
-                        queries,
-                    }) => (chunk_part, queries),
+                    Ok(Message::Data((chunk_part, queries))) => (chunk_part, queries),
                     Ok(Message::EOF) => break,
                     Err(err) => panic!("{:?}", err), // FIXME what should I do here?
                 };
 
-                let _ = match bridge.upload(chunk_part, queries) {
+                let _ = match bridge.upload(chunk_part, to_bytes(queries)) {
                     Ok(_) => {}
                     Err(err) => {
                         panic!("{:?}", err);
@@ -89,16 +78,13 @@ where
 
         let _ = self
             .source
-            .stream_dump_queries(self.transformers, |original_query, query| {
+            .read(self.transformers, |original_query, query| {
                 if consumed_buffer_size + query.data().len() > buffer_size {
                     chunk_part += 1;
                     consumed_buffer_size = 0;
                     // TODO .clone() - look if we do not consume more mem
 
-                    let message = Message::Data {
-                        chunk_part,
-                        queries: queries.clone(),
-                    };
+                    let message = Message::Data((chunk_part, queries.clone()));
 
                     let _ = tx.send(message); // FIXME catch SendError?
                     let _ = queries.clear();
@@ -109,11 +95,7 @@ where
             });
 
         chunk_part += 1;
-        let _ = tx.send(Message::Data {
-            chunk_part,
-            queries,
-        });
-
+        let _ = tx.send(Message::Data((chunk_part, queries)));
         let _ = tx.send(Message::EOF);
         // wait for end of upload execution
         let _ = join_handle.join(); // FIXME catch result here

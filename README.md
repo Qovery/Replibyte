@@ -57,7 +57,6 @@ source:
         - name: first_name
           transformer: first-name
 bridge:
-  type: s3
   bucket: $BUCKET_NAME
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
@@ -77,7 +76,6 @@ Create your `staging-conf.yaml` configuration file to sync your production datab
 bind: 127.0.0.1
 port: 1338
 bridge:
-  - type: s3
     bucket: $BUCKET_NAME
     access_key_id: $ACCESS_KEY_ID
     secret_access_key: $AWS_SECRET_ACCESS_KEY

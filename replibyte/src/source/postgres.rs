@@ -10,7 +10,6 @@ use dump_parser::postgres::{
 use dump_parser::utils::list_queries_from_dump_reader;
 
 use crate::connector::Connector;
-use crate::database::Database;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
@@ -48,10 +47,8 @@ impl<'a> Connector for Postgres<'a> {
     }
 }
 
-impl<'a> Source for Postgres<'a> {}
-
-impl<'a> Database for Postgres<'a> {
-    fn stream_dump_queries<F: FnMut(OriginalQuery, Query)>(
+impl<'a> Source for Postgres<'a> {
+    fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
         transformers: &Vec<Box<dyn Transformer + '_>>,
         mut query_callback: F,
@@ -265,16 +262,15 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
+    use crate::Source;
     use std::str;
     use std::vec;
 
-    use crate::database::Database;
-    use crate::source::postgres::to_query;
+    use crate::source::postgres::{to_query, Postgres};
     use crate::transformer::random::RandomTransformer;
     use crate::transformer::transient::TransientTransformer;
     use crate::transformer::Transformer;
     use crate::types::{Column, InsertIntoQuery};
-    use crate::Postgres;
 
     fn get_postgres() -> Postgres<'static> {
         Postgres::new("localhost", 5432, "root", "root", "password")
@@ -290,12 +286,12 @@ mod tests {
 
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.stream_dump_queries(&transformers, |_, _| {}).is_ok());
+        assert!(p.read(&transformers, |_, _| {}).is_ok());
 
         let p = get_invalid_postgres();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.stream_dump_queries(&transformers, |_, _| {}).is_err());
+        assert!(p.read(&transformers, |_, _| {}).is_err());
     }
 
     #[test]
@@ -303,7 +299,7 @@ mod tests {
         let p = get_postgres();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        p.stream_dump_queries(&transformers, |original_query, query| {
+        p.read(&transformers, |original_query, query| {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);
         });
@@ -398,7 +394,7 @@ mod tests {
 
         let transformers = vec![t1, t2];
 
-        p.stream_dump_queries(&transformers, |original_query, query| {
+        p.read(&transformers, |original_query, query| {
             assert!(query.data().len() > 0);
             assert!(query.data().len() > 0);
 

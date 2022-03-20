@@ -1,11 +1,8 @@
-use std::fmt::format;
 use std::io::{Error, ErrorKind};
 
 use aws_config::provider_config::ProviderConfig;
-use aws_sdk_s3::error::ListObjectsV2Error;
-use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration};
-use aws_sdk_s3::output::ListObjectsV2Output;
-use aws_sdk_s3::types::{ByteStream, SdkError};
+use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration, Object};
+use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::Client;
 use aws_types::os_shim_internal::Env;
 use log::{error, info};
@@ -14,7 +11,7 @@ use crate::bridge::s3::S3Error::FailedObjectUpload;
 use crate::bridge::{Backup, Bridge, IndexFile};
 use crate::connector::Connector;
 use crate::runtime::block_on;
-use crate::types::{Queries, Query};
+use crate::types::{Bytes, Query};
 use crate::utils::epoch_millis;
 
 const INDEX_FILE_NAME: &str = "metadata.json";
@@ -93,16 +90,7 @@ impl Bridge for S3 {
         .map_err(|err| Error::from(err))
     }
 
-    fn upload(&self, file_part: u16, queries: Queries) -> Result<(), Error> {
-        let data = queries
-            .into_iter()
-            .flat_map(|query| {
-                let mut bytes = query.0;
-                bytes.push(b'\n');
-                bytes
-            })
-            .collect::<Vec<_>>();
-
+    fn upload(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
         let data_size = data.len();
         let key = format!("{}/{}.dump", self.root_key.as_str(), file_part);
 
@@ -140,10 +128,33 @@ impl Bridge for S3 {
         self.save(&index_file)
     }
 
-    fn download<F>(&self, query_callback: F) -> Result<(), Error>
+    fn download<F>(&self, mut data_callback: F) -> Result<(), Error>
     where
-        F: FnMut(Query),
+        F: FnMut(Bytes),
     {
+        let mut index_file = self.index_file()?;
+
+        index_file
+            .backups
+            .sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+        if let None = index_file.backups.last() {
+            return Ok(());
+        }
+
+        // get last backup
+        // TODO: make configurable the backup choice
+        let last_backup = index_file.backups.last().unwrap();
+
+        for object in list_objects(
+            &self.client,
+            self.bucket.as_str(),
+            Some(last_backup.directory_name.as_str()),
+        )? {
+            let data = get_object(&self.client, self.bucket.as_str(), object.key().unwrap())?;
+            data_callback(data);
+        }
+
         Ok(())
     }
 }
@@ -245,17 +256,8 @@ fn create_bucket<'a>(client: &Client, bucket: &'a str, region: &str) -> Result<(
 
 fn delete_bucket<'a>(client: &Client, bucket: &'a str, force: bool) -> Result<(), S3Error<'a>> {
     if force {
-        let objects = block_on(client.list_objects_v2().bucket(bucket).send());
-        let objects = match objects {
-            Ok(objects) => objects,
-            Err(err) => {
-                error!("{}", err);
-                return Err(S3Error::FailedToListObjects { bucket });
-            }
-        };
-
-        for content in objects.contents().unwrap() {
-            let _ = delete_object(client, bucket, content.key().unwrap_or(""));
+        for object in list_objects(client, bucket, None)? {
+            let _ = delete_object(client, bucket, object.key().unwrap_or(""));
         }
     }
 
@@ -306,6 +308,28 @@ fn get_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<Vec<
         },
         Err(_) => Err(S3Error::ObjectDoesNotExist { bucket, key }),
     }
+}
+
+fn list_objects<'a>(
+    client: &Client,
+    bucket: &'a str,
+    path: Option<&'a str>,
+) -> Result<Vec<Object>, S3Error<'a>> {
+    let full_bucket_path = match path {
+        Some(p) => format!("{}/{}", bucket, p),
+        None => bucket.to_string(),
+    };
+
+    let objects = block_on(client.list_objects_v2().bucket(full_bucket_path)..send());
+    let objects = match objects {
+        Ok(objects) => objects,
+        Err(err) => {
+            error!("{}", err);
+            return Err(S3Error::FailedToListObjects { bucket });
+        }
+    };
+
+    Ok(objects.contents.unwrap_or(Vec::new()))
 }
 
 fn delete_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<(), S3Error<'a>> {
