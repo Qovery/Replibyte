@@ -14,6 +14,7 @@ use crate::bridge::s3::S3;
 use crate::bridge::{Bridge, DownloadOptions};
 use crate::cli::{BackupCommand, SubCommand, CLI};
 use crate::config::{Config, ConnectionUri};
+use crate::connector::Connector;
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
@@ -35,8 +36,15 @@ mod transformer;
 mod types;
 mod utils;
 
-fn list_backups(s3: &S3) -> Result<(), Error> {
+fn list_backups(s3: &mut S3) -> Result<(), Error> {
+    let _ = s3.init()?;
     let mut index_file = s3.index_file()?;
+
+    if index_file.backups.is_empty() {
+        println!("<empty> no backups available\n");
+        return Ok(());
+    }
+
     index_file.backups.sort_by(|a, b| a.cmp(b).reverse());
 
     let mut table = table();
@@ -64,7 +72,7 @@ fn main() -> anyhow::Result<()> {
     let file = File::open(args.config)?;
     let config: Config = serde_yaml::from_reader(file)?;
 
-    let bridge = S3::new(
+    let mut bridge = S3::new(
         config.bridge.bucket()?,
         config.bridge.region()?,
         config.bridge.access_key_id()?,
@@ -75,7 +83,7 @@ fn main() -> anyhow::Result<()> {
     match sub_commands {
         SubCommand::Backup(cmd) => match cmd {
             BackupCommand::List => {
-                let _ = list_backups(&bridge)?;
+                let _ = list_backups(&mut bridge)?;
             }
             BackupCommand::Run(args) => match config.source {
                 Some(source) => {
