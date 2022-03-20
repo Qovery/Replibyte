@@ -357,7 +357,7 @@ fn list_objects<'a>(
         .collect::<Vec<_>>();
 
     // sort by key
-    objects.sort();
+    objects.sort_by(|a, b| a.key.cmp(&b.key));
 
     Ok(objects)
 }
