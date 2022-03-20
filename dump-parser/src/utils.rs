@@ -46,14 +46,16 @@ where
             Err(err) => return Err(ReadError(err)),
         };
 
-        let last_idx = if buf_bytes.len() < 1 {
-            0
+        let last_real_char_idx = if buf_bytes.len() > 1 {
+            buf_bytes.len() - 2
+        } else if buf_bytes.len() == 1 {
+            1
         } else {
-            buf_bytes.len() - 1
+            0
         };
 
         // check end of line is a ';' char - it would mean it's the end of the query
-        let is_last_by_end_of_query = match line_buf_bytes.get(last_idx) {
+        let is_last_by_end_of_query = match line_buf_bytes.get(last_real_char_idx) {
             Some(byte) => *byte == b';',
             None => false,
         };
@@ -87,12 +89,7 @@ where
             let _ = buf_bytes.append(&mut line_buf_bytes);
         }
 
-        let last_char_of_buf_bytes_is_end_of_query = match buf_bytes.last() {
-            Some(char_byte) => *char_byte == b';',
-            None => false,
-        };
-
-        if (total_bytes <= 1 && last_char_of_buf_bytes_is_end_of_query) || is_last_by_end_of_query {
+        if total_bytes <= 1 || is_last_by_end_of_query {
             if count_empty_lines == 0 && buf_bytes.len() > 1 {
                 let query_str = str::from_utf8(buf_bytes.as_slice()).unwrap(); // FIXME remove unwrap
 
