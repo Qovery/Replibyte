@@ -74,10 +74,10 @@ Restore your Postgres databases from S3
 ```shell
 replibyte backup list -c prod-conf.yaml
 
-name                    size    when
-backup-1647706359405    154MB   Yesterday at 03:00 am
-backup-1647731334517    152MB   2 days ago at 03:00 am
-backup-1647734369306    149MB   3 days ago at 03:00 am
+type          name                    size    when
+PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am
+PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am
+PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am
 ```
 
 ```shell
