@@ -14,6 +14,8 @@ use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
 
+const COMMENT_CHARS: &str = "--";
+
 pub struct Postgres<'a> {
     host: &'a str,
     port: u16,
@@ -95,7 +97,7 @@ impl<'a> Source for Postgres<'a> {
 
         // TODO we need to check that there is no duplicate
 
-        match list_queries_from_dump_reader(reader, |query| {
+        match list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
             let tokens = get_tokens_from_query_str(query);
 
             if match_keyword_at_position(Keyword::Insert, &tokens, 0)
