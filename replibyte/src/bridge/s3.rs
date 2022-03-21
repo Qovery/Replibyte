@@ -4,12 +4,13 @@ use std::str::FromStr;
 use aws_config::provider_config::ProviderConfig;
 use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration, Object};
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Client, Endpoint};
+use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
 use crate::bridge::{Backup, Bridge, DownloadOptions, IndexFile};
+use crate::config::Endpoint;
 use crate::connector::Connector;
 use crate::runtime::block_on;
 use crate::types::Bytes;
@@ -30,6 +31,7 @@ impl S3 {
         region: S,
         access_key_id: S,
         secret_access_key: S,
+        endpoint: Endpoint,
     ) -> Self {
         let access_key_id = access_key_id.into();
         let secret_access_key = secret_access_key.into();
@@ -45,13 +47,23 @@ impl S3 {
                 .load(),
         );
 
-        let s3_config = aws_sdk_s3::config::Builder::from(&sdk_config).build();
+        let s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
+
+        let s3_config = match endpoint {
+            Endpoint::Default => s3_config_builder.build(),
+            Endpoint::Custom(url) => match http::Uri::from_str(url.as_str()) {
+                Ok(uri) => s3_config_builder
+                    .endpoint_resolver(SdkEndpoint::immutable(uri))
+                    .build(),
+                Err(err) => s3_config_builder.build(),
+            },
+        };
 
         S3 {
             bucket: bucket.into().to_string(),
-            root_key: get_root_key(),
+            root_key: format!("backup-{}", epoch_millis()),
             region,
-            client: aws_sdk_s3::Client::from_conf(s3_config),
+            client: Client::from_conf(s3_config),
         }
     }
 
@@ -373,71 +385,6 @@ fn delete_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<(
     }
 }
 
-pub struct S3Builder {
-    bucket: String,
-    region: String,
-    access_key_id: String,
-    secret_access_key: String,
-    endpoint: Option<String>,
-}
-
-impl S3Builder {
-    pub fn new(
-        bucket: String,
-        region: String,
-        access_key_id: String,
-        secret_access_key: String,
-    ) -> Self {
-        Self {
-            bucket,
-            region,
-            access_key_id,
-            secret_access_key,
-            endpoint: None,
-        }
-    }
-
-    pub fn endpoint(mut self, endpoint_uri: String) -> Self {
-        self.endpoint = Some(endpoint_uri);
-        self
-    }
-
-    pub fn build(self) -> S3 {
-        let sdk_config = block_on(
-            aws_config::from_env()
-                .configure(ProviderConfig::default().with_env(Env::from_slice(&[
-                    ("AWS_ACCESS_KEY_ID", self.access_key_id.as_str()),
-                    ("AWS_SECRET_ACCESS_KEY", self.secret_access_key.as_str()),
-                    ("AWS_REGION", self.region.as_str()),
-                ])))
-                .load(),
-        );
-
-        let s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
-
-        let s3_config = match self.endpoint {
-            Some(endpoint) => match http::Uri::from_str(endpoint.as_str()) {
-                Ok(uri) => s3_config_builder
-                    .endpoint_resolver(Endpoint::immutable(uri))
-                    .build(),
-                Err(err) => s3_config_builder.build(),
-            },
-            None => s3_config_builder.build(),
-        };
-
-        S3 {
-            bucket: self.bucket,
-            root_key: get_root_key(),
-            region: self.region,
-            client: aws_sdk_s3::Client::from_conf(s3_config),
-        }
-    }
-}
-
-fn get_root_key() -> String {
-    format!("backup-{}", epoch_millis())
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::SystemTime;
@@ -446,11 +393,10 @@ mod tests {
 
     use crate::bridge::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
     use crate::bridge::{Backup, Bridge};
+    use crate::config::Endpoint;
     use crate::connector::Connector;
     use crate::utils::epoch_millis;
     use crate::S3;
-
-    use super::S3Builder;
 
     const BUCKET_NAME: &str = "replibyte-test";
     const REGION: &str = "us-east-2";
@@ -470,14 +416,13 @@ mod tests {
     fn s3(bucket: &str) -> S3 {
         let (access_key_id, secret_access_key) = credentials();
 
-        S3Builder::new(
+        S3::new(
             bucket.to_string(),
             "us-east-2".to_string(),
             access_key_id,
             secret_access_key,
+            Endpoint::Custom(MINIO_ENDPOINT.to_string()),
         )
-        .endpoint(MINIO_ENDPOINT.to_string())
-        .build()
     }
 
     #[test]

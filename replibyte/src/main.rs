@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::time::Duration;
 
-use bridge::s3::S3Builder;
 use clap::Parser;
 use timeago::Formatter;
 
@@ -64,17 +63,13 @@ fn main() -> anyhow::Result<()> {
     let file = File::open(args.config)?;
     let config: Config = serde_yaml::from_reader(file)?;
 
-    let s3_builder = S3Builder::new(
+    let bridge = S3::new(
         config.bridge.bucket()?,
         config.bridge.region()?,
         config.bridge.access_key_id()?,
         config.bridge.secret_access_key()?,
+        config.bridge.endpoint()?,
     );
-
-    let bridge = match config.bridge.endpoint() {
-        Some(endpoint) => s3_builder.endpoint(endpoint?).build(),
-        None => s3_builder.build(),
-    };
 
     let sub_commands: &SubCommand = &args.sub_commands;
     match sub_commands {
