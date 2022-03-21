@@ -45,6 +45,7 @@ pub struct BridgeConfig {
     pub region: String,
     pub access_key_id: String,
     pub secret_access_key: String,
+    pub endpoint: Option<Endpoint>,
 }
 
 impl BridgeConfig {
@@ -66,6 +67,21 @@ impl BridgeConfig {
     /// decode and return the secret_access_key value
     pub fn secret_access_key(&self) -> Result<String, Error> {
         substitute_env_var(self.secret_access_key.as_str())
+    }
+
+    /// decode and return the endpoint value
+    pub fn endpoint(&self) -> Result<Endpoint, Error> {
+        if let Some(endpoint) = &self.endpoint {
+            match endpoint {
+                Endpoint::Custom(url) => match substitute_env_var(url.as_str()) {
+                    Ok(substituted_url) => Ok(Endpoint::Custom(substituted_url)),
+                    Err(err) => Err(err),
+                },
+                _ => Ok(Endpoint::Default),
+            }
+        } else {
+            Ok(Endpoint::Default)
+        }
     }
 }
 
@@ -257,6 +273,14 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
     };
 
     Ok(connection_uri)
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Endpoint {
+    #[serde(rename = "custom")]
+    Custom(String),
+    #[serde(rename = "default")]
+    Default,
 }
 
 /// take as input $KEY_ENV_VAR and convert it into a real value if the env var does exist

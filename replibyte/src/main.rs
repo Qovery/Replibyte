@@ -77,6 +77,7 @@ fn main() -> anyhow::Result<()> {
         config.bridge.region()?,
         config.bridge.access_key_id()?,
         config.bridge.secret_access_key()?,
+        config.bridge.endpoint()?,
     );
 
     let sub_commands: &SubCommand = &args.sub_commands;

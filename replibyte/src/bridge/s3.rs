@@ -1,14 +1,16 @@
 use std::io::{Error, ErrorKind};
+use std::str::FromStr;
 
 use aws_config::provider_config::ProviderConfig;
 use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration, Object};
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::Client;
+use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
 use crate::bridge::{Backup, Bridge, DownloadOptions, IndexFile};
+use crate::config::Endpoint;
 use crate::connector::Connector;
 use crate::runtime::block_on;
 use crate::types::Bytes;
@@ -29,6 +31,7 @@ impl S3 {
         region: S,
         access_key_id: S,
         secret_access_key: S,
+        endpoint: Endpoint,
     ) -> Self {
         let access_key_id = access_key_id.into();
         let secret_access_key = secret_access_key.into();
@@ -44,11 +47,23 @@ impl S3 {
                 .load(),
         );
 
+        let s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
+
+        let s3_config = match endpoint {
+            Endpoint::Default => s3_config_builder.build(),
+            Endpoint::Custom(url) => match http::Uri::from_str(url.as_str()) {
+                Ok(uri) => s3_config_builder
+                    .endpoint_resolver(SdkEndpoint::immutable(uri))
+                    .build(),
+                Err(err) => s3_config_builder.build(),
+            },
+        };
+
         S3 {
             bucket: bucket.into().to_string(),
             root_key: format!("backup-{}", epoch_millis()),
             region,
-            client: Client::new(&sdk_config),
+            client: Client::from_conf(s3_config),
         }
     }
 
@@ -381,12 +396,14 @@ mod tests {
 
     use crate::bridge::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
     use crate::bridge::{Backup, Bridge};
+    use crate::config::Endpoint;
     use crate::connector::Connector;
     use crate::utils::epoch_millis;
     use crate::S3;
 
     const BUCKET_NAME: &str = "replibyte-test";
     const REGION: &str = "us-east-2";
+    const MINIO_ENDPOINT: &str = "http://localhost:9000";
 
     fn bucket() -> String {
         format!("replibyte-test-{}", Faker.fake::<String>().to_lowercase())
@@ -403,10 +420,11 @@ mod tests {
         let (access_key_id, secret_access_key) = credentials();
 
         S3::new(
-            bucket,
-            "us-east-2",
-            access_key_id.as_str(),
-            secret_access_key.as_str(),
+            bucket.to_string(),
+            "us-east-2".to_string(),
+            access_key_id,
+            secret_access_key,
+            Endpoint::Custom(MINIO_ENDPOINT.to_string()),
         )
     }
 

@@ -1396,6 +1396,7 @@ dependencies = [
  "dump-parser",
  "env_logger",
  "fake",
+ "http",
  "lazy_static",
  "log",
  "prettytable-rs",
