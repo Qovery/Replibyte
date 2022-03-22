@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use std::future::Future;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
