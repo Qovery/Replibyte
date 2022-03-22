@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Read, Write};
 use std::str::FromStr;
 
 use aws_config::provider_config::ProviderConfig;
@@ -6,6 +6,9 @@ use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration, Obj
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
@@ -77,6 +80,19 @@ impl S3 {
             }
         }
     }
+
+    fn compress(&self, data: Bytes) -> Result<Bytes, Error> {
+        let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
+        let _ = enc.write_all(data.as_slice());
+        enc.finish()
+    }
+
+    fn decompress(&self, data: Bytes) -> Result<Bytes, Error> {
+        let mut dec = ZlibDecoder::new(data.as_slice());
+        let mut s = String::new();
+        dec.read_to_string(&mut s);
+        Ok(s.into_bytes())
+    }
 }
 
 impl Connector for S3 {
@@ -106,6 +122,7 @@ impl Bridge for S3 {
     }
 
     fn upload(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
+        let data = self.compress(data)?;
         let data_size = data.len();
         let key = format!("{}/{}.dump", self.root_key.as_str(), file_part);
 
@@ -183,6 +200,7 @@ impl Bridge for S3 {
             Some(backup.directory_name.as_str()),
         )? {
             let data = get_object(&self.client, self.bucket.as_str(), object.key().unwrap())?;
+            let data = self.decompress(data)?;
             data_callback(data);
         }
 

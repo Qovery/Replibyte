@@ -187,9 +187,10 @@ sequenceDiagram
 ## Features
 
 - [x] Complete data synchronization
-- [x] Backup TB of data (read [Design](#design))
 - [x] Work on different VPC/network
 - [x] Generate random/fake information
+- [x] Backup TB of data (read [Design](#design))
+- [x] On-the-fly data (de)compression (Zlib)
 
 Here are the features we plan to support
 
@@ -294,11 +295,6 @@ never be. If you need to synchronize versatile data sources, you are better choo
 engineers to help them to synchronize data from the same databases. With RepliByte, you can only replicate data from the same type of
 databases. As mentioned above, the primary purpose of RepliByte is to duplicate into different environments. You can see RepliByte as a
 specific use case of an ETL, where an ETL is more generic.
-
-### RepliByte is not a database backup tool
-
-Even if you can use RepliByte as a database backup tool, we have not designed it this way. It might change in the future, but at the moment
-RepliByte has not been designed to make all the checks needed to guarantee that the backup is consistent.
 
 ## FAQ
 
