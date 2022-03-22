@@ -24,7 +24,7 @@ impl Source for PostgresStdin {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
         transformers: &Vec<Box<dyn Transformer + '_>>,
-        mut query_callback: F,
+        query_callback: F,
     ) -> Result<(), Error> {
         let reader = BufReader::new(stdin());
         read_and_transform(reader, transformers, query_callback);

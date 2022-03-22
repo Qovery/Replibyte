@@ -53,7 +53,7 @@ impl<'a> Source for Postgres<'a> {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
         transformers: &Vec<Box<dyn Transformer + '_>>,
-        mut query_callback: F,
+        query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 

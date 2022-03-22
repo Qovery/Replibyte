@@ -1,5 +1,6 @@
-use std::io::{Error, ErrorKind};
+use std::io::{stdin, stdout, Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
+use tokio::io::AsyncWriteExt;
 
 use crate::connector::Connector;
 use crate::destination::Destination;
@@ -55,6 +56,7 @@ impl<'a> Connector for Postgres<'a> {
                     "-c",
                     wipe_db_query.as_str(),
                 ])
+                .stdout(Stdio::null())
                 .spawn()?
                 .wait()?;
 
@@ -73,7 +75,6 @@ impl<'a> Connector for Postgres<'a> {
 impl<'a> Destination for Postgres<'a> {
     fn insert(&self, data: Vec<u8>) -> Result<(), Error> {
         let s_port = self.port.to_string();
-        let queries = std::str::from_utf8(data.as_slice()).unwrap();
 
         let mut process = Command::new("psql")
             .env("PGPASSWORD", self.password)
@@ -86,11 +87,12 @@ impl<'a> Destination for Postgres<'a> {
                 self.database,
                 "-U",
                 self.username,
-                "-c",
-                queries,
             ])
             .stdin(Stdio::piped())
+            .stdout(Stdio::null())
             .spawn()?;
+
+        let _ = process.stdin.take().unwrap().write_all(data.as_slice());
 
         let exit_status = process.wait()?;
         if !exit_status.success() {

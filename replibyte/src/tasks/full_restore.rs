@@ -39,7 +39,7 @@ where
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
         mut self,
-        progress_callback: F,
+        mut progress_callback: F,
     ) -> Result<(), Error> {
         // initialize the destination
         let _ = self.destination.init()?;
@@ -50,6 +50,12 @@ where
         // bound to 1 to avoid eating too much memory if we download the dump faster than we ingest it
         let (tx, rx) = mpsc::sync_channel::<Message<Bytes>>(1);
         let bridge = self.bridge;
+
+        let mut index_file = bridge.index_file()?;
+        let backup = index_file.find_backup(&self.bridge_download_options)?;
+
+        // init progress
+        progress_callback(0, backup.size);
 
         let download_options = self.bridge_download_options.clone();
 
@@ -75,11 +81,15 @@ where
                 Err(err) => panic!("{:?}", err), // FIXME what should I do here?
             };
 
+            progress_callback(data.len(), backup.size);
+
             let _ = self.destination.insert(data)?;
         }
 
         // wait for end of download execution
         let _ = join_handle.join(); // FIXME catch result here
+
+        progress_callback(backup.size, backup.size);
 
         Ok(())
     }

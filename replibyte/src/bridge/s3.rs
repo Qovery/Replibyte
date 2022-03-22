@@ -84,14 +84,14 @@ impl S3 {
     fn compress(&self, data: Bytes) -> Result<Bytes, Error> {
         let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
         let _ = enc.write_all(data.as_slice());
-        enc.finish()
+        enc.flush_finish()
     }
 
     fn decompress(&self, data: Bytes) -> Result<Bytes, Error> {
         let mut dec = ZlibDecoder::new(data.as_slice());
-        let mut s = String::new();
-        dec.read_to_string(&mut s);
-        Ok(s.into_bytes())
+        let mut decoded_data = Vec::new();
+        let _ = dec.read_to_end(&mut decoded_data);
+        Ok(decoded_data)
     }
 }
 
@@ -165,34 +165,7 @@ impl Bridge for S3 {
         F: FnMut(Bytes),
     {
         let mut index_file = self.index_file()?;
-
-        let backup = match options {
-            DownloadOptions::Latest => {
-                index_file
-                    .backups
-                    .sort_by(|a, b| a.created_at.cmp(&b.created_at));
-
-                match index_file.backups.last() {
-                    Some(backup) => backup,
-                    None => return Err(Error::new(ErrorKind::Other, "No backups available.")),
-                }
-            }
-            DownloadOptions::Backup { name } => {
-                match index_file
-                    .backups
-                    .iter()
-                    .find(|backup| backup.directory_name.as_str() == name.as_str())
-                {
-                    Some(backup) => backup,
-                    None => {
-                        return Err(Error::new(
-                            ErrorKind::Other,
-                            format!("Can't find backup with name '{}'", name),
-                        ));
-                    }
-                }
-            }
-        };
+        let backup = index_file.find_backup(options)?;
 
         for object in list_objects(
             &self.client,

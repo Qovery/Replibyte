@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate prettytable;
 
-use std::cmp::max;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::sync::mpsc;
@@ -71,14 +70,11 @@ fn list_backups(s3: &mut S3) -> Result<(), Error> {
     Ok(())
 }
 
-fn _progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
+fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
     let pb = ProgressBar::new(0);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.green/blue}] {bytes}/{total_bytes} ({eta})")
-            .progress_chars("#>-"),
-    );
+    pb.set_style(ProgressStyle::default_spinner());
 
+    let mut style_is_progress_bar = false;
     let mut _max_bytes = 0usize;
     let mut last_transferred_bytes = 0usize;
 
@@ -87,6 +83,15 @@ fn _progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
             Ok(msg) => msg,
             Err(_) => (last_transferred_bytes, _max_bytes),
         };
+
+        if _max_bytes == 0 && style_is_progress_bar {
+            // show spinner if there is no max_bytes indicated
+            pb.set_style(ProgressStyle::default_spinner());
+        } else if _max_bytes > 0 && !style_is_progress_bar {
+            pb.set_style(ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.green/blue}] {bytes}/{total_bytes} ({eta})")
+                .progress_chars("#>-"));
+        }
 
         if max_bytes != _max_bytes {
             pb.set_length(max_bytes as u64);
@@ -117,7 +122,7 @@ fn main() -> anyhow::Result<()> {
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 
-    thread::spawn(move || _progress_bar(rx_pb));
+    thread::spawn(move || show_progress_bar(rx_pb));
     let progress_callback = |bytes: TransferredBytes, max_bytes: MaxBytes| {
         let _ = tx_pb.send((bytes, max_bytes));
     };
@@ -160,18 +165,19 @@ fn main() -> anyhow::Result<()> {
                                 task.run(progress_callback)?
                             }
                             ConnectionUri::Mysql(host, port, username, password, database) => {
-                                todo!()
+                                todo!() // FIXME
                             }
                         },
+                        // some user use "postgres" and "postgresql" both are valid
                         Some(v) if v == "postgres" || v == "postgresql" => {
                             if args.input {
                                 let postgres = PostgresStdin::default();
                                 let task = FullBackupTask::new(postgres, &transformers, bridge);
                                 task.run(progress_callback)?
                             } else if args.file.is_some() {
-                                todo!();
+                                todo!(); // FIXME
                             } else {
-                                todo!();
+                                todo!(); // FIXME
                             }
                         }
                         Some(v) => {
@@ -216,7 +222,7 @@ fn main() -> anyhow::Result<()> {
                         task.run(progress_callback)?
                     }
                     ConnectionUri::Mysql(host, port, username, password, database) => {
-                        todo!()
+                        todo!() // FIXME
                     }
                 }
 

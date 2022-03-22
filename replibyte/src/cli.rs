@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgEnum, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 /// RepliByte is a tool to synchronize cloud databases and fake sensitive data, just pass `-h`
 #[derive(Parser, Debug)]
@@ -8,8 +8,13 @@ use clap::{ArgEnum, Args, Parser, Subcommand};
 #[clap(propagate_version = true)]
 pub struct CLI {
     /// replibyte configuration file
-    #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
-    pub config: PathBuf,
+    #[clap(
+        short,
+        long,
+        default_value_t = String::from("replibyte.conf"),
+        value_name = "configuration file"
+    )]
+    pub config: String,
     #[clap(subcommand)]
     pub sub_commands: SubCommand,
 }
