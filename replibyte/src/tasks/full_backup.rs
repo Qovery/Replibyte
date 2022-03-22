@@ -103,6 +103,8 @@ where
                 queries.push(query);
             });
 
+        progress_callback(total_transferred_bytes, total_transferred_bytes);
+
         chunk_part += 1;
         let _ = tx.send(Message::Data((chunk_part, queries)));
         let _ = tx.send(Message::EOF);
