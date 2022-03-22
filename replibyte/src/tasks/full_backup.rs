@@ -3,8 +3,8 @@ use std::sync::mpsc;
 use std::thread;
 
 use crate::bridge::Bridge;
+use crate::source::SourceOptions;
 use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
-use crate::transformer::Transformer;
 use crate::types::{to_bytes, Queries};
 use crate::Source;
 
@@ -17,8 +17,8 @@ where
     B: Bridge + 'static,
 {
     source: S,
-    transformers: &'a Vec<Box<dyn Transformer>>,
     bridge: B,
+    options: SourceOptions<'a>,
 }
 
 impl<'a, S, B> FullBackupTask<'a, S, B>
@@ -26,11 +26,11 @@ where
     S: Source,
     B: Bridge + 'static,
 {
-    pub fn new(source: S, transformers: &'a Vec<Box<dyn Transformer>>, bridge: B) -> Self {
+    pub fn new(source: S, bridge: B, options: SourceOptions<'a>) -> Self {
         FullBackupTask {
             source,
-            transformers,
             bridge,
+            options,
         }
     }
 }
@@ -86,28 +86,26 @@ where
             buffer_size * (chunk_part as usize + 1),
         );
 
-        let _ = self
-            .source
-            .read(self.transformers, |original_query, query| {
-                if consumed_buffer_size + query.data().len() > buffer_size {
-                    chunk_part += 1;
-                    consumed_buffer_size = 0;
-                    // TODO .clone() - look if we do not consume more mem
+        let _ = self.source.read(self.options, |original_query, query| {
+            if consumed_buffer_size + query.data().len() > buffer_size {
+                chunk_part += 1;
+                consumed_buffer_size = 0;
+                // TODO .clone() - look if we do not consume more mem
 
-                    let message = Message::Data((chunk_part, queries.clone()));
+                let message = Message::Data((chunk_part, queries.clone()));
 
-                    let _ = tx.send(message); // FIXME catch SendError?
-                    let _ = queries.clear();
-                }
+                let _ = tx.send(message); // FIXME catch SendError?
+                let _ = queries.clear();
+            }
 
-                consumed_buffer_size += query.data().len();
-                total_transferred_bytes += query.data().len();
-                progress_callback(
-                    total_transferred_bytes,
-                    buffer_size * (chunk_part as usize + 1),
-                );
-                queries.push(query);
-            });
+            consumed_buffer_size += query.data().len();
+            total_transferred_bytes += query.data().len();
+            progress_callback(
+                total_transferred_bytes,
+                buffer_size * (chunk_part as usize + 1),
+            );
+            queries.push(query);
+        });
 
         progress_callback(total_transferred_bytes, total_transferred_bytes);
 

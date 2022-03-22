@@ -24,7 +24,7 @@ use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
-use crate::source::Source;
+use crate::source::{Source, SourceOptions};
 use crate::tasks::full_backup::FullBackupTask;
 use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::{MaxBytes, Task, TransferredBytes};
@@ -174,6 +174,17 @@ fn main() -> anyhow::Result<()> {
                         })
                         .collect::<Vec<_>>();
 
+                    let empty_config = vec![];
+                    let skip_config = match &source.skip {
+                        Some(config) => config,
+                        None => &empty_config,
+                    };
+
+                    let options = SourceOptions {
+                        transformers: &transformers,
+                        skip_config: &skip_config,
+                    };
+
                     match args.source_type.as_ref().map(|x| x.as_str()) {
                         None => match source.connection_uri()? {
                             ConnectionUri::Postgres(host, port, username, password, database) => {
@@ -185,7 +196,7 @@ fn main() -> anyhow::Result<()> {
                                     password.as_str(),
                                 );
 
-                                let task = FullBackupTask::new(postgres, &transformers, bridge);
+                                let task = FullBackupTask::new(postgres, bridge, options);
                                 task.run(progress_callback)?
                             }
                             ConnectionUri::Mysql(host, port, username, password, database) => {
@@ -202,7 +213,7 @@ fn main() -> anyhow::Result<()> {
                             }
 
                             let postgres = PostgresStdin::default();
-                            let task = FullBackupTask::new(postgres, &transformers, bridge);
+                            let task = FullBackupTask::new(postgres, bridge, options);
                             task.run(progress_callback)?
                         }
                         Some(v) => {

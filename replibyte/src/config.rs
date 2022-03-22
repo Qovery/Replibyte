@@ -92,6 +92,7 @@ impl BridgeConfig {
 pub struct SourceConfig {
     pub connection_uri: String,
     pub transformers: Vec<TransformerConfig>,
+    pub skip: Option<Vec<SkipConfig>>,
 }
 
 impl SourceConfig {
@@ -109,6 +110,11 @@ impl DestinationConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkipConfig {
+    pub database: String,
+    pub table: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
