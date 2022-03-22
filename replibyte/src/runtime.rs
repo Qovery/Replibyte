@@ -1,10 +1,10 @@
 use lazy_static::lazy_static;
 use std::future::Future;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
-    pub static ref TOKIO_RUNTIME: Mutex<Runtime> = Mutex::new({
+    static ref TOKIO_RUNTIME: Mutex<Runtime> = Mutex::new({
         Builder::new_current_thread()
             .thread_name("tokio-blocking")
             .enable_all()
@@ -13,14 +13,18 @@ lazy_static! {
     });
 }
 
-pub fn block_on<F: Future>(future: F, runtime: MutexGuard<Runtime>) -> F::Output {
+pub fn block_on<F: Future>(future: F) -> F::Output {
+    _block_on(future, TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock"))
+}
+
+fn _block_on<F: Future>(future: F, runtime: MutexGuard<Runtime>) -> F::Output {
     runtime.block_on(future)
 }
 
 #[cfg(test)]
 mod tests {
     use aws_types::SdkConfig;
-    use crate::runtime::block_on;
+    use crate::runtime::_block_on;
 
     #[test]
     fn test_block_on() {
@@ -32,7 +36,7 @@ mod tests {
                 .unwrap()
         );
         let config_future = aws_config::load_from_env();
-        let result = block_on(config_future, runtime.lock().unwrap());
+        let result = _block_on(config_future, runtime.lock().unwrap());
         assert_eq!(result.app_name(), None);
     }
 }

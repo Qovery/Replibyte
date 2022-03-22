@@ -10,7 +10,7 @@ use log::{error, info};
 use crate::bridge::s3::S3Error::FailedObjectUpload;
 use crate::bridge::{Backup, Bridge, DownloadOptions, IndexFile};
 use crate::connector::Connector;
-use crate::runtime::{block_on, TOKIO_RUNTIME};
+use crate::runtime::block_on;
 use crate::types::Bytes;
 use crate::utils::epoch_millis;
 
@@ -42,7 +42,6 @@ impl S3 {
                     ("AWS_REGION", region.as_str()),
                 ])))
                 .load(),
-            TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock")
         );
 
         S3 {
@@ -245,7 +244,6 @@ fn create_bucket<'a>(client: &Client, bucket: &'a str, region: &str) -> Result<(
             .get_bucket_accelerate_configuration()
             .bucket(bucket)
             .send(),
-        TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock")
     ) {
         info!("bucket {} exists", bucket);
         return Ok(());
@@ -257,7 +255,6 @@ fn create_bucket<'a>(client: &Client, bucket: &'a str, region: &str) -> Result<(
             .create_bucket_configuration(cfg)
             .bucket(bucket)
             .send(),
-        TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock")
     );
 
     match result {
@@ -280,7 +277,7 @@ fn delete_bucket<'a>(client: &Client, bucket: &'a str, force: bool) -> Result<()
         }
     }
 
-    let result = block_on(client.delete_bucket().bucket(bucket).send(), TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock"));
+    let result = block_on(client.delete_bucket().bucket(bucket).send());
     match result {
         Ok(_) => {}
         Err(err) => {
@@ -308,7 +305,6 @@ fn create_object<'a>(
             .body(ByteStream::from(object))
             // TODO: set metadata etag to validate upload on the S3 side
             .send(),
-        TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock")
     );
 
     if let Err(_) = result {
@@ -319,10 +315,10 @@ fn create_object<'a>(
 }
 
 fn get_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<Vec<u8>, S3Error<'a>> {
-    let result = block_on(client.get_object().bucket(bucket).key(key).send(), TOKIO_RUNTIME.lock().expect("Failed to acquire tokio runtime lock"));
+    let result = block_on(client.get_object().bucket(bucket).key(key).send());
 
     match result {
-        Ok(file) => match block_on(file.body.collect(), TOKIO_RUNTIME.lock().expect("Failed to acquire tokio runtime lock")) {
+        Ok(file) => match block_on(file.body.collect()) {
             Ok(data) => Ok(data.into_bytes().to_vec()),
             Err(_) => Err(S3Error::FailedObjectDownload { bucket, key }),
         },
@@ -335,7 +331,7 @@ fn list_objects<'a>(
     bucket: &'a str,
     path: Option<&'a str>,
 ) -> Result<Vec<Object>, S3Error<'a>> {
-    let objects = block_on(client.list_objects_v2().bucket(bucket).send(), TOKIO_RUNTIME.lock().expect("Failed to acquire tokio runtime lock"));
+    let objects = block_on(client.list_objects_v2().bucket(bucket).send());
     let objects = match objects {
         Ok(objects) => objects,
         Err(err) => {
@@ -369,7 +365,7 @@ fn list_objects<'a>(
 fn delete_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<(), S3Error<'a>> {
     let _ = get_object(client, bucket, key)?;
 
-    let result = block_on(client.delete_object().bucket(bucket).key(key).send(),TOKIO_RUNTIME.lock().expect("Failed to acquire TOKIO_RUNTIME lock"));
+    let result = block_on(client.delete_object().bucket(bucket).key(key).send());
 
     match result {
         Ok(_) => Ok(()),
