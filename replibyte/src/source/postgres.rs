@@ -57,7 +57,8 @@ impl<'a> Source for Postgres<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
-        let mut process = Command::new("pg_dump")
+        // use pg_dumpall instead of pg_dump to get all the users, roles and permissions
+        let mut process = Command::new("pg_dumpall")
             .env("PGPASSWORD", self.password)
             .args([
                 "--column-inserts",

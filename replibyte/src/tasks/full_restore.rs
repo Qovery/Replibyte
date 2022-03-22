@@ -2,7 +2,7 @@ use std::io::Error;
 use std::sync::mpsc;
 use std::thread;
 
-use crate::bridge::{Bridge, DownloadOptions};
+use crate::bridge::{Bridge, ReadOptions};
 use crate::destination::Destination;
 use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::types::Bytes;
@@ -15,7 +15,7 @@ where
 {
     destination: D,
     bridge: B,
-    bridge_download_options: DownloadOptions,
+    read_options: ReadOptions,
 }
 
 impl<D, B> FullRestoreTask<D, B>
@@ -23,11 +23,11 @@ where
     D: Destination,
     B: Bridge + 'static,
 {
-    pub fn new(destination: D, bridge: B, bridge_download_options: DownloadOptions) -> Self {
+    pub fn new(destination: D, bridge: B, read_options: ReadOptions) -> Self {
         FullRestoreTask {
             destination,
             bridge,
-            bridge_download_options,
+            read_options,
         }
     }
 }
@@ -52,19 +52,19 @@ where
         let bridge = self.bridge;
 
         let mut index_file = bridge.index_file()?;
-        let backup = index_file.find_backup(&self.bridge_download_options)?;
+        let backup = index_file.find_backup(&self.read_options)?;
 
         // init progress
         progress_callback(0, backup.size);
 
-        let download_options = self.bridge_download_options.clone();
+        let download_options = self.read_options.clone();
 
         let join_handle = thread::spawn(move || {
             // managing Bridge (S3) download here
             let bridge = bridge;
             let download_options = download_options;
 
-            let _ = match bridge.download(&download_options, |data| {
+            let _ = match bridge.read(&download_options, |data| {
                 let _ = tx.send(Message::Data(data));
             }) {
                 Ok(_) => {}
@@ -83,7 +83,7 @@ where
 
             progress_callback(data.len(), backup.size);
 
-            let _ = self.destination.insert(data)?;
+            let _ = self.destination.write(data)?;
         }
 
         // wait for end of download execution

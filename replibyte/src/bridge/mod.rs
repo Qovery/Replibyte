@@ -8,9 +8,9 @@ pub mod s3;
 pub trait Bridge: Connector + Send + Sync {
     /// Getting Index file with all the backups information
     fn index_file(&self) -> Result<IndexFile, Error>;
-    fn save(&self, index_file: &IndexFile) -> Result<(), Error>;
-    fn upload(&self, file_part: u16, data: Bytes) -> Result<(), Error>;
-    fn download<F>(&self, options: &DownloadOptions, data_callback: F) -> Result<(), Error>
+    fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error>;
+    fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error>;
+    fn read<F>(&self, options: &ReadOptions, data_callback: F) -> Result<(), Error>
     where
         F: FnMut(Bytes);
 }
@@ -21,9 +21,9 @@ pub struct IndexFile {
 }
 
 impl IndexFile {
-    pub fn find_backup(&mut self, options: &DownloadOptions) -> Result<&Backup, Error> {
+    pub fn find_backup(&mut self, options: &ReadOptions) -> Result<&Backup, Error> {
         match options {
-            DownloadOptions::Latest => {
+            ReadOptions::Latest => {
                 self.backups.sort_by(|a, b| a.created_at.cmp(&b.created_at));
 
                 match self.backups.last() {
@@ -31,7 +31,7 @@ impl IndexFile {
                     None => return Err(Error::new(ErrorKind::Other, "No backups available.")),
                 }
             }
-            DownloadOptions::Backup { name } => {
+            ReadOptions::Backup { name } => {
                 match self
                     .backups
                     .iter()
@@ -58,7 +58,7 @@ pub struct Backup {
 }
 
 #[derive(Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq, Clone)]
-pub enum DownloadOptions {
+pub enum ReadOptions {
     Latest,
     Backup { name: String },
 }

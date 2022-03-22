@@ -12,7 +12,7 @@ use flate2::Compression;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
-use crate::bridge::{Backup, Bridge, DownloadOptions, IndexFile};
+use crate::bridge::{Backup, Bridge, IndexFile, ReadOptions};
 use crate::config::Endpoint;
 use crate::connector::Connector;
 use crate::runtime::block_on;
@@ -75,7 +75,7 @@ impl S3 {
             Ok(index_file) => Ok(index_file),
             Err(_) => {
                 let index_file = IndexFile { backups: vec![] };
-                let _ = self.save(&index_file)?;
+                let _ = self.write_index_file(&index_file)?;
                 Ok(index_file)
             }
         }
@@ -109,7 +109,7 @@ impl Bridge for S3 {
         Ok(index_file)
     }
 
-    fn save(&self, index_file: &IndexFile) -> Result<(), Error> {
+    fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error> {
         let index_file_json = serde_json::to_vec(index_file)?;
 
         create_object(
@@ -121,7 +121,7 @@ impl Bridge for S3 {
         .map_err(|err| Error::from(err))
     }
 
-    fn upload(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
+    fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
         let data = self.compress(data)?;
         let data_size = data.len();
         let key = format!("{}/{}.dump", self.root_key.as_str(), file_part);
@@ -157,10 +157,10 @@ impl Bridge for S3 {
         }
 
         // save index file
-        self.save(&index_file)
+        self.write_index_file(&index_file)
     }
 
-    fn download<'a, F>(&self, options: &DownloadOptions, mut data_callback: F) -> Result<(), Error>
+    fn read<'a, F>(&self, options: &ReadOptions, mut data_callback: F) -> Result<(), Error>
     where
         F: FnMut(Bytes),
     {
@@ -520,7 +520,7 @@ mod tests {
             created_at: epoch_millis(),
         });
 
-        assert!(s3.save(&index_file).is_ok());
+        assert!(s3.write_index_file(&index_file).is_ok());
 
         assert_eq!(s3.index_file().unwrap().backups.len(), 1);
 

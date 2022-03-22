@@ -16,7 +16,7 @@ use timeago::Formatter;
 use utils::to_human_readable_unit;
 
 use crate::bridge::s3::S3;
-use crate::bridge::{Bridge, DownloadOptions};
+use crate::bridge::{Bridge, ReadOptions};
 use crate::cli::{BackupCommand, SubCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
@@ -212,8 +212,8 @@ fn main() -> anyhow::Result<()> {
                         );
 
                         let options = match cmd.value.as_str() {
-                            "latest" => DownloadOptions::Latest,
-                            v => DownloadOptions::Backup {
+                            "latest" => ReadOptions::Latest,
+                            v => ReadOptions::Backup {
                                 name: v.to_string(),
                             },
                         };

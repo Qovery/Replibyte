@@ -4,6 +4,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::connector::Connector;
 use crate::destination::Destination;
+use crate::types::Bytes;
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -73,7 +74,7 @@ impl<'a> Connector for Postgres<'a> {
 }
 
 impl<'a> Destination for Postgres<'a> {
-    fn insert(&self, data: Vec<u8>) -> Result<(), Error> {
+    fn write(&self, data: Bytes) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
         let mut process = Command::new("psql")
@@ -136,11 +137,11 @@ mod tests {
     fn connect() {
         let mut p = get_postgres();
         let _ = p.init().expect("can't init postgres");
-        assert!(p.insert(b"SELECT 1".to_vec()).is_ok());
+        assert!(p.write(b"SELECT 1".to_vec()).is_ok());
 
         let mut p = get_invalid_postgres();
         assert!(p.init().is_err());
-        assert!(p.insert(b"SELECT 1".to_vec()).is_err());
+        assert!(p.write(b"SELECT 1".to_vec()).is_err());
     }
 
     #[test]

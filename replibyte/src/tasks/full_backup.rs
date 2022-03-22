@@ -64,7 +64,7 @@ where
                     Err(err) => panic!("{:?}", err), // FIXME what should I do here?
                 };
 
-                let _ = match bridge.upload(chunk_part, to_bytes(queries)) {
+                let _ = match bridge.write(chunk_part, to_bytes(queries)) {
                     Ok(_) => {}
                     Err(err) => {
                         panic!("{:?}", err);
