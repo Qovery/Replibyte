@@ -171,7 +171,7 @@ impl Bridge for S3 {
                         return Err(Error::new(
                             ErrorKind::Other,
                             format!("Can't find backup with name '{}'", name),
-                        ))
+                        ));
                     }
                 }
             }

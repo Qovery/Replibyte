@@ -4,7 +4,7 @@ use std::thread;
 
 use crate::bridge::{Bridge, DownloadOptions};
 use crate::destination::Destination;
-use crate::tasks::{Message, Task};
+use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::types::Bytes;
 
 /// FullRestoreTask is a wrapping struct to execute the synchronization between a *Bridge* and a *Source*.
@@ -37,7 +37,10 @@ where
     D: Destination,
     B: Bridge + 'static,
 {
-    fn run(mut self) -> Result<(), Error> {
+    fn run<F: FnMut(TransferredBytes, MaxBytes)>(
+        mut self,
+        progress_callback: F,
+    ) -> Result<(), Error> {
         // initialize the destination
         let _ = self.destination.init()?;
 

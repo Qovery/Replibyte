@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use crate::bridge::Bridge;
-use crate::tasks::{Message, Task};
+use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::transformer::Transformer;
 use crate::types::{to_bytes, Queries};
 use crate::Source;
@@ -40,7 +40,10 @@ where
     S: Source,
     B: Bridge + 'static,
 {
-    fn run(mut self) -> Result<(), Error> {
+    fn run<F: FnMut(TransferredBytes, MaxBytes)>(
+        mut self,
+        mut progress_callback: F,
+    ) -> Result<(), Error> {
         // initialize the source
         let _ = self.source.init()?;
 
@@ -74,6 +77,7 @@ where
         let buffer_size = 50 * 1024 * 1024;
         let mut queries = vec![];
         let mut consumed_buffer_size = 0usize;
+        let mut total_transferred_bytes = 0usize;
         let mut chunk_part = 0u16;
 
         let _ = self
@@ -91,6 +95,11 @@ where
                 }
 
                 consumed_buffer_size += query.data().len();
+                total_transferred_bytes += query.data().len();
+                progress_callback(
+                    total_transferred_bytes,
+                    buffer_size * (chunk_part as usize + 1),
+                );
                 queries.push(query);
             });
 

@@ -1,11 +1,17 @@
 #[macro_use]
 extern crate prettytable;
 
+use std::cmp::max;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
+use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
+use std::thread;
+use std::thread::sleep;
 use std::time::Duration;
 
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use timeago::Formatter;
 
 use utils::to_human_readable_unit;
@@ -21,7 +27,7 @@ use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::Source;
 use crate::tasks::full_backup::FullBackupTask;
 use crate::tasks::full_restore::FullRestoreTask;
-use crate::tasks::Task;
+use crate::tasks::{MaxBytes, Task, TransferredBytes};
 use crate::utils::{epoch_millis, table};
 
 mod bridge;
@@ -65,6 +71,35 @@ fn list_backups(s3: &mut S3) -> Result<(), Error> {
     Ok(())
 }
 
+fn _progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
+    let pb = ProgressBar::new(0);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.green/blue}] {bytes}/{total_bytes} ({eta})")
+            .progress_chars("#>-"),
+    );
+
+    let mut _max_bytes = 0usize;
+    let mut last_transferred_bytes = 0usize;
+
+    loop {
+        let (transferred_bytes, max_bytes) = match rx_pb.try_recv() {
+            Ok(msg) => msg,
+            Err(_) => (last_transferred_bytes, _max_bytes),
+        };
+
+        if max_bytes != _max_bytes {
+            pb.set_length(max_bytes as u64);
+            _max_bytes = max_bytes;
+        }
+
+        last_transferred_bytes = transferred_bytes;
+        pb.set_position(transferred_bytes as u64);
+
+        sleep(Duration::from_micros(50));
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = CLI::parse();
@@ -79,6 +114,13 @@ fn main() -> anyhow::Result<()> {
         config.bridge.secret_access_key()?,
         config.bridge.endpoint()?,
     );
+
+    let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
+
+    thread::spawn(move || _progress_bar(rx_pb));
+    let progress_callback = |bytes: TransferredBytes, max_bytes: MaxBytes| {
+        let _ = tx_pb.send((bytes, max_bytes));
+    };
 
     let sub_commands: &SubCommand = &args.sub_commands;
     match sub_commands {
@@ -115,7 +157,7 @@ fn main() -> anyhow::Result<()> {
                                 );
 
                                 let task = FullBackupTask::new(postgres, &transformers, bridge);
-                                task.run()?
+                                task.run(progress_callback)?
                             }
                             ConnectionUri::Mysql(host, port, username, password, database) => {
                                 todo!()
@@ -125,7 +167,7 @@ fn main() -> anyhow::Result<()> {
                             if args.input {
                                 let postgres = PostgresStdin::default();
                                 let task = FullBackupTask::new(postgres, &transformers, bridge);
-                                task.run()?
+                                task.run(progress_callback)?
                             } else if args.file.is_some() {
                                 todo!();
                             } else {
@@ -171,7 +213,7 @@ fn main() -> anyhow::Result<()> {
                         };
 
                         let task = FullRestoreTask::new(postgres, bridge, options);
-                        task.run()?
+                        task.run(progress_callback)?
                     }
                     ConnectionUri::Mysql(host, port, username, password, database) => {
                         todo!()

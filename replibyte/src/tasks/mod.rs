@@ -1,10 +1,13 @@
+use std::io::Error;
+
 pub mod full_backup;
 pub mod full_restore;
 
-use std::io::Error;
+pub type TransferredBytes = usize;
+pub type MaxBytes = usize;
 
 pub trait Task {
-    fn run(self) -> Result<(), Error>;
+    fn run<F: FnMut(TransferredBytes, MaxBytes)>(self, progress_callback: F) -> Result<(), Error>;
 }
 
 /// inter-thread message for Source/Destination and Bridge
