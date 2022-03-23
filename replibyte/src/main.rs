@@ -167,6 +167,9 @@ fn main() -> anyhow::Result<()> {
                             ConnectionUri::Mysql(host, port, username, password, database) => {
                                 todo!() // FIXME
                             }
+                            ConnectionUri::Mongo(host, port, username, password, database) => {
+                                todo!() // FIXME
+                            }
                         },
                         // some user use "postgres" and "postgresql" both are valid
                         Some(v) if v == "postgres" || v == "postgresql" => {
@@ -222,6 +225,9 @@ fn main() -> anyhow::Result<()> {
                         task.run(progress_callback)?
                     }
                     ConnectionUri::Mysql(host, port, username, password, database) => {
+                        todo!() // FIXME
+                    }
+                    ConnectionUri::Mongo(host, port, username, password, database) => {
                         todo!() // FIXME
                     }
                 }

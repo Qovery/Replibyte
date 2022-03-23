@@ -165,6 +165,7 @@ type Database = String;
 pub enum ConnectionUri {
     Postgres(Host, Port, Username, Password, Database),
     Mysql(Host, Port, Username, Password, Database),
+    Mongo(Host, Port, Username, Password, Database),
 }
 
 fn get_host(uri_ref: &URIReference) -> Result<String, Error> {
@@ -261,6 +262,18 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
             get_password(&uri_ref)?,
             get_database(&uri_ref, None)?,
         ),
+        Some(err)
+            if err.as_str().to_lowercase() == "mongodb"
+                || err.as_str().to_lowercase() == "mongodb+srv" =>
+        {
+            ConnectionUri::Mongo(
+                get_host(&uri_ref)?,
+                get_port(&uri_ref, 27017)?,
+                get_username(&uri_ref)?,
+                get_password(&uri_ref)?,
+                get_database(&uri_ref, None)?,
+            )
+        }
         Some(err) => {
             return Err(Error::new(
                 ErrorKind::Other,
@@ -325,5 +338,13 @@ mod tests {
         assert!(parse_connection_uri("postgres://root:password@localhost:5432").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost").is_ok());
         assert!(parse_connection_uri("postgres://root:password").is_err());
+    }
+    #[test]
+    fn parse_mongo_connection_uri() {
+        assert!(parse_connection_uri("mongodb://root:password@localhost:27017/root").is_ok());
+        assert!(parse_connection_uri("mongodb://root:password@localhost:27017").is_ok());
+        assert!(parse_connection_uri("mongodb://root:password@localhost").is_ok());
+        assert!(parse_connection_uri("mongodb+srv://root:password@server.example.com/").is_ok());
+        assert!(parse_connection_uri("mongodb://root:password").is_err());
     }
 }
