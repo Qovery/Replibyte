@@ -2,7 +2,7 @@
 extern crate prettytable;
 
 use std::fs::File;
-use std::io::{Error, ErrorKind};
+use std::io::{stdin, BufReader, Error, ErrorKind, Read};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
@@ -179,15 +179,16 @@ fn main() -> anyhow::Result<()> {
                         },
                         // some user use "postgres" and "postgresql" both are valid
                         Some(v) if v == "postgres" || v == "postgresql" => {
-                            if args.input {
-                                let postgres = PostgresStdin::default();
-                                let task = FullBackupTask::new(postgres, &transformers, bridge);
-                                task.run(progress_callback)?
-                            } else if args.file.is_some() {
-                                todo!(); // FIXME
-                            } else {
-                                todo!(); // FIXME
+                            if args.file.is_some() {
+                                let dump_file = File::open(args.file.as_ref().unwrap())?;
+                                let mut stdin = stdin(); // FIXME
+                                let mut reader = BufReader::new(dump_file);
+                                let _ = stdin.read_to_end(&mut reader.buffer().to_vec())?;
                             }
+
+                            let postgres = PostgresStdin::default();
+                            let task = FullBackupTask::new(postgres, &transformers, bridge);
+                            task.run(progress_callback)?
                         }
                         Some(v) => {
                             return Err(anyhow::Error::from(Error::new(

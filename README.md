@@ -197,6 +197,7 @@ Here are the features we plan to support
 - [ ] Incremental data synchronization
 - [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
+- [ ] On-the-fly data de/encryption
 
 ## Connectors
 
@@ -297,6 +298,22 @@ databases. As mentioned above, the primary purpose of RepliByte is to duplicate 
 specific use case of an ETL, where an ETL is more generic.
 
 ## FAQ
+
+### Q: Do you support backup from a dump file?
+
+Answer: absolutely,
+
+```shell
+cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
+```
+
+and 
+
+```shell
+replibyte -c prod-conf.yaml backup run -s postgres -f dump.sql
+```
+
+---
 
 ⬆️ _Open an issue if you have any question - I'll pick the most common questions and put them here with the answer_
 
