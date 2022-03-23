@@ -72,7 +72,7 @@ impl<'a> Source for Postgres<'a> {
                 "-U",
                 self.username,
             ])
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
 
