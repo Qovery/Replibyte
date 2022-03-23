@@ -57,14 +57,14 @@ where
         // init progress
         progress_callback(0, backup.size);
 
-        let download_options = self.read_options.clone();
+        let read_options = self.read_options.clone();
 
         let join_handle = thread::spawn(move || {
             // managing Bridge (S3) download here
             let bridge = bridge;
-            let download_options = download_options;
+            let read_options = read_options;
 
-            let _ = match bridge.read(&download_options, |data| {
+            let _ = match bridge.read(&read_options, |data| {
                 let _ = tx.send(Message::Data(data));
             }) {
                 Ok(_) => {}

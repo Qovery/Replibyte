@@ -21,6 +21,7 @@ use crate::cli::{BackupCommand, SubCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
 use crate::destination::postgres::Postgres as DestinationPostgres;
+use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::Source;
@@ -122,12 +123,20 @@ fn main() -> anyhow::Result<()> {
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 
-    thread::spawn(move || show_progress_bar(rx_pb));
+    let sub_commands: &SubCommand = &args.sub_commands;
+
+    match sub_commands {
+        // skip progress when output = true
+        SubCommand::Restore(args) if args.output => {}
+        _ => {
+            let _ = thread::spawn(move || show_progress_bar(rx_pb));
+        }
+    };
+
     let progress_callback = |bytes: TransferredBytes, max_bytes: MaxBytes| {
         let _ = tx_pb.send((bytes, max_bytes));
     };
 
-    let sub_commands: &SubCommand = &args.sub_commands;
     match sub_commands {
         SubCommand::Backup(cmd) => match cmd {
             BackupCommand::List => {
@@ -200,6 +209,20 @@ fn main() -> anyhow::Result<()> {
         },
         SubCommand::Restore(cmd) => match config.destination {
             Some(destination) => {
+                let options = match cmd.value.as_str() {
+                    "latest" => ReadOptions::Latest,
+                    v => ReadOptions::Backup {
+                        name: v.to_string(),
+                    },
+                };
+
+                if cmd.output {
+                    let postgres = PostgresStdout::default();
+                    let task = FullRestoreTask::new(postgres, bridge, options);
+                    let _ = task.run(|_, _| {})?; // do not display the progress bar
+                    return Ok(());
+                }
+
                 match destination.connection_uri()? {
                     ConnectionUri::Postgres(host, port, username, password, database) => {
                         let postgres = DestinationPostgres::new(
@@ -210,13 +233,6 @@ fn main() -> anyhow::Result<()> {
                             password.as_str(),
                             true,
                         );
-
-                        let options = match cmd.value.as_str() {
-                            "latest" => ReadOptions::Latest,
-                            v => ReadOptions::Backup {
-                                name: v.to_string(),
-                            },
-                        };
 
                         let task = FullRestoreTask::new(postgres, bridge, options);
                         task.run(progress_callback)?

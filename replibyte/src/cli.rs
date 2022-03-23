@@ -44,6 +44,9 @@ pub struct RestoreArgs {
     /// restore backup -- set `latest` or `<backup name>` - use `backup list` command to list all backups available
     #[clap(short, long, value_name = "[latest | backup name]")]
     pub value: String,
+    /// stream output on stdout
+    #[clap(short, long)]
+    pub output: bool,
 }
 
 /// all backup run commands
