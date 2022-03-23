@@ -395,6 +395,7 @@ mod tests {
     const BUCKET_NAME: &str = "replibyte-test";
     const REGION: &str = "us-east-2";
     const MINIO_ENDPOINT: &str = "http://localhost:9000";
+    const MINIO_CREDENTIALS: &str = "minioadmin";
 
     fn bucket() -> String {
         format!("replibyte-test-{}", Faker.fake::<String>().to_lowercase())
@@ -402,8 +403,8 @@ mod tests {
 
     fn credentials() -> (String, String) {
         (
-            std::env::var("AWS_ACCESS_KEY_ID").expect("missing AWS_ACCESS_KEY_ID env var"),
-            std::env::var("AWS_SECRET_ACCESS_KEY").expect("missing AWS_SECRET_ACCESS_KEY env var"),
+            std::env::var("AWS_ACCESS_KEY_ID").unwrap_or(MINIO_CREDENTIALS.to_string()),
+            std::env::var("AWS_SECRET_ACCESS_KEY").unwrap_or(MINIO_CREDENTIALS.to_string()),
         )
     }
 
