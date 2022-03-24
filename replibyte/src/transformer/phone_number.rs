@@ -24,6 +24,16 @@ impl PhoneNumberTransformer {
     }
 }
 
+impl Default for PhoneNumberTransformer {
+    fn default() -> Self {
+        PhoneNumberTransformer {
+            database_name: String::default(),
+            table_name: String::default(),
+            column_name: String::default(),
+        }
+    }
+}
+
 impl Transformer for PhoneNumberTransformer {
     fn id(&self) -> &str {
         "phone-number"

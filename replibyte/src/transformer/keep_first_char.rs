@@ -20,9 +20,19 @@ impl KeepFirstCharTransformer {
     }
 }
 
+impl Default for KeepFirstCharTransformer {
+    fn default() -> Self {
+        KeepFirstCharTransformer {
+            database_name: String::default(),
+            table_name: String::default(),
+            column_name: String::default(),
+        }
+    }
+}
+
 impl Transformer for KeepFirstCharTransformer {
     fn id(&self) -> &str {
-        "keep_first_char"
+        "keep-first-char"
     }
 
     fn description(&self) -> &str {
@@ -39,6 +49,15 @@ impl Transformer for KeepFirstCharTransformer {
 
     fn column_name(&self) -> &str {
         self.column_name.as_str()
+    }
+
+    fn database_and_table_and_column_name(&self) -> String {
+        format!(
+            "{}.{}.{}",
+            self.database_name(),
+            self.table_name(),
+            self.column_name()
+        )
     }
 
     fn transform(&self, column: Column) -> Column {
@@ -62,15 +81,6 @@ impl Transformer for KeepFirstCharTransformer {
             }
             column => column,
         }
-    }
-
-    fn database_and_table_and_column_name(&self) -> String {
-        format!(
-            "{}.{}.{}",
-            self.database_name(),
-            self.table_name(),
-            self.column_name()
-        )
     }
 }
 

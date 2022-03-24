@@ -17,7 +17,7 @@ use utils::to_human_readable_unit;
 
 use crate::bridge::s3::S3;
 use crate::bridge::{Bridge, ReadOptions};
-use crate::cli::{BackupCommand, SubCommand, CLI};
+use crate::cli::{BackupCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
 use crate::destination::postgres::Postgres as DestinationPostgres;
@@ -28,6 +28,7 @@ use crate::source::Source;
 use crate::tasks::full_backup::FullBackupTask;
 use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::{MaxBytes, Task, TransferredBytes};
+use crate::transformer::transformers;
 use crate::utils::{epoch_millis, table};
 
 mod bridge;
@@ -66,7 +67,7 @@ fn list_backups(s3: &mut S3) -> Result<(), Error> {
         ]);
     }
 
-    table.printstd();
+    let _ = table.printstd();
 
     Ok(())
 }
@@ -88,10 +89,12 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
         if _max_bytes == 0 && style_is_progress_bar {
             // show spinner if there is no max_bytes indicated
             pb.set_style(ProgressStyle::default_spinner());
+            style_is_progress_bar = false;
         } else if _max_bytes > 0 && !style_is_progress_bar {
             pb.set_style(ProgressStyle::default_bar()
                 .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.green/blue}] {bytes}/{total_bytes} ({eta})")
                 .progress_chars("#>-"));
+            style_is_progress_bar = true;
         }
 
         if max_bytes != _max_bytes {
@@ -104,6 +107,18 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
 
         sleep(Duration::from_micros(50));
     }
+}
+
+/// display all transformers available
+fn list_transformers() {
+    let mut table = table();
+    table.set_titles(row!["name", "description"]);
+
+    for transformer in transformers() {
+        table.add_row(row![transformer.id(), transformer.description()]);
+    }
+
+    let _ = table.printstd();
 }
 
 fn main() -> anyhow::Result<()> {
@@ -182,7 +197,7 @@ fn main() -> anyhow::Result<()> {
                             if args.file.is_some() {
                                 let dump_file = File::open(args.file.as_ref().unwrap())?;
                                 let mut stdin = stdin(); // FIXME
-                                let mut reader = BufReader::new(dump_file);
+                                let reader = BufReader::new(dump_file);
                                 let _ = stdin.read_to_end(&mut reader.buffer().to_vec())?;
                             }
 
@@ -207,6 +222,11 @@ fn main() -> anyhow::Result<()> {
                     )));
                 }
             },
+        },
+        SubCommand::Transformer(cmd) => match cmd {
+            TransformerCommand::List => {
+                let _ = list_transformers();
+            }
         },
         SubCommand::Restore(cmd) => match config.destination {
             Some(destination) => {

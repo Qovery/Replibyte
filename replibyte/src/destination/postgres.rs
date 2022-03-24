@@ -1,6 +1,5 @@
 use std::io::{stdin, stdout, Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
-use tokio::io::AsyncWriteExt;
 
 use crate::connector::Connector;
 use crate::destination::Destination;

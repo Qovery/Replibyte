@@ -24,9 +24,19 @@ impl FirstNameTransformer {
     }
 }
 
+impl Default for FirstNameTransformer {
+    fn default() -> Self {
+        FirstNameTransformer {
+            database_name: String::default(),
+            table_name: String::default(),
+            column_name: String::default(),
+        }
+    }
+}
+
 impl Transformer for FirstNameTransformer {
     fn id(&self) -> &str {
-        "first_name"
+        "first-name"
     }
 
     fn description(&self) -> &str {

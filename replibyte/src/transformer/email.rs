@@ -24,6 +24,16 @@ impl EmailTransformer {
     }
 }
 
+impl Default for EmailTransformer {
+    fn default() -> Self {
+        EmailTransformer {
+            database_name: String::default(),
+            table_name: String::default(),
+            column_name: String::default(),
+        }
+    }
+}
+
 impl Transformer for EmailTransformer {
     fn id(&self) -> &str {
         "email"
