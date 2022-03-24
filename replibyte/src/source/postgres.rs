@@ -67,8 +67,8 @@ impl<'a> Source for Postgres<'a> {
                 self.host,
                 "-p",
                 s_port.as_str(),
-                "-d",
-                self.database,
+                //"-d", pg_dumpall does not let picking the database as it is dump every dbs
+                //self.database,
                 "-U",
                 self.username,
             ])
@@ -288,15 +288,14 @@ mod tests {
     #[test]
     fn connect() {
         let p = get_postgres();
-
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.read(&transformers, |_, _| {}).is_ok());
+        assert!(p.read(&transformers, |original_query, query| {}).is_ok());
 
         let p = get_invalid_postgres();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.read(&transformers, |_, _| {}).is_err());
+        assert!(p.read(&transformers, |original_query, query| {}).is_err());
     }
 
     #[test]
@@ -304,7 +303,7 @@ mod tests {
         let p = get_postgres();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        p.read(&transformers, |original_query, query| {
+        let _ = p.read(&transformers, |original_query, query| {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);
         });
@@ -399,7 +398,7 @@ mod tests {
 
         let transformers = vec![t1, t2];
 
-        p.read(&transformers, |original_query, query| {
+        let _ = p.read(&transformers, |original_query, query| {
             assert!(query.data().len() > 0);
             assert!(query.data().len() > 0);
 
