@@ -117,6 +117,11 @@ source:
           transformer: email
         - name: username
           transformer: keep-first-char
+    - database: public
+      table: customers
+      columns:
+        - name: phone
+          transformer: phone-number
 bridge:
   bucket: $BUCKET_NAME
   access_key_id: $ACCESS_KEY_ID
