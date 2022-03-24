@@ -61,7 +61,7 @@ cargo build --release
 
 ## Usage
 
-[![What is RepliByte](assets/video.png)](https://www.youtube.com/watch?v=IKeLnZvECQw)
+[![What is RepliByte](assets/video_.png)](https://www.youtube.com/watch?v=IKeLnZvECQw)
 
 Example with PostgreSQL as a *Source* and *Destination* database **AND** S3 as a *Bridge* (cf [configuration file](#Configuration))
 
