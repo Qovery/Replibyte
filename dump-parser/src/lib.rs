@@ -3,6 +3,7 @@ use std::io::{BufReader, Read};
 use crate::errors::DumpFileError;
 
 pub mod errors;
+pub mod mongo;
 pub mod postgres;
 pub mod utils;
 
