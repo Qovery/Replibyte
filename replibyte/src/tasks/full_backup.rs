@@ -80,6 +80,12 @@ where
         let mut total_transferred_bytes = 0usize;
         let mut chunk_part = 0u16;
 
+        // init progress
+        progress_callback(
+            total_transferred_bytes,
+            buffer_size * (chunk_part as usize + 1),
+        );
+
         let _ = self
             .source
             .read(self.transformers, |original_query, query| {

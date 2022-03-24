@@ -6,7 +6,14 @@ use crate::transformer::Transformer;
 use crate::types::{OriginalQuery, Query};
 use crate::Source;
 
+/// Source Postgres dump from STDIN
 pub struct PostgresStdin {}
+
+impl PostgresStdin {
+    pub fn new() -> Self {
+        PostgresStdin {}
+    }
+}
 
 impl Default for PostgresStdin {
     fn default() -> Self {
