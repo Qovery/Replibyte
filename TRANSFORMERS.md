@@ -9,3 +9,4 @@ Here is a list of all the transformers available.
 | first-name      | Replace the string value by a first name                             | yes       |
 | email           | Replace the string value by an email address                         | yes       |
 | keep-first-char | Keep only the first char for strings and digit for numbers           | yes       |
+| phone-number    | Replace the string value by a phone number                           | yes       |
