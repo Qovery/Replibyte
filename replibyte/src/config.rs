@@ -1,5 +1,6 @@
 use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
+use crate::transformer::keep_first_char::KeepFirstCharTransformer;
 use crate::transformer::random::RandomTransformer;
 use crate::transformer::Transformer;
 use serde;
@@ -132,6 +133,8 @@ pub enum TransformerTypeConfig {
     FirstName,
     #[serde(rename = "email")]
     Email,
+    #[serde(rename = "keep-first-char")]
+    KeepFirstChar,
 }
 
 impl TransformerTypeConfig {
@@ -153,6 +156,11 @@ impl TransformerTypeConfig {
                 column_name,
             )),
             TransformerTypeConfig::Email => Box::new(EmailTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::KeepFirstChar => Box::new(KeepFirstCharTransformer::new(
                 database_name,
                 table_name,
                 column_name,

@@ -113,6 +113,8 @@ source:
           transformer: first-name
         - name: email
           transformer: email
+        - name: username
+          transformer: keep-first-char
 bridge:
   bucket: $BUCKET_NAME
   access_key_id: $ACCESS_KEY_ID
