@@ -61,6 +61,8 @@ cargo build --release
 
 ## Usage
 
+[![What is RepliByte](assets/video.png)](https://www.youtube.com/watch?v=IKeLnZvECQw)
+
 Example with PostgreSQL as a *Source* and *Destination* database **AND** S3 as a *Bridge* (cf [configuration file](#Configuration))
 
 Backup your PostgreSQL databases into S3
@@ -251,6 +253,7 @@ replicate the data in a stream of bytes and does not store anything on a local d
 ### Limitations
 
 - Tested with PostgreSQL 13 and 14. It should work with prior versions.
+- RepliByte as not been designed to run multiple backups targeting the same Bridge. The Index File does not manage concurrent write (ATM).
 
 ### Index file structure
 
@@ -281,13 +284,13 @@ ambition!
 
 ## Use cases
 
-| Scenario                                                                          | Supported |
-|-----------------------------------------------------------------------------------|-----------|
+| Scenario                                                                            | Supported |
+|-------------------------------------------------------------------------------------|-----------|
 | Synchronize the whole PostgreSQL instance                                           | Yes       |
 | Synchronize the whole PostgreSQL instance and replace sensitive data with fake data | Yes       |
 | Synchronize specific PostgreSQL tables and replace sensitive data with fake data    | WIP       |
 | Synchronize specific PostgreSQL databases and replace sensitive data with fake data | WIP       |
-| Migrate from one database hosting platform to the other                           | Yes       |
+| Migrate from one database hosting platform to the other                             | Yes       |
 
 > Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
