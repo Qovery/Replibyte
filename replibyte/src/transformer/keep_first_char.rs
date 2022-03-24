@@ -46,9 +46,6 @@ impl Transformer for KeepFirstCharTransformer {
             Column::NumberValue(column_name, value) => {
                 Column::NumberValue(column_name, get_first_digit(value))
             }
-            Column::FloatNumberValue(column_name, value) => {
-                Column::FloatNumberValue(column_name, value)
-            }
             Column::StringValue(column_name, value) => {
                 let new_value = match value.len() {
                     len if len > 1 => {
@@ -63,8 +60,7 @@ impl Transformer for KeepFirstCharTransformer {
 
                 Column::StringValue(column_name, new_value)
             }
-            Column::CharValue(column_name, value) => Column::CharValue(column_name, value),
-            Column::None(column_name) => Column::None(column_name),
+            column => column,
         }
     }
 
