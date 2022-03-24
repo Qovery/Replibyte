@@ -1,5 +1,6 @@
 use crate::types::Column;
 
+pub mod email;
 pub mod first_name;
 pub mod random;
 pub mod transient;
@@ -8,6 +9,7 @@ pub enum Transformers {
     Random,
     Transient,
     FirstName,
+    Email,
 }
 
 /// Trait to implement to create a custom Transformer.
