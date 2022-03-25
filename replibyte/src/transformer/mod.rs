@@ -17,6 +17,9 @@ pub trait Transformer {
     fn database_name(&self) -> &str;
     fn table_name(&self) -> &str;
     fn column_name(&self) -> &str;
+    fn database_and_table_name(&self) -> String {
+        format!("{}.{}", self.database_name(), self.table_name())
+    }
     fn database_and_table_and_column_name(&self) -> String {
         format!(
             "{}.{}.{}",

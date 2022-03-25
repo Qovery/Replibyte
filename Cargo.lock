@@ -1485,6 +1485,7 @@ dependencies = [
  "aws-smithy-client",
  "aws-smithy-http",
  "aws-types",
+ "bson",
  "clap",
  "dump-parser",
  "env_logger",
