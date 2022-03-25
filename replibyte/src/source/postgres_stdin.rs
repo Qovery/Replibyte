@@ -2,9 +2,9 @@ use std::io::{stdin, BufReader, Error};
 
 use crate::connector::Connector;
 use crate::source::postgres::read_and_transform;
-use crate::transformer::Transformer;
 use crate::types::{OriginalQuery, Query};
 use crate::Source;
+use crate::SourceOptions;
 
 /// Source Postgres dump from STDIN
 pub struct PostgresStdin {}
@@ -30,11 +30,11 @@ impl Connector for PostgresStdin {
 impl Source for PostgresStdin {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
-        transformers: &Vec<Box<dyn Transformer + '_>>,
+        options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
         let reader = BufReader::new(stdin());
-        read_and_transform(reader, transformers, query_callback);
+        read_and_transform(reader, options, query_callback);
         Ok(())
     }
 }
