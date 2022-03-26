@@ -44,7 +44,7 @@ pub enum BackupCommand {
 /// all transformer commands
 #[derive(Subcommand, Debug)]
 pub enum TransformerCommand {
-    /// list available backups
+    /// list available transformers
     List,
 }
 
