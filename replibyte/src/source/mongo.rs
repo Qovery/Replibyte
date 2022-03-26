@@ -77,7 +77,7 @@ impl<'a> Source for Mongo<'a> {
 
         let reader = BufReader::new(stdout);
 
-        read_and_transform(reader, transformers, query_callback);
+        read_and_transform(reader, transformers, query_callback)?;
 
         match process.wait() {
             Ok(exit_status) => {
@@ -162,7 +162,21 @@ pub fn recursively_transform_bson(
             };
             Bson::Int64(column.number_value().map(|&n| n as i64).unwrap())
         }
-        _ => panic!("Unsupported BSON type"), // TODO: handle other types
+        // ALL OF THE NEXT TYPES ARE NOT TRANSFORMABLE (yet?)
+        Bson::ObjectId(oid) => Bson::ObjectId(oid),
+        Bson::Binary(bin) => Bson::Binary(bin),
+        Bson::RegularExpression(regex) => Bson::RegularExpression(regex),
+        Bson::Boolean(value) => Bson::Boolean(value),
+        Bson::DateTime(value) => Bson::DateTime(value),
+        Bson::Timestamp(value) => Bson::Timestamp(value),
+        Bson::MinKey => Bson::MinKey,
+        Bson::MaxKey => Bson::MaxKey,
+        Bson::JavaScriptCode(jsc) => Bson::JavaScriptCode(jsc),
+        Bson::JavaScriptCodeWithScope(jsc) => Bson::JavaScriptCodeWithScope(jsc),
+        Bson::Symbol(symbol) => Bson::Symbol(symbol),
+        Bson::Decimal128(decimal) => Bson::Decimal128(decimal),
+        Bson::Undefined => Bson::Undefined,
+        Bson::DbPointer(db_pointer) => Bson::DbPointer(db_pointer),
     }
 }
 
@@ -215,7 +229,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     reader: BufReader<R>,
     transformers: &Vec<Box<dyn Transformer + '_>>,
     mut query_callback: F,
-) {
+) -> Result<(), Error> {
     // create a set of wildcards to be used in the transformation
     let wildcard_keys = find_all_keys_with_array_wildcard_op(transformers);
     // create a map variable with Transformer by column_name
@@ -228,28 +242,27 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
             transformer,
         );
     }
-    let original_query = Query(reader.buffer().to_vec());
+    // init archive from reader
+    let mut archive = Archive::from_reader(reader)?;
 
-    let docs_with_prefixes = Archive::new().parse(reader).unwrap(); // TODO handle error
-    let mut new_docs = Vec::new();
-    for (prefix, doc) in docs_with_prefixes {
-        let new_doc = recursively_transform_document(
-            prefix, // prefix is <db_name>.<collection_name>
-            doc,
-            &transformer_by_db_and_table_and_column_name,
-            &wildcard_keys,
-        );
-        new_docs.push(new_doc);
-    }
+    let original_query = Query(archive.to_bytes()?);
 
-    let buf = Vec::new();
-    let mut writer = BufWriter::new(buf);
-    for doc in new_docs {
-        doc.to_writer(&mut writer).unwrap(); // address unwraping here
-    }
-    let query = Query(writer.buffer().to_vec());
+    archive.alter_docs(|prefixed_docs| {
+        for (prefix, doc) in prefixed_docs.to_owned() {
+            let new_doc = recursively_transform_document(
+                prefix.clone(), // prefix is <db_name>.<collection_name>
+                doc,
+                &transformer_by_db_and_table_and_column_name,
+                &wildcard_keys,
+            );
+            prefixed_docs.insert(prefix, new_doc);
+        }
+    });
+
+    let query = Query(archive.to_bytes().unwrap()); // TODO handle error
 
     query_callback(original_query, query);
+    Ok(())
 }
 
 #[cfg(test)]
