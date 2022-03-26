@@ -91,6 +91,8 @@ impl BridgeConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct SourceConfig {
     pub connection_uri: String,
+    pub compression: Option<bool>,
+    pub encryption_key: Option<String>,
     pub transformers: Vec<TransformerConfig>,
     pub skip: Option<Vec<SkipConfig>>,
 }
@@ -104,6 +106,8 @@ impl SourceConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct DestinationConfig {
     pub connection_uri: String,
+    pub compression: Option<bool>,
+    pub encryption_key: Option<String>,
 }
 
 impl DestinationConfig {

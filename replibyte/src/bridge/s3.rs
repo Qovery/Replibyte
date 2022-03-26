@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
 use aws_config::provider_config::ProviderConfig;
@@ -6,13 +6,12 @@ use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration, Obj
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
-use flate2::read::ZlibDecoder;
-use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
-use crate::bridge::{Backup, Bridge, IndexFile, ReadOptions};
+use crate::bridge::{
+    compress, decompress, decrypt, encrypt, Backup, Bridge, IndexFile, ReadOptions,
+};
 use crate::config::Endpoint;
 use crate::connector::Connector;
 use crate::runtime::block_on;
@@ -26,6 +25,8 @@ pub struct S3 {
     root_key: String,
     region: String,
     client: Client,
+    enable_compression: bool,
+    encryption_key: Option<String>,
 }
 
 impl S3 {
@@ -67,6 +68,8 @@ impl S3 {
             root_key: format!("backup-{}", epoch_millis()),
             region,
             client: Client::from_conf(s3_config),
+            enable_compression: true,
+            encryption_key: None,
         }
     }
 
@@ -79,19 +82,6 @@ impl S3 {
                 Ok(index_file)
             }
         }
-    }
-
-    fn compress(&self, data: Bytes) -> Result<Bytes, Error> {
-        let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
-        let _ = enc.write_all(data.as_slice());
-        enc.flush_finish()
-    }
-
-    fn decompress(&self, data: Bytes) -> Result<Bytes, Error> {
-        let mut dec = ZlibDecoder::new(data.as_slice());
-        let mut decoded_data = Vec::new();
-        let _ = dec.read_to_end(&mut decoded_data);
-        Ok(decoded_data)
     }
 }
 
@@ -122,7 +112,19 @@ impl Bridge for S3 {
     }
 
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
-        let data = self.compress(data)?;
+        // compress data?
+        let data = if self.enable_compression {
+            compress(data)?
+        } else {
+            data
+        };
+
+        // encrypt data?
+        let data = match &self.encryption_key {
+            Some(key) => encrypt(data, key.as_str())?,
+            None => data,
+        };
+
         let data_size = data.len();
         let key = format!("{}/{}.dump", self.root_key.as_str(), file_part);
 
@@ -137,6 +139,8 @@ impl Bridge for S3 {
             directory_name: self.root_key.clone(),
             size: 0,
             created_at: epoch_millis(),
+            compressed: self.enable_compression,
+            encrypted: self.encryption_key.is_some(),
         };
 
         // find or create Backup
@@ -173,11 +177,32 @@ impl Bridge for S3 {
             Some(backup.directory_name.as_str()),
         )? {
             let data = get_object(&self.client, self.bucket.as_str(), object.key().unwrap())?;
-            let data = self.decompress(data)?;
+
+            // decrypt data?
+            let data = match &self.encryption_key {
+                Some(key) => decrypt(data, key.as_str())?,
+                None => data,
+            };
+
+            // decompress data?
+            let data = if self.enable_compression {
+                decompress(data)?
+            } else {
+                data
+            };
+
             data_callback(data);
         }
 
         Ok(())
+    }
+
+    fn set_encryption_key(&mut self, key: Option<String>) {
+        self.encryption_key = key;
+    }
+
+    fn set_compression(&mut self, enable: bool) {
+        self.enable_compression = enable;
     }
 }
 
@@ -519,6 +544,8 @@ mod tests {
             directory_name: "backup-1".to_string(),
             size: 0,
             created_at: epoch_millis(),
+            compressed: true,
+            encrypted: false,
         });
 
         assert!(s3.write_index_file(&index_file).is_ok());

@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, Error, ErrorKind, Write};
+use std::io::{Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
 
 use crate::connector::Connector;

@@ -55,7 +55,7 @@ fn list_backups(s3: &mut S3) -> Result<(), Error> {
     index_file.backups.sort_by(|a, b| a.cmp(b).reverse());
 
     let mut table = table();
-    table.set_titles(row!["name", "size", "when"]);
+    table.set_titles(row!["name", "size", "when", "compressed", "encrypted"]);
     let formatter = Formatter::new();
     let now = epoch_millis();
 
@@ -64,6 +64,8 @@ fn list_backups(s3: &mut S3) -> Result<(), Error> {
             backup.directory_name.as_str(),
             to_human_readable_unit(backup.size),
             formatter.convert(Duration::from_millis((now - backup.created_at) as u64)),
+            backup.compressed,
+            backup.encrypted,
         ]);
     }
 
@@ -135,6 +137,16 @@ fn main() -> anyhow::Result<()> {
         config.bridge.secret_access_key()?,
         config.bridge.endpoint()?,
     );
+
+    config.source.as_ref().map(|source| {
+        bridge.set_encryption_key(source.encryption_key.clone());
+        bridge.set_compression(source.compression.unwrap_or(true));
+    });
+
+    config.destination.as_ref().map(|dest| {
+        bridge.set_encryption_key(dest.encryption_key.clone());
+        bridge.set_compression(dest.compression.unwrap_or(true));
+    });
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 

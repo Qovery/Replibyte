@@ -103,6 +103,7 @@ Create your `prod-conf.yaml` configuration file to source your production databa
 ```yaml
 source:
   connection_uri: $DATABASE_URL
+  encryption_key: $MY_PRIVATE_ENC_KEY # optional 
   transformers:
     - database: public
       table: employees
@@ -145,6 +146,7 @@ bridge:
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
   connection_uri: $DATABASE_URL
+  decryption_key: $MY_PUBLIC_DEC_KEY # optional
 ```
 
 Run the app for the destination
@@ -164,11 +166,13 @@ sequenceDiagram
     participant PostgreSQL (Source)
     participant AWS S3 (Bridge)
     PostgreSQL (Source)->>RepliByte: 1. Dump data
-    loop Transformer
-        RepliByte->>RepliByte: 2. Obfuscate sensitive data
+    loop
+        RepliByte->>RepliByte: 2. Hide or fake sensitive data
+        RepliByte->>RepliByte: 3. Encrypt data
+        RepliByte->>RepliByte: 4. Compress data
     end
-    RepliByte->>AWS S3 (Bridge): 3. Upload obfuscated dump data
-    RepliByte->>AWS S3 (Bridge): 4. Write index file
+    RepliByte->>AWS S3 (Bridge): 5. Upload obfuscated dump data
+    RepliByte->>AWS S3 (Bridge): 6. Write index file
 ```
 
 1. RepliByte connects to the _PostgreSQL Source_ database and makes a full SQL dump of it.
@@ -188,7 +192,11 @@ sequenceDiagram
     participant AWS S3 (Bridge)
     AWS S3 (Bridge)->>RepliByte: 1. Read index file
     AWS S3 (Bridge)->>RepliByte: 2. Download dump SQL file
-    RepliByte->>PostgreSQL (Destination): 1. Restore dump SQL
+    loop
+        RepliByte->>RepliByte: 3. Decrypt data
+        RepliByte->>RepliByte: 4. Uncompress data
+    end
+    RepliByte->>PostgreSQL (Destination): 5. Restore dump SQL
 ```
 
 1. RepliByte connects to the S3 bucket and reads the index file to retrieve the latest SQL to download.
@@ -202,13 +210,13 @@ sequenceDiagram
 - [x] Generate random/fake information
 - [x] Backup TB of data (read [Design](#design))
 - [x] On-the-fly data (de)compression (Zlib)
+- [x] On-the-fly data de/encryption (AES-256)
 
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
 - [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
-- [ ] On-the-fly data de/encryption
 
 ## Connectors
 
