@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read};
 use std::process::{Command, Stdio};
 
@@ -99,6 +99,7 @@ pub fn recursively_transform_bson(
     key: String,
     bson: Bson,
     transformers: &HashMap<String, &Box<dyn Transformer + '_>>,
+    wildcard_keys: &HashSet<String>,
 ) -> Bson {
     let mut column;
     match bson {
@@ -118,22 +119,31 @@ pub fn recursively_transform_bson(
             };
             Bson::Double(*column.float_number_value().unwrap())
         }
-        Bson::Array(arr) => Bson::Array(
-            arr.iter()
+        Bson::Array(arr) => {
+            let new_arr = arr
+                .iter()
                 .enumerate()
                 .map(|(idx, bson)| {
+                    let wildcard_key = format!("{}.$[]", key);
                     recursively_transform_bson(
-                        format!("{}.{}", key, idx),
+                        if wildcard_keys.contains(&wildcard_key) {
+                            wildcard_key
+                        } else {
+                            format!("{}.{}", key, idx)
+                        },
                         bson.clone(),
                         transformers,
+                        wildcard_keys,
                     )
                 })
-                .collect::<Vec<Bson>>(),
-        ),
+                .collect::<Vec<Bson>>();
+            Bson::Array(new_arr)
+        }
         Bson::Document(nested_doc) => Bson::Document(recursively_transform_document(
             key,
             nested_doc,
             transformers,
+            wildcard_keys,
         )),
         Bson::Null => Bson::Null,
         Bson::Int32(value) => {
@@ -157,17 +167,47 @@ pub fn recursively_transform_bson(
 }
 
 pub fn recursively_transform_document(
-    full_key: String,
+    prefix: String,
     mut original_doc: Document,
     transformers: &HashMap<String, &Box<dyn Transformer + '_>>,
+    wildcard_keys: &HashSet<String>,
 ) -> Document {
     for (key, bson) in original_doc.clone() {
         original_doc.insert(
             key.clone(),
-            recursively_transform_bson(format!("{}.{}", full_key, key), bson, transformers),
+            recursively_transform_bson(
+                format!("{}.{}", prefix, key),
+                bson,
+                transformers,
+                wildcard_keys,
+            ),
         );
     }
     original_doc
+}
+
+pub(crate) fn find_all_keys_with_array_wildcard_op(
+    transformers: &Vec<Box<dyn Transformer + '_>>,
+) -> HashSet<String> {
+    let mut wildcard_keys = HashSet::new();
+    for transformer in transformers {
+        let column_name = transformer.column_name();
+        let delim = ".$[].";
+        let mut iter = 0;
+        while let Some(idx) = column_name[iter..].find(delim) {
+            let offset = delim.len();
+            iter += idx + offset;
+            let key = column_name[..(iter - 1)].to_string();
+            wildcard_keys.insert(format!("{}.{}", transformer.database_and_table_name(), key));
+        }
+        // try to find last delim
+        let last_delim = ".$[]"; // no dot at the end
+        if let Some(_) = column_name[iter..].find(last_delim) {
+            let key = column_name.to_string();
+            wildcard_keys.insert(format!("{}.{}", transformer.database_and_table_name(), key));
+        }
+    }
+    wildcard_keys
 }
 
 /// consume reader and apply transformation on INSERT INTO queries if needed
@@ -176,6 +216,8 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     transformers: &Vec<Box<dyn Transformer + '_>>,
     mut query_callback: F,
 ) {
+    // create a set of wildcards to be used in the transformation
+    let wildcard_keys = find_all_keys_with_array_wildcard_op(transformers);
     // create a map variable with Transformer by column_name
     let mut transformer_by_db_and_table_and_column_name: HashMap<String, &Box<dyn Transformer>> =
         HashMap::with_capacity(transformers.len());
@@ -195,6 +237,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
             prefix, // prefix is <db_name>.<collection_name>
             doc,
             &transformer_by_db_and_table_and_column_name,
+            &wildcard_keys,
         );
         new_docs.push(new_doc);
     }
@@ -214,11 +257,11 @@ mod tests {
     use crate::transformer::first_name::FirstNameTransformer;
     use crate::transformer::random::RandomTransformer;
     use crate::Source;
-    use bson::{bson, doc, Document};
-    use std::collections::HashMap;
+    use bson::{bson, doc, Bson, Document};
+    use std::collections::{HashMap, HashSet};
     use std::vec;
 
-    use crate::source::mongo::Mongo;
+    use crate::source::mongo::{find_all_keys_with_array_wildcard_op, Mongo};
     use crate::transformer::transient::TransientTransformer;
     use crate::transformer::Transformer;
 
@@ -292,18 +335,16 @@ mod tests {
                 .zip(transformers_vec.iter()),
         );
         // Recursively transform the document
-        let transformed_doc =
-            recursively_transform_document("test.users".to_string(), doc, &transformers);
-
-        println!("{:#?}", transformed_doc);
+        let transformed_doc = recursively_transform_document(
+            "test.users".to_string(),
+            doc,
+            &transformers,
+            &HashSet::new(),
+        );
 
         // Assert transformed values are not equal to original values
-
         // no_nest
-        assert_ne!(
-            transformed_doc.get("no_nest").unwrap(),
-            &bson::Bson::Int32(5)
-        );
+        assert_ne!(transformed_doc.get("no_nest").unwrap(), &Bson::Int32(5));
         // info.ext.number
         assert_ne!(
             transformed_doc
@@ -313,7 +354,7 @@ mod tests {
                 .unwrap()
                 .get("number")
                 .unwrap(),
-            &bson::Bson::Int64(1234567890)
+            &Bson::Int64(1234567890)
         );
 
         let arr = transformed_doc.get_array("info_arr").unwrap();
@@ -321,10 +362,77 @@ mod tests {
         let doc = arr[0].as_document().unwrap();
         assert_ne!(
             doc.get("a").unwrap(),
-            &bson::Bson::String("SomeString".to_string())
+            &Bson::String("SomeString".to_string())
         );
         // info_arr.1.b
         let doc = arr[1].as_document().unwrap();
-        assert_ne!(doc.get("b").unwrap(), &bson::Bson::Double(3.5));
+        assert_ne!(doc.get("b").unwrap(), &Bson::Double(3.5));
+    }
+
+    #[test]
+    fn recursive_document_transform_with_wildcard_nested() {
+        let database_name = "test";
+        let table_name = "users";
+        let column_name = "a.b.$[].c.0";
+        let doc = doc! {
+            "a": {
+                "b" : [
+                    {
+                        "c" : [
+                            1, // should be transformed
+                            2  // shouldn't be transformed
+                        ]
+                    },
+                    {
+                        "c" : [
+                            3, // should be transformed
+                            4  // shouldn't be transformed
+                        ]
+                    }
+                ]
+            }
+        };
+        let t: Box<dyn Transformer> = Box::new(RandomTransformer::new(
+            database_name,
+            table_name,
+            column_name.into(),
+        ));
+        let transformers_vec = vec![t];
+        // create a set of wildcards to be used in the transformation
+        let wildcard_keys = find_all_keys_with_array_wildcard_op(&transformers_vec);
+        // create a map variable with Transformer by column_name
+        let mut transformers: HashMap<String, &Box<dyn Transformer>> =
+            HashMap::with_capacity(transformers_vec.len());
+
+        for transformer in transformers_vec.iter() {
+            let _ = transformers.insert(
+                transformer.database_and_table_and_column_name(),
+                transformer,
+            );
+        }
+        // Recursively transform the document
+        let transformed_doc = recursively_transform_document(
+            "test.users".to_string(),
+            doc,
+            &transformers,
+            &wildcard_keys,
+        );
+
+        // Assert transformed values are not equal to original values
+        let arr = transformed_doc
+            .get_document("a")
+            .unwrap()
+            .get_array("b")
+            .unwrap();
+        // 1, 2
+        let mut doc = arr[0].as_document().unwrap();
+        let mut inner_arr = doc.get_array("c").unwrap();
+        assert_ne!(inner_arr[0], Bson::Int32(1));
+        assert_eq!(inner_arr[1], Bson::Int32(2));
+        // 3, 4
+        doc = arr[1].as_document().unwrap();
+        inner_arr = doc.get_array("c").unwrap();
+        assert_ne!(inner_arr[0], Bson::Int32(3));
+        assert_eq!(inner_arr[1], Bson::Int32(4));
     }
 }
