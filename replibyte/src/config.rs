@@ -101,6 +101,13 @@ impl SourceConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }
+
+    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
+        match &self.encryption_key {
+            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
+            None => Ok(None),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -114,7 +121,15 @@ impl DestinationConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }
+
+    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
+        match &self.encryption_key {
+            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
+            None => Ok(None),
+        }
+    }
 }
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SkipConfig {
     pub database: String,

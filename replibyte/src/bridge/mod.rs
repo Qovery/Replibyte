@@ -1,7 +1,6 @@
 use aes_gcm::aead::{Aead, NewAead};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use std::io::{Error, ErrorKind, Read, Write};
-use std::ops::Add;
 
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;

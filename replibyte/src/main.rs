@@ -138,15 +138,21 @@ fn main() -> anyhow::Result<()> {
         config.bridge.endpoint()?,
     );
 
-    config.source.as_ref().map(|source| {
-        bridge.set_encryption_key(source.encryption_key.clone());
-        bridge.set_compression(source.compression.unwrap_or(true));
-    });
+    match &config.source {
+        Some(source) => {
+            bridge.set_compression(source.compression.unwrap_or(true));
+            bridge.set_encryption_key(source.encryption_key()?)
+        }
+        None => {}
+    }
 
-    config.destination.as_ref().map(|dest| {
-        bridge.set_encryption_key(dest.encryption_key.clone());
-        bridge.set_compression(dest.compression.unwrap_or(true));
-    });
+    match &config.destination {
+        Some(dest) => {
+            bridge.set_compression(dest.compression.unwrap_or(true));
+            bridge.set_encryption_key(dest.encryption_key()?);
+        }
+        None => {}
+    }
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 
