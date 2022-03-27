@@ -1,3 +1,4 @@
+use crate::transformer::credit_card::CreditCardTransformer;
 use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::keep_first_char::KeepFirstCharTransformer;
@@ -6,6 +7,7 @@ use crate::transformer::random::RandomTransformer;
 use crate::transformer::transient::TransientTransformer;
 use crate::types::Column;
 
+pub mod credit_card;
 pub mod email;
 pub mod first_name;
 pub mod keep_first_char;
@@ -21,6 +23,7 @@ pub fn transformers() -> Vec<Box<dyn Transformer>> {
         Box::new(RandomTransformer::default()),
         Box::new(KeepFirstCharTransformer::default()),
         Box::new(TransientTransformer::default()),
+        Box::new(CreditCardTransformer::default()),
     ]
 }
 

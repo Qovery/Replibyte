@@ -1,3 +1,4 @@
+use crate::transformer::credit_card::CreditCardTransformer;
 use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::keep_first_char::KeepFirstCharTransformer;
@@ -163,6 +164,8 @@ pub enum TransformerTypeConfig {
     KeepFirstChar,
     #[serde(rename = "phone-number")]
     PhoneNumber,
+    #[serde(rename = "credit-card")]
+    CreditCard,
 }
 
 impl TransformerTypeConfig {
@@ -199,6 +202,11 @@ impl TransformerTypeConfig {
                 column_name,
             )),
             TransformerTypeConfig::RandomDate => todo!(),
+            TransformerTypeConfig::CreditCard => Box::new(CreditCardTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
         };
 
         transformer
