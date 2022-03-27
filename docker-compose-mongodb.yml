@@ -1,0 +1,16 @@
+services:
+  source-mongodb:
+    image: mongo:5
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - ./db/mongo:/docker-entrypoint-initdb.d/
+    ports:
+      - 27017:27017

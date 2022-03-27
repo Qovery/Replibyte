@@ -22,6 +22,8 @@ use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_stdout::PostgresStdout;
+use crate::source::mongodb::MongoDB as SourceMongoDB;
+use crate::source::mongodb_stdin::MongoDBStdin;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::{Source, SourceOptions};
@@ -220,6 +222,18 @@ fn main() -> anyhow::Result<()> {
                             ConnectionUri::Mysql(host, port, username, password, database) => {
                                 todo!() // FIXME
                             }
+                            ConnectionUri::MongoDB(host, port, username, password, database) => {
+                                let mongodb = SourceMongoDB::new(
+                                    host.as_str(),
+                                    port,
+                                    database.as_str(),
+                                    username.as_str(),
+                                    password.as_str(),
+                                );
+
+                                let task = FullBackupTask::new(mongodb, bridge, options);
+                                task.run(progress_callback)?
+                            }
                         },
                         // some user use "postgres" and "postgresql" both are valid
                         Some(v) if v == "postgres" || v == "postgresql" => {
@@ -288,6 +302,9 @@ fn main() -> anyhow::Result<()> {
                         task.run(progress_callback)?
                     }
                     ConnectionUri::Mysql(host, port, username, password, database) => {
+                        todo!() // FIXME
+                    }
+                    ConnectionUri::MongoDB(host, port, username, password, database) => {
                         todo!() // FIXME
                     }
                 }
