@@ -4,6 +4,7 @@ use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::keep_first_char::KeepFirstCharTransformer;
 use crate::transformer::phone_number::PhoneNumberTransformer;
 use crate::transformer::random::RandomTransformer;
+use crate::transformer::redacted::RedactedTransformer;
 use crate::transformer::Transformer;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -166,6 +167,8 @@ pub enum TransformerTypeConfig {
     PhoneNumber,
     #[serde(rename = "credit-card")]
     CreditCard,
+    #[serde(rename = "redacted")]
+    Redacted,
 }
 
 impl TransformerTypeConfig {
@@ -203,6 +206,11 @@ impl TransformerTypeConfig {
             )),
             TransformerTypeConfig::RandomDate => todo!(),
             TransformerTypeConfig::CreditCard => Box::new(CreditCardTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::Redacted => Box::new(RedactedTransformer::new(
                 database_name,
                 table_name,
                 column_name,
