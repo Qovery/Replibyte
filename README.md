@@ -19,9 +19,9 @@
 
 *The installation from the package managers is coming soon*
 
-### Requirements for Postgres
+### Requirements for PostgreSQL
 
-You need to have **pg_dump** and **psql** binaries installed on your machine. [Download Postgres](https://www.postgresql.org/download/).
+You need to have **pg_dump** and **psql** binaries installed on your machine. [Download PostgreSQL](https://www.postgresql.org/download/).
 
 ```shell
 git clone https://github.com/Qovery/replibyte.git
@@ -61,21 +61,23 @@ cargo build --release
 
 ## Usage
 
-Example with Postgres as a *Source* and *Destination* database **AND** S3 as a *Bridge* (cf [configuration file](#Configuration))
+[![What is RepliByte](assets/video_.png)](https://www.youtube.com/watch?v=IKeLnZvECQw)
 
-Backup your Postgres databases into S3
+Example with PostgreSQL as a *Source* and *Destination* database **AND** S3 as a *Bridge* (cf [configuration file](#Configuration))
+
+Backup your PostgreSQL databases into S3
 
 ```shell
 replibyte -c prod-conf.yaml backup run
 ```
 
-Backup from local Postgres dump file into S3
+Backup from local PostgreSQL dump file into S3
 
 ```shell
 cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
 ```
 
-Restore your Postgres databases from S3
+Restore your PostgreSQL databases from S3
 
 ```shell
 replibyte -c prod-conf.yaml backup list
@@ -101,6 +103,7 @@ Create your `prod-conf.yaml` configuration file to source your production databa
 ```yaml
 source:
   connection_uri: $DATABASE_URL
+  encryption_key: $MY_PRIVATE_ENC_KEY # optional 
   transformers:
     - database: public
       table: employees
@@ -111,6 +114,15 @@ source:
           transformer: random-date
         - name: first_name
           transformer: first-name
+        - name: email
+          transformer: email
+        - name: username
+          transformer: keep-first-char
+    - database: public
+      table: customers
+      columns:
+        - name: phone
+          transformer: phone-number
 bridge:
   bucket: $BUCKET_NAME
   access_key_id: $ACCESS_KEY_ID
@@ -134,6 +146,7 @@ bridge:
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
   connection_uri: $DATABASE_URL
+  decryption_key: $MY_PUBLIC_DEC_KEY # optional
 ```
 
 Run the app for the destination
@@ -145,44 +158,50 @@ replibyte -c staging-conf.yaml
 ## How RepliByte works
 
 RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as
-intermediary (bridge). Here is an example of what happens while replicating a Postgres database.
+intermediary (bridge). Here is an example of what happens while replicating a PostgreSQL database.
 
 ```mermaid
 sequenceDiagram
     participant RepliByte
-    participant Postgres (Source)
+    participant PostgreSQL (Source)
     participant AWS S3 (Bridge)
-    Postgres (Source)->>RepliByte: 1. Dump data
-    loop Transformer
-        RepliByte->>RepliByte: 2. Obfuscate sensitive data
+    PostgreSQL (Source)->>RepliByte: 1. Dump data
+    loop
+        RepliByte->>RepliByte: 2. Hide or fake sensitive data
+        RepliByte->>RepliByte: 3. Encrypt data
+        RepliByte->>RepliByte: 4. Compress data
     end
-    RepliByte->>AWS S3 (Bridge): 3. Upload obfuscated dump data
-    RepliByte->>AWS S3 (Bridge): 4. Write index file
+    RepliByte->>AWS S3 (Bridge): 5. Upload obfuscated dump data
+    RepliByte->>AWS S3 (Bridge): 6. Write index file
 ```
 
-1. RepliByte connects to the _Postgres Source_ database and makes a full SQL dump of it.
+1. RepliByte connects to the _PostgreSQL Source_ database and makes a full SQL dump of it.
 2. RepliByte receives the SQL dump, parse it, and generates random/fake information in real-time.
 3. RepliByte streams and uploads the modified SQL dump in real-time on AWS S3.
 4. RepliByte keeps track of the uploaded SQL dump by writing it into an index file.
 
 ---
 
-Once at least a replica from the source Postgres database is available in the S3 bucket, RepliByte can use and inject it into the
-destination PostgresSQL database.
+Once at least a replica from the source PostgreSQL database is available in the S3 bucket, RepliByte can use and inject it into the
+destination PostgreSQL database.
 
 ```mermaid
 sequenceDiagram
     participant RepliByte
-    participant Postgres (Destination)
+    participant PostgreSQL (Destination)
     participant AWS S3 (Bridge)
     AWS S3 (Bridge)->>RepliByte: 1. Read index file
     AWS S3 (Bridge)->>RepliByte: 2. Download dump SQL file
-    RepliByte->>Postgres (Destination): 1. Restore dump SQL
+    loop
+        RepliByte->>RepliByte: 3. Decrypt data
+        RepliByte->>RepliByte: 4. Uncompress data
+    end
+    RepliByte->>PostgreSQL (Destination): 5. Restore dump SQL
 ```
 
 1. RepliByte connects to the S3 bucket and reads the index file to retrieve the latest SQL to download.
 2. RepliByte downloads the SQL dump in a stream bytes.
-3. RepliByte restores the SQL dump in the destination Postgres database in real-time.
+3. RepliByte restores the SQL dump in the destination PostgreSQL database in real-time.
 
 ## Features
 
@@ -191,13 +210,13 @@ sequenceDiagram
 - [x] Generate random/fake information
 - [x] Backup TB of data (read [Design](#design))
 - [x] On-the-fly data (de)compression (Zlib)
+- [x] On-the-fly data de/encryption (AES-256)
 
 Here are the features we plan to support
 
 - [ ] Incremental data synchronization
 - [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
-- [ ] On-the-fly data de/encryption
 
 ## Connectors
 
@@ -246,7 +265,8 @@ replicate the data in a stream of bytes and does not store anything on a local d
 
 ### Limitations
 
-- Tested with Postgres 13 and 14. It should work with prior versions.
+- Tested with PostgreSQL 13 and 14. It should work with prior versions.
+- RepliByte as not been designed to run multiple backups targeting the same Bridge. The Index File does not manage concurrent write (ATM).
 
 ### Index file structure
 
@@ -277,13 +297,13 @@ ambition!
 
 ## Use cases
 
-| Scenario                                                                          | Supported |
-|-----------------------------------------------------------------------------------|-----------|
-| Synchronize the whole Postgres instance                                           | Yes       |
-| Synchronize the whole Postgres instance and replace sensitive data with fake data | Yes       |
-| Synchronize specific Postgres tables and replace sensitive data with fake data    | WIP       |
-| Synchronize specific Postgres databases and replace sensitive data with fake data | WIP       |
-| Migrate from one database hosting platform to the other                           | Yes       |
+| Scenario                                                                            | Supported |
+|-------------------------------------------------------------------------------------|-----------|
+| Synchronize the whole PostgreSQL instance                                           | Yes       |
+| Synchronize the whole PostgreSQL instance and replace sensitive data with fake data | Yes       |
+| Synchronize specific PostgreSQL tables and replace sensitive data with fake data    | WIP       |
+| Synchronize specific PostgreSQL databases and replace sensitive data with fake data | WIP       |
+| Migrate from one database hosting platform to the other                             | Yes       |
 
 > Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
@@ -322,7 +342,7 @@ replibyte -c prod-conf.yaml backup run -s postgres -f dump.sql
 ## Local development
 
 For local development, you will need to install [Docker](https://www.docker.com/) and run `docker compose -f ./docker-compose-postgres-minio.yml` to start the local databases.
-At the moment, `docker-compose` includes 2 Postgres database instances and a [Minio](https://min.io/) bridge. One source, one destination database and one bridge. In the future, we will provide more options.
+At the moment, `docker-compose` includes 2 PostgreSQL database instances and a [Minio](https://min.io/) bridge. One source, one destination database and one bridge. In the future, we will provide more options.
 
 The Minio console is accessible at http://localhost:9001.
 

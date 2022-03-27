@@ -14,7 +14,25 @@ use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
 
+use super::SourceOptions;
+
 pub const COMMENT_CHARS: &str = "--";
+
+enum RowType {
+    InsertInto {
+        database_name: String,
+        table_name: String,
+    },
+    CreateTable {
+        database_name: String,
+        table_name: String,
+    },
+    AlterTable {
+        database_name: String,
+        table_name: String,
+    },
+    Others,
+}
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -52,7 +70,7 @@ impl<'a> Connector for Postgres<'a> {
 impl<'a> Source for Postgres<'a> {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
-        transformers: &Vec<Box<dyn Transformer + '_>>,
+        options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
@@ -67,8 +85,8 @@ impl<'a> Source for Postgres<'a> {
                 self.host,
                 "-p",
                 s_port.as_str(),
-                "-d",
-                self.database,
+                //"-d", pg_dumpall does not let picking the database as it is dump every dbs
+                //self.database,
                 "-U",
                 self.username,
             ])
@@ -83,7 +101,7 @@ impl<'a> Source for Postgres<'a> {
 
         let reader = BufReader::new(stdout);
 
-        read_and_transform(reader, transformers, query_callback);
+        read_and_transform(reader, options, query_callback);
 
         match process.wait() {
             Ok(exit_status) => {
@@ -104,28 +122,35 @@ impl<'a> Source for Postgres<'a> {
 /// consume reader and apply transformation on INSERT INTO queries if needed
 pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     reader: BufReader<R>,
-    transformers: &Vec<Box<dyn Transformer + '_>>,
+    options: SourceOptions,
     mut query_callback: F,
 ) {
     // create a map variable with Transformer by column_name
     let mut transformer_by_db_and_table_and_column_name: HashMap<String, &Box<dyn Transformer>> =
-        HashMap::with_capacity(transformers.len());
+        HashMap::with_capacity(options.transformers.len());
 
-    for transformer in transformers {
+    for transformer in options.transformers {
         let _ = transformer_by_db_and_table_and_column_name.insert(
             transformer.database_and_table_and_column_name(),
             transformer,
         );
     }
 
+    let mut skip_tables_map: HashMap<String, bool> =
+        HashMap::with_capacity(options.skip_config.len());
+    for skip in options.skip_config {
+        let _ = skip_tables_map.insert(format!("{}.{}", skip.database, skip.table), true);
+    }
+
     match list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
 
-        if match_keyword_at_position(Keyword::Insert, &tokens, 0)
-            && match_keyword_at_position(Keyword::Into, &tokens, 2)
-        {
-            if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-                if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+        match get_row_type(&tokens) {
+            RowType::InsertInto {
+                database_name,
+                table_name,
+            } => {
+                if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
                     // find database name by filtering out all queries starting with
                     // INSERT INTO <database>.<table> (...)
                     // INSERT       -> position 0
@@ -133,7 +158,6 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                     // <table>      -> position 6
                     // L Paren      -> position X?
                     // R Paren      -> position X?
-
                     let column_names = get_column_names_from_insert_into_query(&tokens);
                     let column_values = get_column_values_from_insert_into_query(&tokens);
 
@@ -190,14 +214,14 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
                     query_callback(
                         to_query(
-                            Some(database_name),
+                            Some(database_name.as_str()),
                             InsertIntoQuery {
                                 table_name: table_name.to_string(),
                                 columns: original_columns,
                             },
                         ),
                         to_query(
-                            Some(database_name),
+                            Some(database_name.as_str()),
                             InsertIntoQuery {
                                 table_name: table_name.to_string(),
                                 columns,
@@ -206,18 +230,107 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                     )
                 }
             }
-        } else {
-            // other rows than `INSERT INTO ...`
-            query_callback(
-                // there is no diff between the original and the modified one
-                Query(query.as_bytes().to_vec()),
-                Query(query.as_bytes().to_vec()),
-            )
+            RowType::CreateTable {
+                database_name,
+                table_name,
+            } => {
+                if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
+                    query_callback(
+                        // there is no diff between the original and the modified one
+                        Query(query.as_bytes().to_vec()),
+                        Query(query.as_bytes().to_vec()),
+                    )
+                }
+            }
+            RowType::AlterTable {
+                database_name,
+                table_name,
+            } => {
+                if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
+                    query_callback(
+                        // there is no diff between the original and the modified one
+                        Query(query.as_bytes().to_vec()),
+                        Query(query.as_bytes().to_vec()),
+                    )
+                }
+            }
+            RowType::Others => {
+                // other rows than `INSERT INTO ...` and `CREATE TABLE ...`
+                query_callback(
+                    // there is no diff between the original and the modified one
+                    Query(query.as_bytes().to_vec()),
+                    Query(query.as_bytes().to_vec()),
+                )
+            }
         }
     }) {
         Ok(_) => {}
         Err(err) => panic!("{:?}", err),
     }
+}
+
+fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
+    match_keyword_at_position(Keyword::Insert, &tokens, 0)
+        && match_keyword_at_position(Keyword::Into, &tokens, 2)
+}
+
+fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
+    match_keyword_at_position(Keyword::Create, &tokens, 0)
+        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+}
+
+fn is_alter_table_statement(tokens: &Vec<Token>) -> bool {
+    match_keyword_at_position(Keyword::Alter, &tokens, 0)
+        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+}
+
+fn get_row_type(tokens: &Vec<Token>) -> RowType {
+    let mut row_type = RowType::Others;
+
+    if is_insert_into_statement(&tokens) {
+        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
+            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+                row_type = RowType::InsertInto {
+                    database_name: database_name.to_string(),
+                    table_name: table_name.to_string(),
+                };
+            }
+        }
+    }
+
+    if is_create_table_statement(&tokens) {
+        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
+            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+                row_type = RowType::CreateTable {
+                    database_name: database_name.to_string(),
+                    table_name: table_name.to_string(),
+                };
+            }
+        }
+    }
+
+    if is_alter_table_statement(&tokens) {
+        let database_name_pos = match get_word_value_at_position(&tokens, 4) {
+            Some(word) if word == "ONLY" => 6,
+            _ => 4,
+        };
+
+        let table_name_pos = match get_word_value_at_position(&tokens, 4) {
+            Some(word) if word == "ONLY" => 8,
+            _ => 6,
+        };
+
+        if let Some(database_name) = get_word_value_at_position(&tokens, database_name_pos) {
+            if let Some(table_name) = get_word_value_at_position(&tokens, table_name_pos) {
+                row_type = RowType::AlterTable {
+                    database_name: database_name.to_string(),
+                    table_name: table_name.to_string(),
+                };
+            }
+        }
+    }
+
+    row_type
 }
 
 fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
@@ -267,6 +380,8 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::SkipConfig;
+    use crate::source::SourceOptions;
     use crate::Source;
     use std::str;
     use std::vec;
@@ -288,15 +403,22 @@ mod tests {
     #[test]
     fn connect() {
         let p = get_postgres();
-
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.read(&transformers, |_, _| {}).is_ok());
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
+        assert!(p.read(source_options, |original_query, query| {}).is_ok());
 
         let p = get_invalid_postgres();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.read(&transformers, |_, _| {}).is_err());
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
+        assert!(p.read(source_options, |original_query, query| {}).is_err());
     }
 
     #[test]
@@ -304,7 +426,11 @@ mod tests {
         let p = get_postgres();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        p.read(&transformers, |original_query, query| {
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
+        let _ = p.read(source_options, |original_query, query| {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);
         });
@@ -398,8 +524,12 @@ mod tests {
         ));
 
         let transformers = vec![t1, t2];
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
 
-        p.read(&transformers, |original_query, query| {
+        let _ = p.read(source_options, |original_query, query| {
             assert!(query.data().len() > 0);
             assert!(query.data().len() > 0);
 
@@ -413,6 +543,59 @@ mod tests {
                 // TODO to complete to better check the column change only
             } else {
                 assert_eq!(query.data(), original_query.data());
+            }
+        });
+    }
+
+    #[test]
+    fn skip_table() {
+        let p = get_postgres();
+
+        let database_name = "public";
+        let table_name = "employees";
+
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let skip_employees_table = SkipConfig {
+            database: database_name.to_string(),
+            table: table_name.to_string(),
+        };
+
+        let transformers = vec![t1];
+        let skip_config = vec![skip_employees_table];
+
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &skip_config,
+        };
+
+        let _ = p.read(source_options, |_original_query, query| {
+            assert!(query.data().len() > 0);
+            assert!(query.data().len() > 0);
+
+            let query_str = str::from_utf8(query.data()).unwrap();
+            let unexpected_insert_into = format!("INSERT INTO {}.{}", database_name, table_name);
+            let unexpected_create_table = format!("CREATE TABLE {}.{}", database_name, table_name);
+            let unexpected_alter_table = format!("ALTER TABLE {}.{}", database_name, table_name);
+            let unexpected_alter_table_only =
+                format!("ALTER TABLE ONLY {}.{}", database_name, table_name);
+
+            if query_str.contains(unexpected_insert_into.as_str()) {
+                panic!("unexpected insert into: {}", unexpected_insert_into);
+            }
+
+            if query_str.contains(unexpected_create_table.as_str()) {
+                panic!("unexpected create table: {}", unexpected_create_table);
+            }
+
+            if query_str.contains(unexpected_alter_table.as_str()) {
+                panic!("unexpected alter table: {}", unexpected_alter_table);
+            }
+
+            if query_str.contains(unexpected_alter_table_only.as_str()) {
+                panic!(
+                    "unexpected alter table only: {}",
+                    unexpected_alter_table_only
+                );
             }
         });
     }

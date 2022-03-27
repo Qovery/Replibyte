@@ -8,13 +8,8 @@ use clap::{Args, Parser, Subcommand};
 #[clap(propagate_version = true)]
 pub struct CLI {
     /// replibyte configuration file
-    #[clap(
-        short,
-        long,
-        default_value_t = String::from("replibyte.conf"),
-        value_name = "configuration file"
-    )]
-    pub config: String,
+    #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
+    pub config: PathBuf,
     #[clap(subcommand)]
     pub sub_commands: SubCommand,
 }
@@ -25,6 +20,9 @@ pub enum SubCommand {
     /// all backup commands
     #[clap(subcommand)]
     Backup(BackupCommand),
+    /// all transformers command
+    #[clap(subcommand)]
+    Transformer(TransformerCommand),
     /// all restore commands
     Restore(RestoreArgs),
 }
@@ -36,6 +34,13 @@ pub enum BackupCommand {
     List,
     /// launch backup -- use `-h` to show all the options
     Run(BackupRunArgs),
+}
+
+/// all transformer commands
+#[derive(Subcommand, Debug)]
+pub enum TransformerCommand {
+    /// list available transformers
+    List,
 }
 
 /// all restore commands

@@ -11,9 +11,9 @@ pub struct TransientTransformer {
 impl Default for TransientTransformer {
     fn default() -> Self {
         TransientTransformer {
-            database_name: String::from("database_name"),
-            table_name: String::from("no_table_name"),
-            column_name: String::from("no_name"),
+            database_name: String::default(),
+            table_name: String::default(),
+            column_name: String::default(),
         }
     }
 }

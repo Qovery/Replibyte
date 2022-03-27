@@ -1,4 +1,7 @@
+use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
+use crate::transformer::keep_first_char::KeepFirstCharTransformer;
+use crate::transformer::phone_number::PhoneNumberTransformer;
 use crate::transformer::random::RandomTransformer;
 use crate::transformer::Transformer;
 use serde;
@@ -88,24 +91,49 @@ impl BridgeConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct SourceConfig {
     pub connection_uri: String,
+    pub compression: Option<bool>,
+    pub encryption_key: Option<String>,
     pub transformers: Vec<TransformerConfig>,
+    pub skip: Option<Vec<SkipConfig>>,
 }
 
 impl SourceConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }
+
+    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
+        match &self.encryption_key {
+            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
+            None => Ok(None),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct DestinationConfig {
     pub connection_uri: String,
+    pub compression: Option<bool>,
+    pub encryption_key: Option<String>,
 }
 
 impl DestinationConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }
+
+    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
+        match &self.encryption_key {
+            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
+            None => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkipConfig {
+    pub database: String,
+    pub table: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -129,6 +157,12 @@ pub enum TransformerTypeConfig {
     RandomDate,
     #[serde(rename = "first-name")]
     FirstName,
+    #[serde(rename = "email")]
+    Email,
+    #[serde(rename = "keep-first-char")]
+    KeepFirstChar,
+    #[serde(rename = "phone-number")]
+    PhoneNumber,
 }
 
 impl TransformerTypeConfig {
@@ -145,6 +179,21 @@ impl TransformerTypeConfig {
                 column_name,
             )),
             TransformerTypeConfig::FirstName => Box::new(FirstNameTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::Email => Box::new(EmailTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::KeepFirstChar => Box::new(KeepFirstCharTransformer::new(
+                database_name,
+                table_name,
+                column_name,
+            )),
+            TransformerTypeConfig::PhoneNumber => Box::new(PhoneNumberTransformer::new(
                 database_name,
                 table_name,
                 column_name,

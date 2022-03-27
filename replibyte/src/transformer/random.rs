@@ -23,6 +23,16 @@ impl RandomTransformer {
     }
 }
 
+impl Default for RandomTransformer {
+    fn default() -> Self {
+        RandomTransformer {
+            database_name: String::default(),
+            table_name: String::default(),
+            column_name: String::default(),
+        }
+    }
+}
+
 impl Transformer for RandomTransformer {
     fn id(&self) -> &str {
         "random"

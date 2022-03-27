@@ -1,17 +1,31 @@
+use crate::transformer::email::EmailTransformer;
+use crate::transformer::first_name::FirstNameTransformer;
+use crate::transformer::keep_first_char::KeepFirstCharTransformer;
+use crate::transformer::phone_number::PhoneNumberTransformer;
+use crate::transformer::random::RandomTransformer;
+use crate::transformer::transient::TransientTransformer;
 use crate::types::Column;
 
+pub mod email;
 pub mod first_name;
+pub mod keep_first_char;
+pub mod phone_number;
 pub mod random;
 pub mod transient;
 
-pub enum Transformers {
-    Random,
-    Transient,
-    FirstName,
+pub fn transformers() -> Vec<Box<dyn Transformer>> {
+    vec![
+        Box::new(EmailTransformer::default()),
+        Box::new(FirstNameTransformer::default()),
+        Box::new(PhoneNumberTransformer::default()),
+        Box::new(RandomTransformer::default()),
+        Box::new(KeepFirstCharTransformer::default()),
+        Box::new(TransientTransformer::default()),
+    ]
 }
 
 /// Trait to implement to create a custom Transformer.
-pub trait Transformer {
+pub trait Transformer: Sync {
     fn id(&self) -> &str;
     fn description(&self) -> &str;
     fn database_name(&self) -> &str;

@@ -1,5 +1,4 @@
-use std::io::{stdout, Error, ErrorKind, Write};
-use std::process::{Command, Stdio};
+use std::io::{stdout, Error, Write};
 
 use crate::connector::Connector;
 use crate::destination::Destination;
