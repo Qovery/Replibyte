@@ -1,6 +1,7 @@
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - "v*"
 
 jobs:
   release:
@@ -17,6 +18,10 @@ jobs:
           - target: x86_64-apple-darwin
             archive: zip
     steps:
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
       - uses: actions/checkout@master
       - name: Compile and release
         uses: rust-build/rust-build.action@latest
