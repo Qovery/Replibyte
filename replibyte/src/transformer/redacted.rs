@@ -86,6 +86,15 @@ mod tests {
         assert_eq!(transformed_value.to_owned(), "424**********")
     }
 
+    #[test]
+    fn strings_lower_than_3_chars_remains_visible() {
+        let transformer = get_transformer();
+        let column = Column::StringValue("credit_card_number".to_string(), "424".to_string());
+        let transformed_column = transformer.transform(column);
+        let transformed_value = transformed_column.string_value().unwrap();
+        assert_eq!(transformed_value.to_owned(), "424")
+    }
+
     fn get_transformer() -> RedactedTransformer {
         RedactedTransformer::new("github", "users", "credit_card_number")
     }
