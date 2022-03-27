@@ -231,7 +231,7 @@ fn main() -> anyhow::Result<()> {
                                     password.as_str(),
                                 );
 
-                                let task = FullBackupTask::new(mongodb, &transformers, bridge);
+                                let task = FullBackupTask::new(mongodb, bridge, options);
                                 task.run(progress_callback)?
                             }
                         },

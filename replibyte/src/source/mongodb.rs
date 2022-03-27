@@ -6,6 +6,7 @@ use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, OriginalQuery, Query};
+use crate::SourceOptions;
 
 use bson::{Bson, Document};
 use dump_parser::mongodb::Archive;
@@ -45,7 +46,7 @@ impl<'a> Connector for MongoDB<'a> {
 impl<'a> Source for MongoDB<'a> {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
-        transformers: &Vec<Box<dyn Transformer + '_>>,
+        source_options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
@@ -77,7 +78,7 @@ impl<'a> Source for MongoDB<'a> {
 
         let reader = BufReader::new(stdout);
 
-        read_and_transform(reader, transformers, query_callback)?;
+        read_and_transform(reader, source_options, query_callback)?;
 
         match process.wait() {
             Ok(exit_status) => {
@@ -227,9 +228,10 @@ pub(crate) fn find_all_keys_with_array_wildcard_op(
 /// consume reader and apply transformation on INSERT INTO queries if needed
 pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     reader: BufReader<R>,
-    transformers: &Vec<Box<dyn Transformer + '_>>,
+    source_options: SourceOptions,
     mut query_callback: F,
 ) -> Result<(), Error> {
+    let transformers = source_options.transformers;
     // create a set of wildcards to be used in the transformation
     let wildcard_keys = find_all_keys_with_array_wildcard_op(transformers);
     // create a map variable with Transformer by column_name
@@ -267,6 +269,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
 #[cfg(test)]
 mod tests {
+    use crate::source::SourceOptions;
     use crate::transformer::random::RandomTransformer;
     use crate::Source;
     use bson::{doc, Bson};
@@ -293,12 +296,20 @@ mod tests {
 
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.read(&transformers, |_, _| {}).is_ok());
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
+        assert!(p.read(source_options, |_, _| {}).is_ok());
 
         let p = get_invalid_mongodb();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        assert!(p.read(&transformers, |_, _| {}).is_err());
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
+        assert!(p.read(source_options, |_, _| {}).is_err());
     }
 
     #[test]
@@ -306,7 +317,11 @@ mod tests {
         let p = get_mongodb();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
-        p.read(&transformers, |original_query, query| {
+        let source_options = SourceOptions {
+            transformers: &transformers,
+            skip_config: &vec![],
+        };
+        p.read(source_options, |original_query, query| {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);
         })
