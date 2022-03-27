@@ -222,8 +222,8 @@ Here are the features we plan to support
 ### Supported Source connectors
 
 - [x] PostgreSQL
+- [x] MongoDB
 - [ ] MySQL (Coming Soon)
-- [ ] MongoDB (Coming Soon)
 - [x] Local dump file (Yes for PostgreSQL) 
 
 ### Supported Transformers
@@ -251,8 +251,8 @@ services.
 ### Supported Destination connectors
 
 - [x] PostgreSQL
-- [ ] MySQL (Coming Soon)
 - [ ] MongoDB (Coming Soon)
+- [ ] MySQL (Coming Soon)
 - [ ] Local dump file (Coming soon)
 
 ## Design
