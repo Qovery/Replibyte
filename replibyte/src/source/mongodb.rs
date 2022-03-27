@@ -1,16 +1,16 @@
 use std::collections::{HashMap, HashSet};
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Read};
+use std::io::{BufReader, Error, ErrorKind, Read};
 use std::process::{Command, Stdio};
 
 use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
-use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
+use crate::types::{Column, OriginalQuery, Query};
 
 use bson::{Bson, Document};
-use dump_parser::mongo::Archive;
+use dump_parser::mongodb::Archive;
 
-pub struct Mongo<'a> {
+pub struct MongoDB<'a> {
     host: &'a str,
     port: u16,
     database: &'a str,
@@ -18,7 +18,7 @@ pub struct Mongo<'a> {
     password: &'a str,
 }
 
-impl<'a> Mongo<'a> {
+impl<'a> MongoDB<'a> {
     pub fn new(
         host: &'a str,
         port: u16,
@@ -26,7 +26,7 @@ impl<'a> Mongo<'a> {
         username: &'a str,
         password: &'a str,
     ) -> Self {
-        Mongo {
+        MongoDB {
             host,
             port,
             database,
@@ -36,13 +36,13 @@ impl<'a> Mongo<'a> {
     }
 }
 
-impl<'a> Connector for Mongo<'a> {
+impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<'a> Source for Mongo<'a> {
+impl<'a> Source for MongoDB<'a> {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
         transformers: &Vec<Box<dyn Transformer + '_>>,
@@ -259,7 +259,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
         }
     });
 
-    let query = Query(archive.to_bytes().unwrap()); // TODO handle error
+    let query = Query(archive.to_bytes()?);
 
     query_callback(original_query, query);
     Ok(())
@@ -267,36 +267,35 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
 #[cfg(test)]
 mod tests {
-    use crate::transformer::first_name::FirstNameTransformer;
     use crate::transformer::random::RandomTransformer;
     use crate::Source;
-    use bson::{bson, doc, Bson, Document};
+    use bson::{doc, Bson};
     use std::collections::{HashMap, HashSet};
     use std::vec;
 
-    use crate::source::mongo::{find_all_keys_with_array_wildcard_op, Mongo};
+    use crate::source::mongodb::{find_all_keys_with_array_wildcard_op, MongoDB};
     use crate::transformer::transient::TransientTransformer;
     use crate::transformer::Transformer;
 
     use super::recursively_transform_document;
 
-    fn get_mongo() -> Mongo<'static> {
-        Mongo::new("localhost", 27017, "test", "root", "password")
+    fn get_mongodb() -> MongoDB<'static> {
+        MongoDB::new("localhost", 27017, "test", "root", "password")
     }
 
-    fn get_invalid_mongo() -> Mongo<'static> {
-        Mongo::new("localhost", 27017, "test", "root", "wrongpassword")
+    fn get_invalid_mongodb() -> MongoDB<'static> {
+        MongoDB::new("localhost", 27017, "test", "root", "wrongpassword")
     }
 
     #[test]
     fn connect() {
-        let p = get_mongo();
+        let p = get_mongodb();
 
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         assert!(p.read(&transformers, |_, _| {}).is_ok());
 
-        let p = get_invalid_mongo();
+        let p = get_invalid_mongodb();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         assert!(p.read(&transformers, |_, _| {}).is_err());
@@ -304,7 +303,7 @@ mod tests {
 
     #[test]
     fn list_rows() {
-        let p = get_mongo();
+        let p = get_mongodb();
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         p.read(&transformers, |original_query, query| {

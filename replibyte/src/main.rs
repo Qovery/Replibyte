@@ -22,8 +22,8 @@ use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_stdout::PostgresStdout;
-use crate::source::mongo::Mongo as SourceMongo;
-use crate::source::mongo_stdin::MongoStdin;
+use crate::source::mongodb::MongoDB as SourceMongoDB;
+use crate::source::mongodb_stdin::MongoDBStdin;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::Source;
@@ -178,8 +178,8 @@ fn main() -> anyhow::Result<()> {
                             ConnectionUri::Mysql(host, port, username, password, database) => {
                                 todo!() // FIXME
                             }
-                            ConnectionUri::Mongo(host, port, username, password, database) => {
-                                let mongo = SourceMongo::new(
+                            ConnectionUri::MongoDB(host, port, username, password, database) => {
+                                let mongodb = SourceMongoDB::new(
                                     host.as_str(),
                                     port,
                                     database.as_str(),
@@ -187,7 +187,7 @@ fn main() -> anyhow::Result<()> {
                                     password.as_str(),
                                 );
 
-                                let task = FullBackupTask::new(mongo, &transformers, bridge);
+                                let task = FullBackupTask::new(mongodb, &transformers, bridge);
                                 task.run(progress_callback)?
                             }
                         },
@@ -255,7 +255,7 @@ fn main() -> anyhow::Result<()> {
                     ConnectionUri::Mysql(host, port, username, password, database) => {
                         todo!() // FIXME
                     }
-                    ConnectionUri::Mongo(host, port, username, password, database) => {
+                    ConnectionUri::MongoDB(host, port, username, password, database) => {
                         todo!() // FIXME
                     }
                 }

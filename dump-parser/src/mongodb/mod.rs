@@ -80,27 +80,30 @@ impl Archive {
             num_blocks += 1;
         }
 
-        // read blocks
-        loop {
-            // read block header
-            let collection_header_doc = Document::from_reader(&mut reader).map_err(|err| {
-                Error::new(
-                    ErrorKind::Other,
-                    format!("Error reading block header: {}", err),
-                )
-            })?;
-            block_headers.push(collection_header_doc.clone()); // TODO can we avoid cloning here?
-            let db_name = collection_header_doc.get_str("db").unwrap();
-            let coll_name = collection_header_doc.get_str("collection").unwrap();
-            let eof = collection_header_doc.get_bool("EOF").unwrap();
-            vec_eofs.push(eof);
-            // read block data
-            while let Ok(collection_doc) = Document::from_reader(&mut reader) {
-                prefixed_docs.insert(format!("{}.{}", db_name, coll_name), collection_doc.clone());
-            }
-            // when we've seen as much EOFs as there are blocks, we're done.
-            if vec_eofs.iter().filter(|&&eof| eof).count() == num_blocks {
-                break;
+        if num_blocks > 0 {
+            // read blocks
+            loop {
+                // read block header
+                let collection_header_doc = Document::from_reader(&mut reader).map_err(|err| {
+                    Error::new(
+                        ErrorKind::Other,
+                        format!("Error reading block header: {}", err),
+                    )
+                })?;
+                block_headers.push(collection_header_doc.clone()); // TODO can we avoid cloning here?
+                let db_name = collection_header_doc.get_str("db").unwrap();
+                let coll_name = collection_header_doc.get_str("collection").unwrap();
+                let eof = collection_header_doc.get_bool("EOF").unwrap();
+                vec_eofs.push(eof);
+                // read block data
+                while let Ok(collection_doc) = Document::from_reader(&mut reader) {
+                    prefixed_docs
+                        .insert(format!("{}.{}", db_name, coll_name), collection_doc.clone());
+                }
+                // when we've seen as much EOFs as there are blocks, we're done.
+                if vec_eofs.iter().filter(|&&eof| eof).count() == num_blocks {
+                    break;
+                }
             }
         }
         Ok(Archive {
@@ -166,7 +169,7 @@ impl Archive {
 
 #[cfg(test)]
 mod tests {
-    use crate::mongo::Archive;
+    use crate::mongodb::Archive;
     use std::{fmt::Write, io::BufReader};
 
     fn decode_hex(s: &str) -> Result<Vec<u8>, std::num::ParseIntError> {

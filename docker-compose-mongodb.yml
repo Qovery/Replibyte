@@ -1,5 +1,5 @@
 services:
-  source-mongo:
+  source-mongodb:
     image: mongo:5
     restart: always
     healthcheck:
