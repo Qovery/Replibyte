@@ -3,6 +3,8 @@ use std::io::Error;
 use crate::connector::Connector;
 use crate::types::Bytes;
 
+pub mod mongodb;
+pub mod mongodb_stdout;
 pub mod postgres;
 pub mod postgres_stdout;
 

@@ -261,7 +261,6 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                 );
                 new_collection.push(new_doc);
             }
-            println!("PREFIX: {}, COLLECTION {:#?}", prefix, new_collection);
             prefixed_collections.insert(prefix, new_collection);
         }
     });
