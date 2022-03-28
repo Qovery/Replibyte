@@ -20,6 +20,8 @@ use crate::bridge::{Bridge, ReadOptions};
 use crate::cli::{BackupCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
+use crate::destination::mongodb::MongoDB as DestinationMongoDB;
+use crate::destination::mongodb_stdout::MongoDBStdout;
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB as SourceMongoDB;
@@ -305,7 +307,16 @@ fn main() -> anyhow::Result<()> {
                         todo!() // FIXME
                     }
                     ConnectionUri::MongoDB(host, port, username, password, database) => {
-                        todo!() // FIXME
+                        let mongodb = DestinationMongoDB::new(
+                            host.as_str(),
+                            port,
+                            database.as_str(),
+                            username.as_str(),
+                            password.as_str(),
+                        );
+
+                        let task = FullRestoreTask::new(mongodb, bridge, options);
+                        task.run(progress_callback)?
                     }
                 }
 
