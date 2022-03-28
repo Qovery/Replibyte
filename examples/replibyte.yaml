@@ -1,0 +1,19 @@
+source:
+  connection_uri: $SOURCE_CONNECTION_URI
+  encryption_key: $ENCRYPTION_SECRET
+  transformers:
+    - database: public # TO CHANGE
+      table: employees # TO CHANGE
+      columns:
+        - name: fist_name # TO CHANGE
+          transformer: first-name # TO CHANGE
+        - name: last_name # TO CHANGE
+          transformer: random # TO CHANGE
+destination:
+  connection_uri: $DESTINATION_CONNECTION_URI
+  encryption_key: $ENCRYPTION_SECRET
+bridge:
+  bucket: $S3_BUCKET
+  region: $S3_REGION
+  access_key_id: $S3_ACCESS_KEY_ID
+  secret_access_key: $S3_SECRET_ACCESS_KEY

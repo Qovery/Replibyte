@@ -19,19 +19,17 @@
 
 *The installation from the package managers is coming soon*
 
-### Requirements for PostgreSQL
-
-You need to have **pg_dump** and **psql** binaries installed on your machine. [Download PostgreSQL](https://www.postgresql.org/download/).
-
 ```shell
 git clone https://github.com/Qovery/replibyte.git
 
-# you need to install rust compiler before
-cargo build --release
+# Build image with Docker
+docker build -t replibyte -f Dockerfile .
 
-# feel free to move the binary elsewhere
-./target/release/replibyte
+# Run RepliByte
+docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml transformer list
 ```
+
+Feel free to edit `./examples/replibyte.yaml` with your configuration.
 
 [//]: # (For MacOS)
 
@@ -82,10 +80,10 @@ Restore your PostgreSQL databases from S3
 ```shell
 replibyte -c prod-conf.yaml backup list
 
-type          name                    size    when
-PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am
-PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am
-PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am
+type          name                    size    when                    compressed  encrypted
+PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am   true        true
+PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am  true        true
+PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am  true        true
 ```
 
 ```shell
@@ -209,6 +207,7 @@ sequenceDiagram
 - [x] Work on different VPC/network
 - [x] Generate random/fake information
 - [x] Backup TB of data (read [Design](#design))
+- [x] Skip data sync for specific tables
 - [x] On-the-fly data (de)compression (Zlib)
 - [x] On-the-fly data de/encryption (AES-256)
 
@@ -223,8 +222,8 @@ Here are the features we plan to support
 ### Supported Source connectors
 
 - [x] PostgreSQL
+- [x] MongoDB
 - [ ] MySQL (Coming Soon)
-- [ ] MongoDB (Coming Soon)
 - [x] Local dump file (Yes for PostgreSQL) 
 
 ### Supported Transformers
@@ -252,8 +251,8 @@ services.
 ### Supported Destination connectors
 
 - [x] PostgreSQL
-- [ ] MySQL (Coming Soon)
 - [ ] MongoDB (Coming Soon)
+- [ ] MySQL (Coming Soon)
 - [ ] Local dump file (Coming soon)
 
 ## Design

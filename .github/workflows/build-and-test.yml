@@ -1,6 +1,6 @@
 on: [push, pull_request]
 
-name: Build and tests
+name: Build and Test
 
 jobs:
   test:
