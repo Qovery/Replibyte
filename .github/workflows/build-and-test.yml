@@ -53,6 +53,9 @@ jobs:
       - name: Start Postgres and Minio Containers
         run: docker-compose -f "docker-compose-postgres-minio.yml" up -d --build
 
+      - name: Start MongoDB Container
+        run: docker-compose -f "docker-compose-mongodb.yml" up -d --build
+
       - name: Test RepliByte
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -66,4 +69,8 @@ jobs:
 
       - name: Stop Postgres and Minio Containers
         if: always()
-        run: docker-compose -f "docker-compose-postgres-minio.yml" down
+        run: docker-compose -f "docker-compose-postgres-minio.yml" down --remove-orphans
+
+      - name: Stop MongoDB Container
+        if: always()
+        run: docker-compose -f "docker-compose-mongodb.yml" down --remove-orphans
