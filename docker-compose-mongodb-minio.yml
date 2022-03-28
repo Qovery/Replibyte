@@ -1,0 +1,58 @@
+version: '3'
+
+services:
+  source-mongodb:
+    image: mongo:5
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - ./db/mongodb:/docker-entrypoint-initdb.d/
+    ports:
+      - 27017:27017
+  dest-mongodb:
+    image: mongo:5
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    ports:
+      - 27018:27017
+  bridge-minio:
+    image: minio/minio:RELEASE.2022-03-17T06-34-49Z
+    restart: always
+    command: server --console-address ":9001" /data/minio/
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - 9000:9000
+      - 9001:9001
+  create-minio-bucket:
+    image: minio/mc
+    depends_on:
+      - bridge-minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://bridge-minio:9000 minioadmin minioadmin;
+      /usr/bin/mc rm -r --force myminio/replibyte-test;
+      /usr/bin/mc mb myminio/replibyte-test;
+      /usr/bin/mc policy download myminio/replibyte-test;
+      exit 0;
+      "
