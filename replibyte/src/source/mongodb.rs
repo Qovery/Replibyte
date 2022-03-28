@@ -247,21 +247,26 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     // init archive from reader
     let mut archive = Archive::from_reader(reader)?;
 
-    let original_query = Query(archive.to_bytes()?);
+    let original_query = Query(archive.clone().into_bytes()?);
 
-    archive.alter_docs(|prefixed_docs| {
-        for (prefix, doc) in prefixed_docs.to_owned() {
-            let new_doc = recursively_transform_document(
-                prefix.clone(), // prefix is <db_name>.<collection_name>
-                doc,
-                &transformer_by_db_and_table_and_column_name,
-                &wildcard_keys,
-            );
-            prefixed_docs.insert(prefix, new_doc);
+    archive.alter_docs(|prefixed_collections| {
+        for (prefix, collection) in prefixed_collections.to_owned() {
+            let mut new_collection = vec![];
+            for doc in collection {
+                let new_doc = recursively_transform_document(
+                    prefix.clone(), // prefix is <db_name>.<collection_name>
+                    doc,
+                    &transformer_by_db_and_table_and_column_name,
+                    &wildcard_keys,
+                );
+                new_collection.push(new_doc);
+            }
+            println!("PREFIX: {}, COLLECTION {:#?}", prefix, new_collection);
+            prefixed_collections.insert(prefix, new_collection);
         }
     });
 
-    let query = Query(archive.to_bytes()?);
+    let query = Query(archive.into_bytes()?);
 
     query_callback(original_query, query);
     Ok(())
