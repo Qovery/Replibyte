@@ -128,3 +128,18 @@ where
 
     Ok(())
 }
+
+/// Decodes a hex string to a byte `Vec`.
+/// #### example:
+///
+/// ```rust
+/// # use dump_parser::utils::decode_hex;
+/// let bytes = decode_hex("0123456789ABCDEF");
+/// assert_eq!(bytes, Ok(vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF]));
+/// ```
+pub fn decode_hex(s: &str) -> Result<Vec<u8>, std::num::ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
+}
