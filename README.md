@@ -224,7 +224,7 @@ Here are the features we plan to support
 - [x] PostgreSQL
 - [x] MongoDB
 - [ ] MySQL (Coming Soon)
-- [x] Local dump file (Yes for PostgreSQL) 
+- [x] Local dump file (Yes for PostgreSQL)
 
 ### Supported Transformers
 
@@ -277,13 +277,18 @@ Here is the manifest file that you can find at the root of your target `Bridge` 
 {
   "backups": [
     {
-      "size": 1024000, // in bytes
+      "size": 1024000,
       "directory_name": "backup-{epoch timestamp}",
-      "created_at": "epoch timestamp"
+      "created_at": "epoch timestamp",
+      "compressed": true,
+      "encrypted": true
     }
   ]
 }
 ```
+
+* *size* is in bytes
+* *created_at* is an epoch timestamp in millis
 
 ## Motivation
 
@@ -326,11 +331,16 @@ Answer: absolutely,
 cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
 ```
 
-and 
+and
 
 ```shell
 replibyte -c prod-conf.yaml backup run -s postgres -f dump.sql
 ```
+
+### How RepliByte can list the backups? Is there an API?
+
+There is no API, RepliByte is fully stateless and store the backup list into the bridge (E.g. S3) via an [index_file](#index-file-structure)
+.
 
 ---
 
@@ -340,8 +350,10 @@ replibyte -c prod-conf.yaml backup run -s postgres -f dump.sql
 
 ## Local development
 
-For local development, you will need to install [Docker](https://www.docker.com/) and run `docker compose -f ./docker-compose-postgres-minio.yml` to start the local databases.
-At the moment, `docker-compose` includes 2 PostgreSQL database instances and a [Minio](https://min.io/) bridge. One source, one destination database and one bridge. In the future, we will provide more options.
+For local development, you will need to install [Docker](https://www.docker.com/) and
+run `docker compose -f ./docker-compose-postgres-minio.yml` to start the local databases. At the moment, `docker-compose` includes 2
+PostgreSQL database instances and a [Minio](https://min.io/) bridge. One source, one destination database and one bridge. In the future, we
+will provide more options.
 
 The Minio console is accessible at http://localhost:9001.
 
