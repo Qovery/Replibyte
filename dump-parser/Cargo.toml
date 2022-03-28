@@ -7,3 +7,13 @@ edition = "2021"
 
 [dependencies]
 bson = "2.1"
+serde = "1.0"
+
+########## WARNING ############# 
+# DO NOT UPGRADE THE CRC CRATE #
+# version 2 (or higher) is not compatible with the current crc64 algorithm that 'mongorestore' uses in its archive parser.
+# mongorestore ECMA: https://go.dev/src/hash/crc64/crc64.go#L28
+# crc-rs  1.8  ECMA: https://github.com/mrhooray/crc-rs/blob/1.8.1/build.rs#L41 (COMPATIBLE)
+# crc-rs ^2.0  ECMA: https://github.com/akhilles/crc-catalog/blob/2.0.1/src/catalog.rs#L104 (INCOMPATIBLE)
+crc = "1.8" 
+################################
