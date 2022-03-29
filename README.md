@@ -1,4 +1,4 @@
-<p align="center"> <img src="assets/RepliByte_.png" alt="replibyte logo"/> </p>
+<p align="center"> <img src="assets/RepliByte%20Logo.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">The Simplest Way To Synchronize Your Cloud Databases</h3>
 <p align="center">Replibyte is an application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
@@ -251,9 +251,9 @@ services.
 ### Supported Destination connectors
 
 - [x] PostgreSQL
-- [ ] MongoDB (Coming Soon)
+- [x] MongoDB
+- [x] Local dump file
 - [ ] MySQL (Coming Soon)
-- [ ] Local dump file (Coming soon)
 
 ## Design
 
