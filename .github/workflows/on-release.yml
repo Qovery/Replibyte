@@ -7,7 +7,6 @@ on:
 jobs:
   release:
     name: release ${{ matrix.target }}
-    needs: [release-tag]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
