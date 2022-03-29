@@ -1,6 +1,8 @@
 on:
   release:
-    types: [created]
+    types:
+      - published
+      - created
 
 jobs:
   release:
@@ -22,7 +24,7 @@ jobs:
       - name: Compile and release
         uses: rust-build/rust-build.action@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           RUSTTARGET: ${{ matrix.target }}
           ARCHIVE_TYPES: ${{ matrix.archive }}
           EXTRA_FILES: "README.md"
