@@ -17,7 +17,53 @@
 
 ## Install
 
-*The installation from the package managers is coming soon*
+### MacOS
+
+#### Homebrew
+
+*Coming soon* (contribution appreciated)
+
+#### Manual
+
+```shell
+# download latest replibyte archive for MacOSX
+curl -s https://api.github.com/repos/Qovery/replibyte/releases/latest | \
+    jq -r '.assets[].browser_download_url' | \
+    grep -i 'apple-darwin.zip$' | wget -qi - && \
+
+# unarchive
+unzip *.zip
+
+# make replibyte executable
+chmod +x replibyte
+
+# make it accessible from everywhere
+mv replibyte /usr/local/bin/
+```
+
+### Linux
+
+```shell
+# download latest replibyte archive for Linux
+curl -s https://api.github.com/repos/Qovery/replibyte/releases/latest | \
+    jq -r '.assets[].browser_download_url' | \
+    grep -i 'linux-musl.tar.gz$' | wget -qi - && \
+
+# unarchive
+tar zxf *.tar.gz
+
+# make replibyte executable
+chmod +x replibyte
+
+# make it accessible from everywhere
+mv replibyte /usr/local/bin/
+```
+
+### Windows
+
+Download [the latest Windows release](https://github.com/Qovery/replibyte/releases) and install it.
+
+### Docker
 
 ```shell
 git clone https://github.com/Qovery/replibyte.git
@@ -30,32 +76,6 @@ docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml t
 ```
 
 Feel free to edit `./examples/replibyte.yaml` with your configuration.
-
-[//]: # (For MacOS)
-
-[//]: # (```)
-
-[//]: # (# Add Replibyte brew repository)
-
-[//]: # (brew tap Qovery/replibyte)
-
-[//]: # ()
-
-[//]: # (# Install the CLI)
-
-[//]: # (brew install replibyte)
-
-[//]: # (```)
-
-[//]: # ()
-
-[//]: # (For Linux)
-
-[//]: # (```)
-
-[//]: # (bash)
-
-[//]: # (```)
 
 ## Usage
 
@@ -301,13 +321,13 @@ ambition!
 
 ## Use cases
 
-| Scenario                                                                            | Supported |
-|-------------------------------------------------------------------------------------|-----------|
-| Synchronize the whole PostgreSQL instance                                           | Yes       |
-| Synchronize the whole PostgreSQL instance and replace sensitive data with fake data | Yes       |
-| Synchronize specific PostgreSQL tables and replace sensitive data with fake data    | WIP       |
-| Synchronize specific PostgreSQL databases and replace sensitive data with fake data | WIP       |
-| Migrate from one database hosting platform to the other                             | Yes       |
+| Scenario                                                                                    | Supported |
+|---------------------------------------------------------------------------------------------|-----------|
+| Synchronize the whole PostgreSQL/MongoDB instance                                           | Yes       |
+| Synchronize the whole PostgreSQL/MongoDB instance and replace sensitive data with fake data | Yes       |
+| Synchronize specific PostgreSQL/MongoDB tables and replace sensitive data with fake data    | Yes       |
+| Synchronize specific PostgreSQL/MongoDB databases and replace sensitive data with fake data | Yes       |
+| Migrate from one database hosting platform to the other                                     | Yes       |
 
 > Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
 
