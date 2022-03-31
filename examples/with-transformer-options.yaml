@@ -5,11 +5,10 @@ source:
       table: employees
       columns:
         - name: last_name
-          transformer:
-            name: redacted
-            options:
-              character: '#'
-              width: 12
+          transformer_name: redacted
+          transformer_options:
+            character: '#'
+            width: 12
 bridge:
   bucket: replibyte-test
   region: us-east-2
@@ -17,3 +16,5 @@ bridge:
   secret_access_key: minioadmin
   endpoint:
     custom: 'http://localhost:9000'
+destination:
+  connection_uri: postgres://root:password@localhost:5453/root

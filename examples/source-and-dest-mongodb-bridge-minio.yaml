@@ -5,9 +5,9 @@ source:
       table: users
       columns:
         - name: name
-          transformer: first-name
+          transformer_name: first-name
         - name: age
-          transformer: random
+          transformer_name: random
 destination:
   connection_uri: mongodb://root:password@localhost:27018/?authSource=admin
 bridge:
@@ -16,4 +16,4 @@ bridge:
   access_key_id: minioadmin
   secret_access_key: minioadmin
   endpoint:
-    custom: "http://localhost:9000"
+    custom: 'http://localhost:9000'

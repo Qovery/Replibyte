@@ -155,13 +155,13 @@ pub struct TransformerConfig {
 pub struct ColumnConfig {
     pub name: String,
 
-    #[serde(deserialize_with = "string_or_struct")]
+    #[serde(flatten)]
     pub transformer: TransformerTypeConfig,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "name", rename_all = "kebab-case")]
-#[serde(content = "options")]
+#[serde(rename_all = "kebab-case")]
+#[serde(tag = "transformer_name", content = "transformer_options")]
 pub enum TransformerTypeConfig {
     Random,
     RandomDate,
@@ -170,28 +170,8 @@ pub enum TransformerTypeConfig {
     KeepFirstChar,
     PhoneNumber,
     CreditCard,
-    Redacted(RedactedTransformerOptions),
+    Redacted(Option<RedactedTransformerOptions>),
     Transient,
-}
-
-impl FromStr for TransformerTypeConfig {
-    type Err = Void;
-
-    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
-        match s {
-            "random" => Ok(TransformerTypeConfig::Random),
-            "random-date" => Ok(TransformerTypeConfig::RandomDate),
-            "first-name" => Ok(TransformerTypeConfig::FirstName),
-            "email" => Ok(TransformerTypeConfig::Email),
-            "keep-first-char" => Ok(TransformerTypeConfig::KeepFirstChar),
-            "phone-number" => Ok(TransformerTypeConfig::PhoneNumber),
-            "credit-card" => Ok(TransformerTypeConfig::CreditCard),
-            "redacted" => Ok(TransformerTypeConfig::Redacted(
-                RedactedTransformerOptions::default(),
-            )),
-            _ => Ok(TransformerTypeConfig::Transient),
-        }
-    }
 }
 
 impl TransformerTypeConfig {
@@ -233,12 +213,18 @@ impl TransformerTypeConfig {
                 table_name,
                 column_name,
             )),
-            TransformerTypeConfig::Redacted(options) => Box::new(RedactedTransformer::new(
-                database_name,
-                table_name,
-                column_name,
-                options.clone(),
-            )),
+            TransformerTypeConfig::Redacted(options) => {
+                let options = match options {
+                    Some(options) => *options,
+                    None => RedactedTransformerOptions::default(),
+                };
+                Box::new(RedactedTransformer::new(
+                    database_name,
+                    table_name,
+                    column_name,
+                    options,
+                ))
+            }
             TransformerTypeConfig::Transient => Box::new(TransientTransformer::new(
                 database_name,
                 table_name,

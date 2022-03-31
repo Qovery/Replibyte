@@ -127,20 +127,20 @@ source:
       table: employees
       columns:
         - name: last_name
-          transformer: random
+          transformer_name: random
         - name: birth_date
-          transformer: random-date
+          transformer_name: random-date
         - name: first_name
-          transformer: first-name
+          transformer_name: first-name
         - name: email
-          transformer: email
+          transformer_name: email
         - name: username
-          transformer: keep-first-char
+          transformer_name: keep-first-char
     - database: public
       table: customers
       columns:
         - name: phone
-          transformer: phone-number
+          transformer_name: phone-number
 bridge:
   bucket: $BUCKET_NAME
   access_key_id: $ACCESS_KEY_ID
