@@ -5,9 +5,7 @@ source:
       table: employees
       columns:
         - name: last_name
-          transformer: random
-        #- name: birth_date
-        #  transformer: random-date
+          transformer_name: random
 bridge:
   bucket: $BUCKET_NAME
   region: us-east-2

@@ -6,9 +6,9 @@ source:
       table: employees # TO CHANGE
       columns:
         - name: fist_name # TO CHANGE
-          transformer: first-name # TO CHANGE
+          transformer_name: first-name # TO CHANGE
         - name: last_name # TO CHANGE
-          transformer: random # TO CHANGE
+          transformer_name: random # TO CHANGE
 destination:
   connection_uri: $DESTINATION_CONNECTION_URI
   encryption_key: $ENCRYPTION_SECRET

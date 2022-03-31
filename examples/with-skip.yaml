@@ -1,5 +1,10 @@
 source:
   connection_uri: postgres://root:password@localhost:5432/root
+  skip:
+    - database: public
+      table: us_states
+    - database: public
+      table: order_details
   transformers:
     - database: public
       table: employees
@@ -11,5 +16,9 @@ source:
 bridge:
   bucket: replibyte-test
   region: us-east-2
-  access_key_id: $AWS_ACCESS_KEY_ID
-  secret_access_key: $AWS_SECRET_ACCESS_KEY
+  access_key_id: minioadmin
+  secret_access_key: minioadmin
+  endpoint:
+    custom: 'http://localhost:9000'
+destination:
+  connection_uri: postgres://root:password@localhost:5453/root
