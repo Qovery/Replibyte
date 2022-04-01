@@ -24,12 +24,10 @@ jobs:
         with:
           # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
           token: ${{ secrets.PERSONAL_TOKEN }}
-          # Optional, will create tap repo fork in organization
-          org: Qovery
           # Optional, defaults to homebrew/core
           tap: Qovery/homebrew-replibyte
           # Formula name, required
-          formula: FORMULA
+          formula: replibyte
           # Optional, will be determined automatically
           tag: ${{ github.ref }}
           # Optional, will be determined automatically
