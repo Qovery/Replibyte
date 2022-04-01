@@ -19,3 +19,20 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          # Optional, will create tap repo fork in organization
+          org: Qovery
+          # Optional, defaults to homebrew/core
+          tap: Qovery/homebrew-replibyte
+          # Formula name, required
+          formula: FORMULA
+          # Optional, will be determined automatically
+          tag: ${{ github.ref }}
+          # Optional, will be determined automatically
+          revision: ${{ github.sha }}
+          # Optional, if don't want to check for already open PRs
+          force: false # true
