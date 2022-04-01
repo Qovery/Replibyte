@@ -4,44 +4,30 @@
 <p align="center">Replibyte is an application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/stability-work_in_progress-lightgrey.svg?style=flat-square" alt="work in progress badge">
+<img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
 <img src="https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square" alt="Build and Tests">
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
----
-
-**⚠️ DEVELOPMENT IN PROGRESS - CONTRIBUTORS WANTED!! [JOIN DISCORD](https://discord.qovery.com)**
-
----
-
 ## Install
 
-### MacOS
 
-#### Homebrew
+<details>
 
-*Coming soon* (contribution appreciated)
-
-#### Manual
+<summary>Install on MacOSX</summary>
 
 ```shell
-# download latest replibyte archive for MacOSX
-curl -s https://api.github.com/repos/Qovery/replibyte/releases/latest | \
-    jq -r '.assets[].browser_download_url' | \
-    grep -i 'apple-darwin.zip$' | wget -qi - && \
-
-# unarchive
-unzip *.zip
-
-# make replibyte executable
-chmod +x replibyte
-
-# make it accessible from everywhere
-mv replibyte /usr/local/bin/
+brew tap Qovery/replibyte
+brew install replibyte
 ```
 
-### Linux
+Or [manually](https://github.com/Qovery/replibyte/releases).
+
+</details>
+
+<details>
+
+<summary>Install on Linux</summary>
 
 ```shell
 # download latest replibyte archive for Linux
@@ -58,10 +44,19 @@ chmod +x replibyte
 # make it accessible from everywhere
 mv replibyte /usr/local/bin/
 ```
+</details>
 
-### Windows
+<details>
+
+<summary>Install on Windows</summary>
 
 Download [the latest Windows release](https://github.com/Qovery/replibyte/releases) and install it.
+
+</details>
+
+<details>
+
+<summary>Run with Docker</summary>
 
 ### Docker
 
@@ -76,6 +71,8 @@ docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml t
 ```
 
 Feel free to edit `./examples/replibyte.yaml` with your configuration.
+
+</details>
 
 ## Usage
 
