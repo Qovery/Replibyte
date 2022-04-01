@@ -1,5 +1,7 @@
 use prettytable::{format, Table};
+use std::io::{Error, ErrorKind};
 use std::time::{SystemTime, UNIX_EPOCH};
+use which::which;
 
 pub fn epoch_millis() -> u128 {
     SystemTime::now()
@@ -27,4 +29,16 @@ pub fn to_human_readable_unit(bytes: usize) -> String {
         1024_000_000_000..=1023_999_999_999_999 => format!("{:.2} GB", bytes / 1_000_000_000_000),
         _ => format!("{:.2} TB", bytes / 1_000_000_000_000_000),
     }
+}
+
+/// check for binary presence in PATH
+pub fn binary_exists(binary_name: &str) -> Result<(), Error> {
+    let _ = which(binary_name).map_err(|_| {
+        Error::new(
+            ErrorKind::Other,
+            format!("cannot find '{}' binary in path", binary_name),
+        )
+    })?;
+
+    Ok(())
 }

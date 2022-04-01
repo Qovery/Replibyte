@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
+use crate::utils::binary_exists;
 
 pub struct MongoDB<'a> {
     host: &'a str,
@@ -33,6 +34,9 @@ impl<'a> MongoDB<'a> {
 
 impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
+        let _ = binary_exists("mongo")?;
+        let _ = binary_exists("mongorestore")?;
+
         let s_port = self.port.to_string();
 
         let mut echo_process = Command::new("echo")
