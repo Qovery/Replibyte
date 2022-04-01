@@ -18,6 +18,7 @@ pub struct MongoDB<'a> {
     database: &'a str,
     username: &'a str,
     password: &'a str,
+    authentication_database: &'a str,
 }
 
 impl<'a> MongoDB<'a> {
@@ -27,6 +28,7 @@ impl<'a> MongoDB<'a> {
         database: &'a str,
         username: &'a str,
         password: &'a str,
+        authentication_database: &'a str,
     ) -> Self {
         MongoDB {
             host,
@@ -34,6 +36,7 @@ impl<'a> MongoDB<'a> {
             database,
             username,
             password,
+            authentication_database,
         }
     }
 }
@@ -61,7 +64,7 @@ impl<'a> Source for MongoDB<'a> {
                 "--port",
                 s_port.as_str(),
                 "--authenticationDatabase",
-                "admin",
+                self.authentication_database,
                 "--db",
                 self.database,
                 "-u",
@@ -290,11 +293,11 @@ mod tests {
     use super::recursively_transform_document;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27017, "test", "root", "password")
+        MongoDB::new("localhost", 27017, "test", "root", "password", "admin")
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27017, "test", "root", "wrongpassword")
+        MongoDB::new("localhost", 27017, "test", "root", "wrongpassword", "admin")
     }
 
     #[test]

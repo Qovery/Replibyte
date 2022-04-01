@@ -224,13 +224,21 @@ fn main() -> anyhow::Result<()> {
                             ConnectionUri::Mysql(host, port, username, password, database) => {
                                 todo!() // FIXME
                             }
-                            ConnectionUri::MongoDB(host, port, username, password, database) => {
+                            ConnectionUri::MongoDB(
+                                host,
+                                port,
+                                username,
+                                password,
+                                database,
+                                authentication_db,
+                            ) => {
                                 let mongodb = SourceMongoDB::new(
                                     host.as_str(),
                                     port,
                                     database.as_str(),
                                     username.as_str(),
                                     password.as_str(),
+                                    authentication_db.as_str(),
                                 );
 
                                 let task = FullBackupTask::new(mongodb, bridge, options);
@@ -306,13 +314,21 @@ fn main() -> anyhow::Result<()> {
                     ConnectionUri::Mysql(host, port, username, password, database) => {
                         todo!() // FIXME
                     }
-                    ConnectionUri::MongoDB(host, port, username, password, database) => {
+                    ConnectionUri::MongoDB(
+                        host,
+                        port,
+                        username,
+                        password,
+                        database,
+                        authentication_db,
+                    ) => {
                         let mongodb = DestinationMongoDB::new(
                             host.as_str(),
                             port,
                             database.as_str(),
                             username.as_str(),
                             password.as_str(),
+                            authentication_db.as_str(),
                         );
 
                         let task = FullRestoreTask::new(mongodb, bridge, options);

@@ -1,6 +1,8 @@
 use std::io::{BufReader, Error, ErrorKind, Read, Write};
 use std::process::{Command, Stdio};
 
+use bson::de;
+
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
@@ -12,6 +14,7 @@ pub struct MongoDB<'a> {
     database: &'a str,
     username: &'a str,
     password: &'a str,
+    authentication_database: &'a str,
 }
 
 impl<'a> MongoDB<'a> {
@@ -21,6 +24,7 @@ impl<'a> MongoDB<'a> {
         database: &'a str,
         username: &'a str,
         password: &'a str,
+        authentication_database: &'a str,
     ) -> Self {
         MongoDB {
             host,
@@ -28,6 +32,7 @@ impl<'a> MongoDB<'a> {
             database,
             username,
             password,
+            authentication_database,
         }
     }
 }
@@ -44,20 +49,22 @@ impl<'a> Connector for MongoDB<'a> {
             .stdout(Stdio::piped())
             .spawn()?;
 
+        let args = vec![
+            "--host",
+            self.host,
+            "--port",
+            s_port.as_str(),
+            "--authenticationDatabase",
+            self.authentication_database,
+            "-u",
+            self.username,
+            "-p",
+            self.password,
+            "--quiet",
+        ];
+
         let mut mongo_process = Command::new("mongo")
-            .args([
-                "--host",
-                self.host,
-                "--port",
-                s_port.as_str(),
-                "--authenticationDatabase",
-                "admin",
-                "-u",
-                self.username,
-                "-p",
-                self.password,
-                "--quiet",
-            ])
+            .args(args)
             .stdin(echo_process.stdout.take().unwrap())
             .stdout(Stdio::null())
             .spawn()?;
@@ -85,7 +92,7 @@ impl<'a> Destination for MongoDB<'a> {
                 "--port",
                 s_port.as_str(),
                 "--authenticationDatabase",
-                "admin",
+                self.authentication_database,
                 "-u",
                 self.username,
                 "-p",
@@ -125,11 +132,11 @@ mod tests {
     use crate::destination::Destination;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27018, "test", "root", "password")
+        MongoDB::new("localhost", 27018, "test", "root", "password", "admin")
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27018, "test", "root", "wrongpassword")
+        MongoDB::new("localhost", 27018, "test", "root", "wrongpassword", "admin")
     }
 
     #[test]
