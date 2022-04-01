@@ -6,6 +6,7 @@ use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, OriginalQuery, Query};
+use crate::utils::binary_exists;
 use crate::SourceOptions;
 
 use bson::{Bson, Document};
@@ -39,6 +40,8 @@ impl<'a> MongoDB<'a> {
 
 impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
+        let _ = binary_exists("mongodump")?;
+
         Ok(())
     }
 }

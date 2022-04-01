@@ -13,6 +13,7 @@ use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
+use crate::utils::binary_exists;
 
 use super::SourceOptions;
 
@@ -62,7 +63,8 @@ impl<'a> Postgres<'a> {
 
 impl<'a> Connector for Postgres<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        // TODO check pg_dump binary available
+        let _ = binary_exists("pg_dumpall")?;
+
         Ok(())
     }
 }
