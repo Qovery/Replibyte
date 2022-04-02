@@ -41,41 +41,7 @@ impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
         let _ = binary_exists("mongo")?;
         let _ = binary_exists("mongorestore")?;
-
-        let s_port = self.port.to_string();
-
-        let mut echo_process = Command::new("echo")
-            .arg(r#"'db.runCommand("ping").ok'"#)
-            .stdout(Stdio::piped())
-            .spawn()?;
-
-        let args = vec![
-            "--host",
-            self.host,
-            "--port",
-            s_port.as_str(),
-            "--authenticationDatabase",
-            self.authentication_database,
-            "-u",
-            self.username,
-            "-p",
-            self.password,
-            "--quiet",
-        ];
-
-        let mut mongo_process = Command::new("mongo")
-            .args(args)
-            .stdin(echo_process.stdout.take().unwrap())
-            .stdout(Stdio::null())
-            .spawn()?;
-
-        let exit_status = mongo_process.wait()?;
-        if !exit_status.success() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error: {:?}", exit_status.to_string()),
-            ));
-        }
+        let _ = check_connection_status(self)?;
 
         Ok(())
     }
@@ -121,6 +87,43 @@ impl<'a> Destination for MongoDB<'a> {
 
         Ok(())
     }
+}
+
+fn check_connection_status(db: &MongoDB) -> Result<(), Error> {
+    let s_port = db.port.to_string();
+
+    let mut echo_process = Command::new("echo")
+        .arg(r#"'db.runCommand("ping").ok'"#)
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let mut mongo_process = Command::new("mongo")
+        .args([
+            "--host",
+            db.host,
+            "--port",
+            s_port.as_str(),
+            "--authenticationDatabase",
+            db.authentication_database,
+            "-u",
+            db.username,
+            "-p",
+            db.password,
+            "--quiet",
+        ])
+        .stdin(echo_process.stdout.take().unwrap())
+        .stdout(Stdio::inherit())
+        .spawn()?;
+
+    let exit_status = mongo_process.wait()?;
+    if !exit_status.success() {
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("command error: {:?}", exit_status.to_string()),
+        ));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
