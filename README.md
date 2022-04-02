@@ -183,8 +183,8 @@ sequenceDiagram
     PostgreSQL (Source)->>RepliByte: 1. Dump data
     loop
         RepliByte->>RepliByte: 2. Hide or fake sensitive data
-        RepliByte->>RepliByte: 3. Encrypt data
-        RepliByte->>RepliByte: 4. Compress data
+        RepliByte->>RepliByte: 3. Compress data
+        RepliByte->>RepliByte: 4. Encrypt data
     end
     RepliByte->>AWS S3 (Bridge): 5. Upload obfuscated dump data
     RepliByte->>AWS S3 (Bridge): 6. Write index file
