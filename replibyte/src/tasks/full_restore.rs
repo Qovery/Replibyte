@@ -8,22 +8,22 @@ use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::types::Bytes;
 
 /// FullRestoreTask is a wrapping struct to execute the synchronization between a *Bridge* and a *Source*.
-pub struct FullRestoreTask<D, B>
+pub struct FullRestoreTask<'a, D, B>
 where
     D: Destination,
     B: Bridge + 'static,
 {
-    destination: D,
+    destination: &'a mut D,
     bridge: B,
     read_options: ReadOptions,
 }
 
-impl<D, B> FullRestoreTask<D, B>
+impl<'a, D, B> FullRestoreTask<'a, D, B>
 where
     D: Destination,
     B: Bridge + 'static,
 {
-    pub fn new(destination: D, bridge: B, read_options: ReadOptions) -> Self {
+    pub fn new(destination: &'a mut D, bridge: B, read_options: ReadOptions) -> Self {
         FullRestoreTask {
             destination,
             bridge,
@@ -32,7 +32,7 @@ where
     }
 }
 
-impl<D, B> Task for FullRestoreTask<D, B>
+impl<'a, D, B> Task for FullRestoreTask<'a, D, B>
 where
     D: Destination,
     B: Bridge + 'static,

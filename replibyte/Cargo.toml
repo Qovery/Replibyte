@@ -36,6 +36,7 @@ aes-gcm = "0.9"
 which = "4.2.5"
 url = "2.2.2"
 tempfile = "3.3"
+ctrlc = "3.2.1"
 
 # FIXME removed until the CI release pipeline is fixed
 #wasmer = { version = "2.2", optional = true }
