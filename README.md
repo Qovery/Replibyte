@@ -74,6 +74,23 @@ Feel free to edit `./examples/replibyte.yaml` with your configuration.
 
 </details>
 
+## Features
+
+- [x] Complete data synchronization
+- [x] Work on different VPC/network
+- [x] Generate random/fake information
+- [x] Backup TB of data (read [Design](#design))
+- [x] Skip data sync for specific tables
+- [x] On-the-fly data (de)compression (Zlib)
+- [x] On-the-fly data de/encryption (AES-256)
+
+Here are the features we plan to support
+
+- [ ] Incremental data synchronization
+- [ ] Auto-detect sensitive fields and generate fake data
+- [ ] Auto-clean up bridge data
+
+
 ## Usage
 
 [![What is RepliByte](assets/video_.png)](https://www.youtube.com/watch?v=IKeLnZvECQw)
@@ -217,22 +234,6 @@ sequenceDiagram
 1. RepliByte connects to the S3 bucket and reads the index file to retrieve the latest SQL to download.
 2. RepliByte downloads the SQL dump in a stream bytes.
 3. RepliByte restores the SQL dump in the destination PostgreSQL database in real-time.
-
-## Features
-
-- [x] Complete data synchronization
-- [x] Work on different VPC/network
-- [x] Generate random/fake information
-- [x] Backup TB of data (read [Design](#design))
-- [x] Skip data sync for specific tables
-- [x] On-the-fly data (de)compression (Zlib)
-- [x] On-the-fly data de/encryption (AES-256)
-
-Here are the features we plan to support
-
-- [ ] Incremental data synchronization
-- [ ] Auto-detect sensitive fields and generate fake data
-- [ ] Auto-clean up bridge data
 
 ## Connectors
 
