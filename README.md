@@ -86,9 +86,11 @@ Feel free to edit `./examples/replibyte.yaml` with your configuration.
 
 Here are the features we plan to support
 
+- [ ] Auto-detect and version database schema change
 - [ ] Incremental data synchronization
 - [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
+- [ ] Database Subsetting: Scale down a production database to a more reasonable size
 
 
 ## Usage
@@ -243,8 +245,8 @@ sequenceDiagram
 
 - [x] PostgreSQL
 - [x] MongoDB
+- [x] Local dump file
 - [ ] MySQL (Coming Soon)
-- [x] Local dump file (Yes for PostgreSQL)
 
 ### Supported Transformers
 
