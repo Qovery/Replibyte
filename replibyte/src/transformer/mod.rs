@@ -9,6 +9,7 @@ use crate::transformer::transient::TransientTransformer;
 use crate::types::Column;
 
 pub mod credit_card;
+pub mod custom_wasm;
 pub mod email;
 pub mod first_name;
 pub mod keep_first_char;
@@ -31,7 +32,7 @@ pub fn transformers() -> Vec<Box<dyn Transformer>> {
 }
 
 /// Trait to implement to create a custom Transformer.
-pub trait Transformer: Sync {
+pub trait Transformer {
     fn id(&self) -> &str;
     fn description(&self) -> &str;
     fn database_name(&self) -> &str;
