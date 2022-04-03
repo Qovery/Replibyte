@@ -1,7 +1,5 @@
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
-
-use bson::de;
 
 use crate::connector::Connector;
 use crate::destination::Destination;

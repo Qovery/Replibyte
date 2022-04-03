@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::process::{Command, Stdio};
@@ -63,9 +64,7 @@ impl<'a> Postgres<'a> {
 
 impl<'a> Connector for Postgres<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists("pg_dumpall")?;
-
-        Ok(())
+        binary_exists("pg_dumpall")
     }
 }
 
@@ -153,66 +152,12 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                 table_name,
             } => {
                 if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    // find database name by filtering out all queries starting with
-                    // INSERT INTO <database>.<table> (...)
-                    // INSERT       -> position 0
-                    // INTO         -> position 2
-                    // <table>      -> position 6
-                    // L Paren      -> position X?
-                    // R Paren      -> position X?
-                    let column_names = get_column_names_from_insert_into_query(&tokens);
-                    let column_values = get_column_values_from_insert_into_query(&tokens);
-
-                    let mut original_columns = vec![];
-                    let mut columns = vec![];
-
-                    for (i, column_name) in column_names.iter().enumerate() {
-                        let value_token = column_values.get(i).unwrap();
-
-                        let column = match value_token {
-                            Token::Number(column_value, _) => {
-                                if column_value.contains(".") {
-                                    Column::FloatNumberValue(
-                                        column_name.to_string(),
-                                        column_value.parse::<f64>().unwrap(),
-                                    )
-                                } else {
-                                    Column::NumberValue(
-                                        column_name.to_string(),
-                                        column_value.parse::<i128>().unwrap(),
-                                    )
-                                }
-                            }
-                            Token::Char(column_value) => {
-                                Column::CharValue(column_name.to_string(), column_value.clone())
-                            }
-                            Token::SingleQuotedString(column_value) => {
-                                Column::StringValue(column_name.to_string(), column_value.clone())
-                            }
-                            Token::NationalStringLiteral(column_value) => {
-                                Column::StringValue(column_name.to_string(), column_value.clone())
-                            }
-                            Token::HexStringLiteral(column_value) => {
-                                Column::StringValue(column_name.to_string(), column_value.clone())
-                            }
-                            _ => Column::None(column_name.to_string()),
-                        };
-
-                        // get the right transformer for the right column name
-                        let original_column = column.clone();
-
-                        let db_and_table_and_column_name =
-                            format!("{}.{}.{}", database_name, table_name, *column_name);
-                        let column = match transformer_by_db_and_table_and_column_name
-                            .get(db_and_table_and_column_name.as_str())
-                        {
-                            Some(transformer) => transformer.transform(column), // apply transformation on the column
-                            None => column,
-                        };
-
-                        original_columns.push(original_column);
-                        columns.push(column);
-                    }
+                    let (original_columns, columns) = transform_columns(
+                        database_name.as_str(),
+                        table_name.as_str(),
+                        &tokens,
+                        &transformer_by_db_and_table_and_column_name,
+                    );
 
                     query_callback(
                         to_query(
@@ -237,11 +182,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                 table_name,
             } => {
                 if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    query_callback(
-                        // there is no diff between the original and the modified one
-                        Query(query.as_bytes().to_vec()),
-                        Query(query.as_bytes().to_vec()),
-                    )
+                    no_change_query_callback(query_callback.borrow_mut(), query);
                 }
             }
             RowType::AlterTable {
@@ -249,26 +190,96 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                 table_name,
             } => {
                 if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    query_callback(
-                        // there is no diff between the original and the modified one
-                        Query(query.as_bytes().to_vec()),
-                        Query(query.as_bytes().to_vec()),
-                    )
+                    no_change_query_callback(query_callback.borrow_mut(), query);
                 }
             }
             RowType::Others => {
                 // other rows than `INSERT INTO ...` and `CREATE TABLE ...`
-                query_callback(
-                    // there is no diff between the original and the modified one
-                    Query(query.as_bytes().to_vec()),
-                    Query(query.as_bytes().to_vec()),
-                )
+                no_change_query_callback(query_callback.borrow_mut(), query);
             }
         }
     }) {
         Ok(_) => {}
         Err(err) => panic!("{:?}", err),
     }
+}
+
+fn no_change_query_callback<F: FnMut(OriginalQuery, Query)>(query_callback: &mut F, query: &str) {
+    query_callback(
+        // there is no diff between the original and the modified one
+        Query(query.as_bytes().to_vec()),
+        Query(query.as_bytes().to_vec()),
+    );
+}
+
+fn transform_columns(
+    database_name: &str,
+    table_name: &str,
+    tokens: &Vec<Token>,
+    transformer_by_db_and_table_and_column_name: &HashMap<String, &Box<dyn Transformer>>,
+) -> (Vec<Column>, Vec<Column>) {
+    // find database name by filtering out all queries starting with
+    // INSERT INTO <database>.<table> (...)
+    // INSERT       -> position 0
+    // INTO         -> position 2
+    // <table>      -> position 6
+    // L Paren      -> position X?
+    // R Paren      -> position X?
+    let column_names = get_column_names_from_insert_into_query(&tokens);
+    let column_values = get_column_values_from_insert_into_query(&tokens);
+
+    let mut original_columns = vec![];
+    let mut columns = vec![];
+
+    for (i, column_name) in column_names.iter().enumerate() {
+        let value_token = column_values.get(i).unwrap();
+
+        let column = match value_token {
+            Token::Number(column_value, _) => {
+                if column_value.contains(".") {
+                    Column::FloatNumberValue(
+                        column_name.to_string(),
+                        column_value.parse::<f64>().unwrap(),
+                    )
+                } else {
+                    Column::NumberValue(
+                        column_name.to_string(),
+                        column_value.parse::<i128>().unwrap(),
+                    )
+                }
+            }
+            Token::Char(column_value) => {
+                Column::CharValue(column_name.to_string(), column_value.clone())
+            }
+            Token::SingleQuotedString(column_value) => {
+                Column::StringValue(column_name.to_string(), column_value.clone())
+            }
+            Token::NationalStringLiteral(column_value) => {
+                Column::StringValue(column_name.to_string(), column_value.clone())
+            }
+            Token::HexStringLiteral(column_value) => {
+                Column::StringValue(column_name.to_string(), column_value.clone())
+            }
+            _ => Column::None(column_name.to_string()),
+        };
+
+        // get the right transformer for the right column name
+        let original_column = column.clone();
+
+        let db_and_table_and_column_name =
+            format!("{}.{}.{}", database_name, table_name, *column_name);
+        let column = match transformer_by_db_and_table_and_column_name
+            .get(db_and_table_and_column_name.as_str())
+        {
+            Some(transformer) => transformer.transform(column), // apply transformation on the column
+            None => column,
+        };
+
+        original_columns.push(original_column);
+        columns.push(column);
+    }
+
+    (original_columns, columns)
 }
 
 fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
