@@ -1,7 +1,7 @@
 <p align="center"> <img src="assets/RepliByte%20Logo.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">The Simplest Way To Synchronize Your Cloud Databases</h3>
-<p align="center">Replibyte is an application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
+<p align="center">Replibyte is a tool to replicate your cloud databases </br>from one place to the other while keeping sensitive data safe 🕵️‍♂️</p>
 
 <p align="center">
 <img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
@@ -9,8 +9,27 @@
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
-## Install
+## Features
 
+- [x] Support PostgreSQL and MongoDB (more [connectors](#connectors) coming soon)
+- [x] Complete data synchronization (Full-backup)
+- [x] Generate random/fake information
+- [x] Backup TB of data (read [Design](#design))
+- [x] Skip data sync for specific tables
+- [x] On-the-fly data (de)compression (Zlib)
+- [x] On-the-fly data de/encryption (AES-256)
+- [x] Work on different VPC/network
+
+Here are the features we plan to support
+
+- [ ] Start a local database with the prod data in a single command ([WIP](https://github.com/Qovery/replibyte/issues/32))
+- [ ] Auto-detect and version database schema change
+- [ ] Database Subsetting: Scale down a production database to a more reasonable size ([WIP](https://github.com/Qovery/replibyte/issues/40))
+- [ ] Auto-detect sensitive fields and generate fake data
+- [ ] Auto-clean up bridge data
+- [ ] Incremental data synchronization (Incremental backup)
+
+## Install
 
 <details>
 
@@ -73,25 +92,6 @@ docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml t
 Feel free to edit `./examples/replibyte.yaml` with your configuration.
 
 </details>
-
-## Features
-
-- [x] Complete data synchronization
-- [x] Work on different VPC/network
-- [x] Generate random/fake information
-- [x] Backup TB of data (read [Design](#design))
-- [x] Skip data sync for specific tables
-- [x] On-the-fly data (de)compression (Zlib)
-- [x] On-the-fly data de/encryption (AES-256)
-
-Here are the features we plan to support
-
-- [ ] Auto-detect and version database schema change
-- [ ] Incremental data synchronization
-- [ ] Auto-detect sensitive fields and generate fake data
-- [ ] Auto-clean up bridge data
-- [ ] Database Subsetting: Scale down a production database to a more reasonable size
-
 
 ## Usage
 
@@ -323,15 +323,12 @@ ambition!
 
 ## Use cases
 
-| Scenario                                                                                    | Supported |
-|---------------------------------------------------------------------------------------------|-----------|
-| Synchronize the whole PostgreSQL/MongoDB instance                                           | Yes       |
-| Synchronize the whole PostgreSQL/MongoDB instance and replace sensitive data with fake data | Yes       |
-| Synchronize specific PostgreSQL/MongoDB tables and replace sensitive data with fake data    | Yes       |
-| Synchronize specific PostgreSQL/MongoDB databases and replace sensitive data with fake data | Yes       |
-| Migrate from one database hosting platform to the other                                     | Yes       |
-
-> Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
+- Synchronize **the whole** PostgreSQL/MongoDB **instance**.
+- Synchronize **the whole** PostgreSQL/MongoDB **instance** and **replace sensitive data** with fake data.
+- Synchronize **specific** PostgreSQL/MongoDB **tables** and **replace sensitive data** with fake data.
+- Synchronize **specific** PostgreSQL/MongoDB **databases** and **replace sensitive data** with fake data.
+- Synchronize **a subset** of your production database. 
+- **Migrate** from one **database** hosting platform to the other.
 
 ## What is not RepliByte
 
