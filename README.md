@@ -157,6 +157,7 @@ source:
           transformer_name: phone-number
 bridge:
   bucket: $BUCKET_NAME
+  region: $S3_REGION
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
@@ -174,6 +175,7 @@ Create your `staging-conf.yaml` configuration file to sync your production datab
 ```yaml
 bridge:
   bucket: $BUCKET_NAME
+  region: $S3_REGION
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
