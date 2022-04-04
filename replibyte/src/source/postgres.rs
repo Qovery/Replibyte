@@ -12,7 +12,7 @@ use dump_parser::utils::list_queries_from_dump_reader;
 use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
-use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
+use crate::types::{Column, FloatNumberValue, InsertIntoQuery, NumberValue, OriginalQuery, Query};
 
 use super::SourceOptions;
 
@@ -172,12 +172,12 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                                 if column_value.contains(".") {
                                     Column::FloatNumberValue(
                                         column_name.to_string(),
-                                        column_value.parse::<f64>().unwrap(),
+                                        FloatNumberValue::F64(column_value.parse::<f64>().unwrap()),
                                     )
                                 } else {
                                     Column::NumberValue(
                                         column_name.to_string(),
-                                        column_value.parse::<i128>().unwrap(),
+                                        NumberValue::I128(column_value.parse::<i128>().unwrap()),
                                     )
                                 }
                             }
@@ -382,6 +382,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 mod tests {
     use crate::config::SkipConfig;
     use crate::source::SourceOptions;
+    use crate::types::FloatNumberValue;
     use crate::Source;
     use std::str;
     use std::vec;
@@ -460,7 +461,10 @@ mod tests {
                 table_name: "test".to_string(),
                 columns: vec![
                     Column::StringValue("first_name".to_string(), "romaric".to_string()),
-                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
+                    Column::FloatNumberValue(
+                        "height_in_meters".to_string(),
+                        FloatNumberValue::F64(1.78),
+                    ),
                 ],
             },
         );
@@ -476,7 +480,10 @@ mod tests {
                 table_name: "test".to_string(),
                 columns: vec![
                     Column::None("first_name".to_string()),
-                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
+                    Column::FloatNumberValue(
+                        "height_in_meters".to_string(),
+                        FloatNumberValue::F64(1.78),
+                    ),
                 ],
             },
         );
@@ -492,7 +499,10 @@ mod tests {
                 table_name: "test".to_string(),
                 columns: vec![
                     Column::StringValue("first_name".to_string(), "romaric".to_string()),
-                    Column::FloatNumberValue("height_in_meters".to_string(), 1.78),
+                    Column::FloatNumberValue(
+                        "height_in_meters".to_string(),
+                        FloatNumberValue::F64(1.78),
+                    ),
                     Column::StringValue(
                         "description".to_string(),
                         "I'd like to say... I don't know.".to_string(),

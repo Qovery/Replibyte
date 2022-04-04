@@ -78,15 +78,18 @@ impl Transformer for FirstNameTransformer {
 
 #[cfg(test)]
 mod tests {
-    use crate::{transformer::Transformer, types::Column};
+    use crate::{
+        transformer::Transformer,
+        types::{Column, FloatNumberValue, NumberValue},
+    };
 
     use super::FirstNameTransformer;
 
     #[test]
     fn transform_first_name_with_number_value() {
-        let expected_value = 34;
+        let expected_value = NumberValue::I32(34);
         let transformer = get_transformer();
-        let column = Column::NumberValue("first_name".to_string(), expected_value);
+        let column = Column::NumberValue("first_name".to_string(), expected_value.clone());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.number_value().unwrap();
 
@@ -95,9 +98,9 @@ mod tests {
 
     #[test]
     fn transform_first_name_with_float_value() {
-        let expected_value = 1.5;
+        let expected_value = FloatNumberValue::F64(1.5);
         let transformer = get_transformer();
-        let column = Column::FloatNumberValue("first_name".to_string(), expected_value);
+        let column = Column::FloatNumberValue("first_name".to_string(), expected_value.clone());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.float_number_value().unwrap();
 

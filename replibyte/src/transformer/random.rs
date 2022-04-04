@@ -1,5 +1,5 @@
 use crate::transformer::Transformer;
-use crate::types::Column;
+use crate::types::{Column, FloatNumberValue, NumberValue};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 
@@ -58,11 +58,23 @@ impl Transformer for RandomTransformer {
         let mut random = rand::thread_rng();
 
         match column {
-            Column::NumberValue(column_name, _) => {
-                Column::NumberValue(column_name, random.gen::<i128>())
+            Column::NumberValue(column_name, value) => {
+                let random_value: NumberValue = match value {
+                    NumberValue::I32(_) => NumberValue::I32(random.gen::<i32>()),
+                    NumberValue::I64(_) => NumberValue::I64(random.gen::<i64>()),
+                    NumberValue::I128(_) => NumberValue::I128(random.gen::<i128>()),
+                    NumberValue::U32(_) => NumberValue::U32(random.gen::<u32>()),
+                    NumberValue::U64(_) => NumberValue::U64(random.gen::<u64>()),
+                    NumberValue::U128(_) => NumberValue::U128(random.gen::<u128>()),
+                };
+                Column::NumberValue(column_name, random_value)
             }
-            Column::FloatNumberValue(column_name, _) => {
-                Column::FloatNumberValue(column_name, random.gen::<f64>())
+            Column::FloatNumberValue(column_name, value) => {
+                let random_value: FloatNumberValue = match value {
+                    FloatNumberValue::F32(_) => FloatNumberValue::F32(random.gen::<f32>()),
+                    FloatNumberValue::F64(_) => FloatNumberValue::F64(random.gen::<f64>()),
+                };
+                Column::FloatNumberValue(column_name, random_value)
             }
             Column::StringValue(column_name, value) => {
                 let new_value = random

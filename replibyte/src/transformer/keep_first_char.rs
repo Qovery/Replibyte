@@ -1,5 +1,5 @@
 use crate::transformer::Transformer;
-use crate::types::Column;
+use crate::types::{Column, NumberValue};
 
 pub struct KeepFirstCharTransformer {
     database_name: String,
@@ -63,7 +63,23 @@ impl Transformer for KeepFirstCharTransformer {
     fn transform(&self, column: Column) -> Column {
         match column {
             Column::NumberValue(column_name, value) => {
-                Column::NumberValue(column_name, get_first_digit(value))
+                let first_digit = match value {
+                    NumberValue::I32(i) => {
+                        NumberValue::I32(get_first_digit_signed(i as i128) as i32)
+                    }
+                    NumberValue::I64(i) => {
+                        NumberValue::I64(get_first_digit_signed(i as i128) as i64)
+                    }
+                    NumberValue::I128(i) => NumberValue::I128(get_first_digit_signed(i)),
+                    NumberValue::U32(u) => {
+                        NumberValue::U32(get_first_digit_unsigned(u as u128) as u32)
+                    }
+                    NumberValue::U64(u) => {
+                        NumberValue::U64(get_first_digit_unsigned(u as u128) as u64)
+                    }
+                    NumberValue::U128(u) => NumberValue::U128(get_first_digit_unsigned(u)),
+                };
+                Column::NumberValue(column_name, first_digit)
             }
             Column::StringValue(column_name, value) => {
                 let new_value = match value.len() {
@@ -84,7 +100,15 @@ impl Transformer for KeepFirstCharTransformer {
     }
 }
 
-fn get_first_digit(mut number: i128) -> i128 {
+fn get_first_digit_signed(mut number: i128) -> i128 {
+    while number >= 10 {
+        number /= 10;
+    }
+
+    number
+}
+
+fn get_first_digit_unsigned(mut number: u128) -> u128 {
     while number >= 10 {
         number /= 10;
     }
@@ -94,30 +118,33 @@ fn get_first_digit(mut number: i128) -> i128 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{transformer::Transformer, types::Column};
+    use crate::{
+        transformer::Transformer,
+        types::{Column, FloatNumberValue, NumberValue},
+    };
 
     use super::KeepFirstCharTransformer;
 
     #[test]
     fn transform_keep_first_char_only_with_number_value() {
         let transformer = get_transformer();
-        let column = Column::NumberValue("a_column".to_string(), 123);
+        let column = Column::NumberValue("a_column".to_string(), NumberValue::I32(123));
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.number_value().unwrap();
-        assert_eq!(transformed_value.to_owned(), 1);
+        assert_eq!(transformed_value.to_owned(), NumberValue::I32(1));
 
         let transformer = get_transformer();
-        let column = Column::NumberValue("a_column".to_string(), 1);
+        let column = Column::NumberValue("a_column".to_string(), NumberValue::I32(1));
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.number_value().unwrap();
-        assert_eq!(transformed_value.to_owned(), 1);
+        assert_eq!(transformed_value.to_owned(), NumberValue::I32(1));
     }
 
     #[test]
     fn transform_doesnt_change_with_float_value() {
-        let expected_value = 1.5;
+        let expected_value = FloatNumberValue::F64(1.5);
         let transformer = get_transformer();
-        let column = Column::FloatNumberValue("a_column".to_string(), expected_value);
+        let column = Column::FloatNumberValue("a_column".to_string(), expected_value.clone());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.float_number_value().unwrap();
 
