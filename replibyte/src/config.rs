@@ -101,6 +101,7 @@ pub struct SourceConfig {
     pub encryption_key: Option<String>,
     pub transformers: Vec<TransformerConfig>,
     pub skip: Option<Vec<SkipConfig>>,
+    pub database_subset: Option<DatabaseSubsetConfig>,
 }
 
 impl SourceConfig {
@@ -140,6 +141,17 @@ impl DestinationConfig {
 pub struct SkipConfig {
     pub database: String,
     pub table: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DatabaseSubsetConfig {
+    pub database: String,
+    // the reference query is from where we start to compute the dependency graph and subset the source
+    // E.g.
+    // `SELECT * FROM <table> WHERE random() < 0.05` will take 5% of the table users with the related data
+    pub reference_query: String,
+    // copy the entire table - not affected by the subset algorithm
+    pub passthrough_tables: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -442,7 +454,7 @@ mod tests {
                 5432,
                 "root".to_string(),
                 "password".to_string(),
-                "db".to_string()
+                "db".to_string(),
             ),
         )
     }

@@ -18,7 +18,7 @@ use utils::to_human_readable_unit;
 use crate::bridge::s3::S3;
 use crate::bridge::{Bridge, ReadOptions};
 use crate::cli::{BackupCommand, SubCommand, TransformerCommand, CLI};
-use crate::config::{Config, ConnectionUri};
+use crate::config::{Config, ConnectionUri, DatabaseSubsetConfig};
 use crate::connector::Connector;
 use crate::destination::mongodb::MongoDB as DestinationMongoDB;
 use crate::destination::postgres::Postgres as DestinationPostgres;
@@ -203,6 +203,7 @@ fn main() -> anyhow::Result<()> {
                     let options = SourceOptions {
                         transformers: &transformers,
                         skip_config: &skip_config,
+                        database_subset: &source.database_subset,
                     };
 
                     match args.source_type.as_ref().map(|x| x.as_str()) {

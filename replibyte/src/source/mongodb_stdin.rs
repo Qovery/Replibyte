@@ -23,11 +23,16 @@ impl Connector for MongoDBStdin {
 impl Source for MongoDBStdin {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
-        source_options: SourceOptions,
+        options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
         let reader = BufReader::new(stdin());
-        read_and_transform(reader, source_options, query_callback);
+
+        if let Some(_database_subset) = &options.database_subset {
+            todo!("database subset not supported yet for MongoDB source")
+        }
+
+        read_and_transform(reader, options, query_callback);
         Ok(())
     }
 }

@@ -60,6 +60,40 @@ impl<'a> Postgres<'a> {
             password,
         }
     }
+
+    fn get_schema(&self) -> Result<(), Error> {
+        let s_port = self.port.to_string();
+
+        let mut process = Command::new("pg_dumpall")
+            .env("PGPASSWORD", self.password)
+            .args([
+                "--schema-only",
+                "--no-owner", // skip restoration of object ownership
+                "-h",
+                self.host,
+                "-p",
+                s_port.as_str(),
+                "-U",
+                self.username,
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let stdout = process
+            .stdout
+            .take()
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
+
+        let reader = BufReader::new(stdout);
+
+        list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
+            let tokens = get_tokens_from_query_str(query);
+            //
+        });
+
+        Ok(())
+    }
 }
 
 impl<'a> Connector for Postgres<'a> {
@@ -76,18 +110,20 @@ impl<'a> Source for Postgres<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
+        if let Some(reference_query) = &options.database_subset {
+            // TODO get database schema + link between tables
+        }
+
         // use pg_dumpall instead of pg_dump to get all the users, roles and permissions
         let mut process = Command::new("pg_dumpall")
             .env("PGPASSWORD", self.password)
             .args([
-                "--column-inserts", //dump data as INSERT commands with column names
+                "--column-inserts", // dump data as INSERT commands with column names
                 "--no-owner",       // skip restoration of object ownership
                 "-h",
                 self.host,
                 "-p",
                 s_port.as_str(),
-                //"-d", pg_dumpall does not let picking the database as it is dump every dbs
-                //self.database,
                 "-U",
                 self.username,
             ])
@@ -393,7 +429,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::SkipConfig;
+    use crate::config::{DatabaseSubsetConfig, SkipConfig};
     use crate::source::SourceOptions;
     use crate::Source;
     use std::str;
@@ -421,7 +457,9 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
+
         assert!(p.read(source_options, |original_query, query| {}).is_ok());
 
         let p = get_invalid_postgres();
@@ -430,7 +468,9 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
+
         assert!(p.read(source_options, |original_query, query| {}).is_err());
     }
 
@@ -442,7 +482,9 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
+
         let _ = p.read(source_options, |original_query, query| {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);
@@ -540,6 +582,7 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
 
         let _ = p.read(source_options, |original_query, query| {
@@ -579,6 +622,7 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &skip_config,
+            database_subset: &None,
         };
 
         let _ = p.read(source_options, |_original_query, query| {

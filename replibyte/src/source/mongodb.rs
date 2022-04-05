@@ -53,10 +53,14 @@ impl<'a> Connector for MongoDB<'a> {
 impl<'a> Source for MongoDB<'a> {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
-        source_options: SourceOptions,
+        options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
+
+        if let Some(_database_subset) = &options.database_subset {
+            todo!("database subset not supported yet for MongoDB source")
+        }
 
         let mut process = Command::new("mongodump")
             .args([
@@ -85,7 +89,7 @@ impl<'a> Source for MongoDB<'a> {
 
         let reader = BufReader::new(stdout);
 
-        read_and_transform(reader, source_options, query_callback)?;
+        read_and_transform(reader, options, query_callback)?;
 
         match process.wait() {
             Ok(exit_status) => {
@@ -348,7 +352,9 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
+
         assert!(p.read(source_options, |_, _| {}).is_ok());
 
         let p = get_invalid_mongodb();
@@ -357,7 +363,9 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
+
         assert!(p.read(source_options, |_, _| {}).is_err());
     }
 
@@ -369,7 +377,9 @@ mod tests {
         let source_options = SourceOptions {
             transformers: &transformers,
             skip_config: &vec![],
+            database_subset: &None,
         };
+
         p.read(source_options, |original_query, query| {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);

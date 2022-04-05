@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use crate::config::SkipConfig;
+use crate::config::{DatabaseSubsetConfig, SkipConfig};
 use crate::connector::Connector;
 use crate::transformer::Transformer;
 use crate::types::{OriginalQuery, Query};
@@ -21,4 +21,5 @@ pub trait Source: Connector {
 pub struct SourceOptions<'a> {
     pub transformers: &'a Vec<Box<dyn Transformer>>,
     pub skip_config: &'a Vec<SkipConfig>,
+    pub database_subset: &'a Option<DatabaseSubsetConfig>,
 }
