@@ -1,4 +1,5 @@
 use crate::transformer::credit_card::CreditCardTransformer;
+use crate::transformer::custom_wasm::{CustomWasmTransformer, CustomWasmTransformerOptions};
 use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::keep_first_char::KeepFirstCharTransformer;
@@ -170,6 +171,7 @@ pub enum TransformerTypeConfig {
     CreditCard,
     Redacted(Option<RedactedTransformerOptions>),
     Transient,
+    CustomWasm(CustomWasmTransformerOptions),
 }
 
 impl TransformerTypeConfig {
@@ -228,6 +230,24 @@ impl TransformerTypeConfig {
                 table_name,
                 column_name,
             )),
+            TransformerTypeConfig::CustomWasm(options) => {
+                let wasm_bytes = match std::fs::read(options.path.clone()) {
+                    Ok(bytes) => bytes,
+                    Err(err) => {
+                        // The user probably provided a wrong path to the wasm file
+                        panic!("Failed to read wasm file: {}", err);
+                    }
+                };
+                let wasm_transformer =
+                    CustomWasmTransformer::new(database_name, table_name, column_name, wasm_bytes);
+                match wasm_transformer {
+                    Ok(transformer) => Box::new(transformer),
+                    Err(err) => {
+                        // The wasm which the user provided is invalid
+                        panic!("Failed to load custom wasm transformer: {}", err);
+                    }
+                }
+            }
         };
 
         transformer

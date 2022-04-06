@@ -34,3 +34,9 @@ bson = "2.1"
 aes-gcm = "0.9"
 which = "4.2.5"
 url = "2.2.2"
+
+wasmer = { version = "2.2", optional = true }
+wasmer-wasi = { version = "2.2", optional = true }
+
+[features]
+wasm = ["wasmer", "wasmer-wasi"]
