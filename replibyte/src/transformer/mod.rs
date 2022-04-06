@@ -18,7 +18,8 @@ pub mod random;
 pub mod redacted;
 pub mod transient;
 
-#[cfg(feature = "wasm")]
+// FIXME: CI release build is broken because of feature flag
+//#[cfg(feature = "wasm")]
 pub mod custom_wasm;
 
 pub fn transformers() -> Vec<Box<dyn Transformer>> {
