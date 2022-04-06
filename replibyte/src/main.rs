@@ -21,11 +21,9 @@ use crate::cli::{BackupCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
 use crate::destination::mongodb::MongoDB as DestinationMongoDB;
-use crate::destination::mongodb_stdout::MongoDBStdout;
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB as SourceMongoDB;
-use crate::source::mongodb_stdin::MongoDBStdin;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::{Source, SourceOptions};
@@ -224,13 +222,21 @@ fn main() -> anyhow::Result<()> {
                             ConnectionUri::Mysql(host, port, username, password, database) => {
                                 todo!() // FIXME
                             }
-                            ConnectionUri::MongoDB(host, port, username, password, database) => {
+                            ConnectionUri::MongoDB(
+                                host,
+                                port,
+                                username,
+                                password,
+                                database,
+                                authentication_db,
+                            ) => {
                                 let mongodb = SourceMongoDB::new(
                                     host.as_str(),
                                     port,
                                     database.as_str(),
                                     username.as_str(),
                                     password.as_str(),
+                                    authentication_db.as_str(),
                                 );
 
                                 let task = FullBackupTask::new(mongodb, bridge, options);
@@ -306,13 +312,21 @@ fn main() -> anyhow::Result<()> {
                     ConnectionUri::Mysql(host, port, username, password, database) => {
                         todo!() // FIXME
                     }
-                    ConnectionUri::MongoDB(host, port, username, password, database) => {
+                    ConnectionUri::MongoDB(
+                        host,
+                        port,
+                        username,
+                        password,
+                        database,
+                        authentication_db,
+                    ) => {
                         let mongodb = DestinationMongoDB::new(
                             host.as_str(),
                             port,
                             database.as_str(),
                             username.as_str(),
                             password.as_str(),
+                            authentication_db.as_str(),
                         );
 
                         let task = FullRestoreTask::new(mongodb, bridge, options);

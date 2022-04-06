@@ -4,12 +4,16 @@ use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::keep_first_char::KeepFirstCharTransformer;
 use crate::transformer::phone_number::PhoneNumberTransformer;
 use crate::transformer::random::RandomTransformer;
-use crate::transformer::redacted::RedactedTransformer;
+use crate::transformer::redacted::{RedactedTransformer, RedactedTransformerOptions};
+use crate::transformer::transient::TransientTransformer;
 use crate::transformer::Transformer;
 use serde;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
-use uriparse::URIReference;
+use url::Url;
+
+const DEFAULT_MONGODB_AUTH_DB: &str = "admin";
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
@@ -148,27 +152,24 @@ pub struct TransformerConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ColumnConfig {
     pub name: String,
+
+    #[serde(flatten)]
     pub transformer: TransformerTypeConfig,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(tag = "transformer_name", content = "transformer_options")]
 pub enum TransformerTypeConfig {
-    #[serde(rename = "random")]
     Random,
-    #[serde(rename = "random-date")]
     RandomDate,
-    #[serde(rename = "first-name")]
     FirstName,
-    #[serde(rename = "email")]
     Email,
-    #[serde(rename = "keep-first-char")]
     KeepFirstChar,
-    #[serde(rename = "phone-number")]
     PhoneNumber,
-    #[serde(rename = "credit-card")]
     CreditCard,
-    #[serde(rename = "redacted")]
-    Redacted,
+    Redacted(Option<RedactedTransformerOptions>),
+    Transient,
 }
 
 impl TransformerTypeConfig {
@@ -210,7 +211,19 @@ impl TransformerTypeConfig {
                 table_name,
                 column_name,
             )),
-            TransformerTypeConfig::Redacted => Box::new(RedactedTransformer::new(
+            TransformerTypeConfig::Redacted(options) => {
+                let options = match options {
+                    Some(options) => *options,
+                    None => RedactedTransformerOptions::default(),
+                };
+                Box::new(RedactedTransformer::new(
+                    database_name,
+                    table_name,
+                    column_name,
+                    options,
+                ))
+            }
+            TransformerTypeConfig::Transient => Box::new(TransientTransformer::new(
                 database_name,
                 table_name,
                 column_name,
@@ -226,15 +239,24 @@ type Port = u16;
 type Username = String;
 type Password = String;
 type Database = String;
+type AuthenticationDatabase = String;
 
+#[derive(Debug, PartialEq)]
 pub enum ConnectionUri {
     Postgres(Host, Port, Username, Password, Database),
     Mysql(Host, Port, Username, Password, Database),
-    MongoDB(Host, Port, Username, Password, Database),
+    MongoDB(
+        Host,
+        Port,
+        Username,
+        Password,
+        Database,
+        AuthenticationDatabase,
+    ),
 }
 
-fn get_host(uri_ref: &URIReference) -> Result<String, Error> {
-    match uri_ref.host() {
+fn get_host(url: &Url) -> Result<String, Error> {
+    match url.host() {
         Some(host) => Ok(host.to_string()),
         None => Err(Error::new(
             ErrorKind::Other,
@@ -243,8 +265,8 @@ fn get_host(uri_ref: &URIReference) -> Result<String, Error> {
     }
 }
 
-fn get_port(uri_ref: &URIReference, default_port: u16) -> Result<u16, Error> {
-    match uri_ref.port() {
+fn get_port(url: &Url, default_port: u16) -> Result<u16, Error> {
+    match url.port() {
         Some(port) if port < 1 => Err(Error::new(
             ErrorKind::Other,
             "<port> from connection uri can't be lower than 0",
@@ -254,18 +276,18 @@ fn get_port(uri_ref: &URIReference, default_port: u16) -> Result<u16, Error> {
     }
 }
 
-fn get_username(uri_ref: &URIReference) -> Result<String, Error> {
-    match uri_ref.username() {
-        Some(username) => Ok(username.to_string()),
-        None => Err(Error::new(
+fn get_username(url: &Url) -> Result<String, Error> {
+    match url.username() {
+        username if username != "" => Ok(username.to_string()),
+        _ => Err(Error::new(
             ErrorKind::Other,
             "missing <username> property from connection uri",
         )),
     }
 }
 
-fn get_password(uri_ref: &URIReference) -> Result<String, Error> {
-    match uri_ref.password() {
+fn get_password(url: &Url) -> Result<String, Error> {
+    match url.password() {
         Some(password) => Ok(password.to_string()),
         None => Err(Error::new(
             ErrorKind::Other,
@@ -274,9 +296,9 @@ fn get_password(uri_ref: &URIReference) -> Result<String, Error> {
     }
 }
 
-fn get_database(uri_ref: &URIReference, default: Option<&str>) -> Result<String, Error> {
-    let path = uri_ref.path().to_string();
-    let database = path.split("/").take(1).collect::<Vec<&str>>();
+fn get_database(url: &Url, default: Option<&str>) -> Result<String, Error> {
+    let path = url.path().to_string();
+    let database = path.split("/").collect::<Vec<&str>>();
 
     if database.is_empty() {
         return match default {
@@ -288,7 +310,7 @@ fn get_database(uri_ref: &URIReference, default: Option<&str>) -> Result<String,
         };
     }
 
-    let database = match database.get(0) {
+    let database = match database.get(1) {
         Some(database) => *database,
         None => {
             return match default {
@@ -304,49 +326,55 @@ fn get_database(uri_ref: &URIReference, default: Option<&str>) -> Result<String,
     Ok(database.to_string())
 }
 
+fn get_mongodb_authentication_db(url: &Url) -> String {
+    let hash_query: HashMap<String, String> = url.query_pairs().into_owned().collect();
+
+    let authentication_database = match hash_query.get("authSource") {
+        Some(auth_source) => auth_source.to_string(),
+        None => DEFAULT_MONGODB_AUTH_DB.to_string(),
+    };
+
+    authentication_database
+}
+
 fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
     let uri = substitute_env_var(uri)?;
 
-    let uri_ref = match URIReference::try_from(uri.as_str()) {
-        Ok(uri_ref) => uri_ref,
+    let url = match Url::parse(uri.as_str()) {
+        Ok(url) => url,
         Err(err) => return Err(Error::new(ErrorKind::Other, format!("{:?}", err))),
     };
 
-    let connection_uri = match uri_ref.scheme() {
-        Some(err) if err.as_str().to_lowercase() == "postgres" => ConnectionUri::Postgres(
-            get_host(&uri_ref)?,
-            get_port(&uri_ref, 5432)?,
-            get_username(&uri_ref)?,
-            get_password(&uri_ref)?,
-            get_database(&uri_ref, Some("public"))?,
+    let connection_uri = match url.scheme() {
+        scheme if scheme.to_lowercase() == "postgres" => ConnectionUri::Postgres(
+            get_host(&url)?,
+            get_port(&url, 5432)?,
+            get_username(&url)?,
+            get_password(&url)?,
+            get_database(&url, Some("public"))?,
         ),
-        Some(err) if err.as_str().to_lowercase() == "mysql" => ConnectionUri::Postgres(
-            get_host(&uri_ref)?,
-            get_port(&uri_ref, 3306)?,
-            get_username(&uri_ref)?,
-            get_password(&uri_ref)?,
-            get_database(&uri_ref, None)?,
+        scheme if scheme.to_lowercase() == "mysql" => ConnectionUri::Postgres(
+            get_host(&url)?,
+            get_port(&url, 3306)?,
+            get_username(&url)?,
+            get_password(&url)?,
+            get_database(&url, None)?,
         ),
-        Some(err)
-            if err.as_str().to_lowercase() == "mongodb"
-                || err.as_str().to_lowercase() == "mongodb+srv" =>
-        {
+        scheme if scheme.to_lowercase() == "mongodb" || scheme.to_lowercase() == "mongodb+srv" => {
             ConnectionUri::MongoDB(
-                get_host(&uri_ref)?,
-                get_port(&uri_ref, 27017)?,
-                get_username(&uri_ref)?,
-                get_password(&uri_ref)?,
-                get_database(&uri_ref, None)?,
+                get_host(&url)?,
+                get_port(&url, 27017)?,
+                get_username(&url)?,
+                get_password(&url)?,
+                get_database(&url, Some(DEFAULT_MONGODB_AUTH_DB))?,
+                get_mongodb_authentication_db(&url),
             )
         }
-        Some(err) => {
+        scheme => {
             return Err(Error::new(
                 ErrorKind::Other,
-                format!("'{}' not supported", err.as_str()),
+                format!("'{}' not supported", scheme),
             ));
-        }
-        None => {
-            return Err(Error::new(ErrorKind::Other, "missing URI scheme"));
         }
     };
 
@@ -382,7 +410,7 @@ fn substitute_env_var(env_var: &str) -> Result<String, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{parse_connection_uri, substitute_env_var};
+    use crate::config::{parse_connection_uri, substitute_env_var, ConnectionUri};
 
     #[test]
     fn substitute_env_variables() {
@@ -399,17 +427,52 @@ mod tests {
 
     #[test]
     fn parse_postgres_connection_uri() {
-        assert!(parse_connection_uri("postgres://root:password@localhost:5432/root").is_ok());
+        assert!(parse_connection_uri("postgres://root:password@localhost:5432/db").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost:5432").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost").is_ok());
         assert!(parse_connection_uri("postgres://root:password").is_err());
     }
+
+    #[test]
+    fn parse_postgres_connection_uri_with_db() {
+        assert_eq!(
+            parse_connection_uri("postgres://root:password@localhost:5432/db").unwrap(),
+            ConnectionUri::Postgres(
+                "localhost".to_string(),
+                5432,
+                "root".to_string(),
+                "password".to_string(),
+                "db".to_string()
+            ),
+        )
+    }
+
     #[test]
     fn parse_mongodb_connection_uri() {
-        assert!(parse_connection_uri("mongodb://root:password@localhost:27017/root").is_ok());
+        assert!(parse_connection_uri("mongodb://root:password").is_err());
         assert!(parse_connection_uri("mongodb://root:password@localhost:27017").is_ok());
+        assert!(parse_connection_uri("mongodb://root:password@localhost:27017/db").is_ok());
         assert!(parse_connection_uri("mongodb://root:password@localhost").is_ok());
         assert!(parse_connection_uri("mongodb+srv://root:password@server.example.com/").is_ok());
-        assert!(parse_connection_uri("mongodb://root:password").is_err());
+    }
+
+    #[test]
+    fn parse_mongodb_connection_uri_with_db() {
+        let connection_uri = parse_connection_uri(
+            "mongodb+srv://root:password@server.example.com/my_db?authSource=other_db",
+        )
+        .unwrap();
+
+        assert_eq!(
+            connection_uri,
+            ConnectionUri::MongoDB(
+                "server.example.com".to_string(),
+                27017,
+                "root".to_string(),
+                "password".to_string(),
+                "my_db".to_string(),
+                "other_db".to_string(),
+            )
+        )
     }
 }

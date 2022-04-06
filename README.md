@@ -1,47 +1,52 @@
 <p align="center"> <img src="assets/RepliByte%20Logo.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">The Simplest Way To Synchronize Your Cloud Databases</h3>
-<p align="center">Replibyte is an application to replicate your cloud databases </br>from one place to the other while hiding sensitive data 🕵️‍♂️</p>
+<p align="center">Replibyte is a tool to replicate your cloud databases </br>from one place to the other while keeping sensitive data safe 🕵️‍♂️</p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/stability-work_in_progress-lightgrey.svg?style=flat-square" alt="work in progress badge">
+<img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
 <img src="https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square" alt="Build and Tests">
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
----
+## Features
 
-**⚠️ DEVELOPMENT IN PROGRESS - CONTRIBUTORS WANTED!! [JOIN DISCORD](https://discord.qovery.com)**
+- [x] Support PostgreSQL and MongoDB (more [connectors](#connectors) coming soon)
+- [x] Complete data synchronization (Full-backup)
+- [x] Generate random/fake information
+- [x] Backup TB of data (read [Design](#design))
+- [x] Skip data sync for specific tables
+- [x] On-the-fly data (de)compression (Zlib)
+- [x] On-the-fly data de/encryption (AES-256)
+- [x] Work on different VPC/network
 
----
+Here are the features we plan to support
+
+- [ ] Start a local database with the prod data in a single command ([WIP](https://github.com/Qovery/replibyte/issues/32))
+- [ ] Auto-detect and version database schema change
+- [ ] Database Subsetting: Scale down a production database to a more reasonable size ([WIP](https://github.com/Qovery/replibyte/issues/40))
+- [ ] Auto-detect sensitive fields and generate fake data
+- [ ] Auto-clean up bridge data
+- [ ] Incremental data synchronization (Incremental backup)
 
 ## Install
 
-### MacOS
+<details>
 
-#### Homebrew
-
-*Coming soon* (contribution appreciated)
-
-#### Manual
+<summary>Install on MacOSX</summary>
 
 ```shell
-# download latest replibyte archive for MacOSX
-curl -s https://api.github.com/repos/Qovery/replibyte/releases/latest | \
-    jq -r '.assets[].browser_download_url' | \
-    grep -i 'apple-darwin.zip$' | wget -qi - && \
-
-# unarchive
-unzip *.zip
-
-# make replibyte executable
-chmod +x replibyte
-
-# make it accessible from everywhere
-mv replibyte /usr/local/bin/
+brew tap Qovery/replibyte
+brew install replibyte
 ```
 
-### Linux
+Or [manually](https://github.com/Qovery/replibyte/releases).
+
+</details>
+
+<details>
+
+<summary>Install on Linux</summary>
 
 ```shell
 # download latest replibyte archive for Linux
@@ -58,10 +63,19 @@ chmod +x replibyte
 # make it accessible from everywhere
 mv replibyte /usr/local/bin/
 ```
+</details>
 
-### Windows
+<details>
+
+<summary>Install on Windows</summary>
 
 Download [the latest Windows release](https://github.com/Qovery/replibyte/releases) and install it.
+
+</details>
+
+<details>
+
+<summary>Run with Docker</summary>
 
 ### Docker
 
@@ -76,6 +90,8 @@ docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml t
 ```
 
 Feel free to edit `./examples/replibyte.yaml` with your configuration.
+
+</details>
 
 ## Usage
 
@@ -127,22 +143,23 @@ source:
       table: employees
       columns:
         - name: last_name
-          transformer: random
+          transformer_name: random
         - name: birth_date
-          transformer: random-date
+          transformer_name: random-date
         - name: first_name
-          transformer: first-name
+          transformer_name: first-name
         - name: email
-          transformer: email
+          transformer_name: email
         - name: username
-          transformer: keep-first-char
+          transformer_name: keep-first-char
     - database: public
       table: customers
       columns:
         - name: phone
-          transformer: phone-number
+          transformer_name: phone-number
 bridge:
   bucket: $BUCKET_NAME
+  region: $S3_REGION
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
@@ -160,6 +177,7 @@ Create your `staging-conf.yaml` configuration file to sync your production datab
 ```yaml
 bridge:
   bucket: $BUCKET_NAME
+  region: $S3_REGION
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
@@ -186,8 +204,8 @@ sequenceDiagram
     PostgreSQL (Source)->>RepliByte: 1. Dump data
     loop
         RepliByte->>RepliByte: 2. Hide or fake sensitive data
-        RepliByte->>RepliByte: 3. Encrypt data
-        RepliByte->>RepliByte: 4. Compress data
+        RepliByte->>RepliByte: 3. Compress data
+        RepliByte->>RepliByte: 4. Encrypt data
     end
     RepliByte->>AWS S3 (Bridge): 5. Upload obfuscated dump data
     RepliByte->>AWS S3 (Bridge): 6. Write index file
@@ -221,30 +239,14 @@ sequenceDiagram
 2. RepliByte downloads the SQL dump in a stream bytes.
 3. RepliByte restores the SQL dump in the destination PostgreSQL database in real-time.
 
-## Features
-
-- [x] Complete data synchronization
-- [x] Work on different VPC/network
-- [x] Generate random/fake information
-- [x] Backup TB of data (read [Design](#design))
-- [x] Skip data sync for specific tables
-- [x] On-the-fly data (de)compression (Zlib)
-- [x] On-the-fly data de/encryption (AES-256)
-
-Here are the features we plan to support
-
-- [ ] Incremental data synchronization
-- [ ] Auto-detect sensitive fields and generate fake data
-- [ ] Auto-clean up bridge data
-
 ## Connectors
 
 ### Supported Source connectors
 
 - [x] PostgreSQL
 - [x] MongoDB
+- [x] Local dump file
 - [ ] MySQL (Coming Soon)
-- [x] Local dump file (Yes for PostgreSQL)
 
 ### Supported Transformers
 
@@ -321,15 +323,12 @@ ambition!
 
 ## Use cases
 
-| Scenario                                                                                    | Supported |
-|---------------------------------------------------------------------------------------------|-----------|
-| Synchronize the whole PostgreSQL/MongoDB instance                                           | Yes       |
-| Synchronize the whole PostgreSQL/MongoDB instance and replace sensitive data with fake data | Yes       |
-| Synchronize specific PostgreSQL/MongoDB tables and replace sensitive data with fake data    | Yes       |
-| Synchronize specific PostgreSQL/MongoDB databases and replace sensitive data with fake data | Yes       |
-| Migrate from one database hosting platform to the other                                     | Yes       |
-
-> Do you want to support an additional use-case? Feel free to [contribute](#contributing) by opening an issue or submitting a PR.
+- Synchronize **the whole** PostgreSQL/MongoDB **instance**.
+- Synchronize **the whole** PostgreSQL/MongoDB **instance** and **replace sensitive data** with fake data.
+- Synchronize **specific** PostgreSQL/MongoDB **tables** and **replace sensitive data** with fake data.
+- Synchronize **specific** PostgreSQL/MongoDB **databases** and **replace sensitive data** with fake data.
+- Synchronize **a subset** of your production database. 
+- **Migrate** from one **database** hosting platform to the other.
 
 ## What is not RepliByte
 

@@ -1,9 +1,10 @@
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
 
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
+use crate::utils::binary_exists;
 
 pub struct MongoDB<'a> {
     host: &'a str,
@@ -11,6 +12,7 @@ pub struct MongoDB<'a> {
     database: &'a str,
     username: &'a str,
     password: &'a str,
+    authentication_database: &'a str,
 }
 
 impl<'a> MongoDB<'a> {
@@ -20,6 +22,7 @@ impl<'a> MongoDB<'a> {
         database: &'a str,
         username: &'a str,
         password: &'a str,
+        authentication_database: &'a str,
     ) -> Self {
         MongoDB {
             host,
@@ -27,44 +30,16 @@ impl<'a> MongoDB<'a> {
             database,
             username,
             password,
+            authentication_database,
         }
     }
 }
 
 impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        let s_port = self.port.to_string();
-
-        let mut echo_process = Command::new("echo")
-            .arg(r#"'db.runCommand("ping").ok'"#)
-            .stdout(Stdio::piped())
-            .spawn()?;
-
-        let mut mongo_process = Command::new("mongo")
-            .args([
-                "--host",
-                self.host,
-                "--port",
-                s_port.as_str(),
-                "--authenticationDatabase",
-                "admin",
-                "-u",
-                self.username,
-                "-p",
-                self.password,
-                "--quiet",
-            ])
-            .stdin(echo_process.stdout.take().unwrap())
-            .stdout(Stdio::null())
-            .spawn()?;
-
-        let exit_status = mongo_process.wait()?;
-        if !exit_status.success() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error: {:?}", exit_status.to_string()),
-            ));
-        }
+        let _ = binary_exists("mongo")?;
+        let _ = binary_exists("mongorestore")?;
+        let _ = check_connection_status(self)?;
 
         Ok(())
     }
@@ -81,7 +56,7 @@ impl<'a> Destination for MongoDB<'a> {
                 "--port",
                 s_port.as_str(),
                 "--authenticationDatabase",
-                "admin",
+                self.authentication_database,
                 "-u",
                 self.username,
                 "-p",
@@ -112,6 +87,43 @@ impl<'a> Destination for MongoDB<'a> {
     }
 }
 
+fn check_connection_status(db: &MongoDB) -> Result<(), Error> {
+    let s_port = db.port.to_string();
+
+    let mut echo_process = Command::new("echo")
+        .arg(r#"'db.runCommand("ping").ok'"#)
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let mut mongo_process = Command::new("mongo")
+        .args([
+            "--host",
+            db.host,
+            "--port",
+            s_port.as_str(),
+            "--authenticationDatabase",
+            db.authentication_database,
+            "-u",
+            db.username,
+            "-p",
+            db.password,
+            "--quiet",
+        ])
+        .stdin(echo_process.stdout.take().unwrap())
+        .stdout(Stdio::inherit())
+        .spawn()?;
+
+    let exit_status = mongo_process.wait()?;
+    if !exit_status.success() {
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("command error: {:?}", exit_status.to_string()),
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use dump_parser::utils::decode_hex;
@@ -121,11 +133,11 @@ mod tests {
     use crate::destination::Destination;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27018, "test", "root", "password")
+        MongoDB::new("localhost", 27018, "test", "root", "password", "admin")
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27018, "test", "root", "wrongpassword")
+        MongoDB::new("localhost", 27018, "test", "root", "wrongpassword", "admin")
     }
 
     #[test]

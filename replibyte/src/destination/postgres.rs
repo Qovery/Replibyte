@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
+use crate::utils::binary_exists;
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -36,7 +37,7 @@ impl<'a> Postgres<'a> {
 
 impl<'a> Connector for Postgres<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        // TODO check psql binary available
+        let _ = binary_exists("psql")?;
 
         if self.wipe_database {
             let s_port = self.port.to_string();

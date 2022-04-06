@@ -3,7 +3,8 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 use crate::postgres::Keyword::{
-    Alter, Copy, Create, Database, From, Insert, Into as KeywordInto, NoKeyword, Not, Null, Table,
+    Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Insert, Into as KeywordInto,
+    Key, NoKeyword, Not, Null, Primary, References, Table,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -134,7 +135,12 @@ impl Token {
                     "FROM" => From,
                     "NOT" => Not,
                     "NULL" => Null,
-                    // TODO add more keywords
+                    "ADD" => Add,
+                    "CONSTRAINT" => Constraint,
+                    "PRIMARY" => Primary,
+                    "FOREIGN" => Foreign,
+                    "REFERENCES" => References,
+                    "KEY" => Key,
                     _ => NoKeyword,
                 }
             } else {
@@ -172,6 +178,12 @@ pub enum Keyword {
     From,
     Not,
     Null,
+    Add,
+    Constraint,
+    Primary,
+    Foreign,
+    References,
+    Key,
     NoKeyword,
 }
 
@@ -817,7 +829,7 @@ CREATE TABLE public.application (
 
         let expected: Vec<Token> = vec![];
 
-        // TODO assert_eq!(tokens, expected);
+        // FIXME assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -842,7 +854,7 @@ COPY public.categories (category_id, category_name, description, picture) FROM s
 
         let expected: Vec<Token> = vec![];
 
-        // TODO assert_eq!(tokens, expected);
+        // FIXME assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -860,7 +872,7 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
 
         let expected: Vec<Token> = vec![];
 
-        // TODO assert_eq!(tokens, expected);
+        // FIXME assert_eq!(tokens, expected);
     }
 
     #[test]
