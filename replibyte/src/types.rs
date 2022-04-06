@@ -29,48 +29,10 @@ pub struct InsertIntoQuery {
     pub columns: Vec<Column>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum NumberValue {
-    I32(i32),
-    I64(i64),
-    I128(i128),
-    U32(u32),
-    U64(u64),
-    U128(u128),
-}
-
-impl std::fmt::Display for NumberValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NumberValue::I32(val) => write!(f, "{}", val),
-            NumberValue::I64(val) => write!(f, "{}", val),
-            NumberValue::I128(val) => write!(f, "{}", val),
-            NumberValue::U32(val) => write!(f, "{}", val),
-            NumberValue::U64(val) => write!(f, "{}", val),
-            NumberValue::U128(val) => write!(f, "{}", val),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum FloatNumberValue {
-    F32(f32),
-    F64(f64),
-}
-
-impl std::fmt::Display for FloatNumberValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FloatNumberValue::F32(val) => write!(f, "{}", val),
-            FloatNumberValue::F64(val) => write!(f, "{}", val),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub enum Column {
-    NumberValue(String, NumberValue),
-    FloatNumberValue(String, FloatNumberValue),
+    NumberValue(String, i128),
+    FloatNumberValue(String, f64),
     StringValue(String, String),
     CharValue(String, char),
     None(String),
@@ -87,7 +49,7 @@ impl Column {
         }
     }
 
-    pub fn number_value(&self) -> Option<&NumberValue> {
+    pub fn number_value(&self) -> Option<&i128> {
         match self {
             Column::NumberValue(_, value) => Some(value),
             _ => None,
@@ -101,7 +63,7 @@ impl Column {
         }
     }
 
-    pub fn float_number_value(&self) -> Option<&FloatNumberValue> {
+    pub fn float_number_value(&self) -> Option<&f64> {
         match self {
             Column::FloatNumberValue(_, value) => Some(value),
             _ => None,

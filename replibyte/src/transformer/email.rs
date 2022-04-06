@@ -72,18 +72,15 @@ impl Transformer for EmailTransformer {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        transformer::Transformer,
-        types::{Column, FloatNumberValue, NumberValue},
-    };
+    use crate::{transformer::Transformer, types::Column};
 
     use super::EmailTransformer;
 
     #[test]
     fn transform_email_with_number_value() {
-        let expected_value = NumberValue::I32(34);
+        let expected_value = 34;
         let transformer = get_transformer();
-        let column = Column::NumberValue("email".to_string(), expected_value.clone());
+        let column = Column::NumberValue("email".to_string(), expected_value);
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.number_value().unwrap();
 
@@ -92,9 +89,9 @@ mod tests {
 
     #[test]
     fn transform_email_with_float_value() {
-        let expected_value = FloatNumberValue::F64(1.5);
+        let expected_value = 1.5;
         let transformer = get_transformer();
-        let column = Column::FloatNumberValue("email".to_string(), expected_value.clone());
+        let column = Column::FloatNumberValue("email".to_string(), expected_value);
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.float_number_value().unwrap();
 

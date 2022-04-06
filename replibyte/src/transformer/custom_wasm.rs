@@ -1,5 +1,5 @@
+use crate::transformer::Transformer;
 use crate::types::Column;
-use crate::{transformer::Transformer, types::NumberValue};
 
 use wasmer::{wat2wasm, Instance, Module, Store};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
@@ -111,10 +111,7 @@ impl Transformer for CustomWasmTransformer {
 mod tests {
     use wasmer::wat2wasm;
 
-    use crate::{
-        transformer::Transformer,
-        types::{Column, NumberValue},
-    };
+    use crate::{transformer::Transformer, types::Column};
 
     use super::CustomWasmTransformer;
 
@@ -148,17 +145,16 @@ mod tests {
     #[test]
     fn transform_wat_add_one() {
         let transformer = get_wat_transformer();
-        let column = Column::NumberValue("number".to_string(), NumberValue::I32(1));
+        let column = Column::NumberValue("number".to_string(), 1);
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.number_value().unwrap();
 
-        assert_eq!(transformed_value, &(NumberValue::I32(2)));
+        assert_eq!(transformed_value, &2);
     }
 
     #[test]
     fn transform_wasm_reverse_string() {
-        let transformer =
-            get_wasm_transformer("../examples/wasm-transformer-reverse-string.wasm");
+        let transformer = get_wasm_transformer("../examples/wasm-transformer-reverse-string.wasm");
         let column = Column::StringValue("string".to_string(), "reverse_it".to_string());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.string_value().unwrap();

@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
-use crate::types::{Column, FloatNumberValue, NumberValue, OriginalQuery, Query};
+use crate::types::{Column, OriginalQuery, Query};
 use crate::utils::binary_exists;
 use crate::SourceOptions;
 
@@ -158,16 +158,12 @@ pub fn recursively_transform_bson(
             Bson::String((*column.string_value().unwrap()).to_string())
         }
         Bson::Double(value) => {
-            column = Column::FloatNumberValue(key.clone(), FloatNumberValue::F64(value));
+            column = Column::FloatNumberValue(key.clone(), value);
             column = match transformers.get(key.as_str()) {
                 Some(transformer) => transformer.transform(column), // apply transformation on the column
                 None => column,
             };
-            let new_value = match column.float_number_value().unwrap() {
-                FloatNumberValue::F64(val) => *val,
-                _ => unreachable!(),
-            };
-            Bson::Double(new_value)
+            Bson::Double(*column.float_number_value().unwrap())
         }
         Bson::Array(arr) => {
             let new_arr = arr
@@ -197,28 +193,20 @@ pub fn recursively_transform_bson(
         )),
         Bson::Null => Bson::Null,
         Bson::Int32(value) => {
-            column = Column::NumberValue(key.clone(), NumberValue::I32(value));
+            column = Column::NumberValue(key.clone(), value as i128);
             column = match transformers.get(key.as_str()) {
                 Some(transformer) => transformer.transform(column), // apply transformation on the column
                 None => column,
             };
-            let new_value = match column.number_value().unwrap() {
-                NumberValue::I32(val) => *val,
-                _ => unreachable!(),
-            };
-            Bson::Int32(new_value)
+            Bson::Int32(column.number_value().map(|&n| n as i32).unwrap())
         }
         Bson::Int64(value) => {
-            column = Column::NumberValue(key.clone(), NumberValue::I64(value));
+            column = Column::NumberValue(key.clone(), value as i128);
             column = match transformers.get(key.as_str()) {
                 Some(transformer) => transformer.transform(column), // apply transformation on the column
                 None => column,
             };
-            let new_value = match column.number_value().unwrap() {
-                NumberValue::I64(val) => *val,
-                _ => unreachable!(),
-            };
-            Bson::Int64(new_value)
+            Bson::Int64(column.number_value().map(|&n| n as i64).unwrap())
         }
         // ALL OF THE NEXT TYPES ARE NOT TRANSFORMABLE (yet?)
         Bson::ObjectId(oid) => Bson::ObjectId(oid),
