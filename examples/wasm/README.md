@@ -10,6 +10,20 @@
 
 <br>
 
+## How it works
+---
+<br>
+
+RepliByte's communication with external `wasm` modules is implemented with the use of pipes:
+1. The column value which needs to be transformed is written to stdin by RepliByte. This will always be a single column value. 
+2. The wasm module should read the value from stdin and **transform** it (this is where your custom implementation comes in).
+3. The wasm module should write the transformed value to stdout.
+4. RepliByte reads the transformed value from stdout. RepliByte will expect to read a single column value, anything else will cause a runtime error.
+
+As long as you start with reading from stdin and end with printing to stdout, you can go as crazy as you want with the implementation of your custom transformers.
+
+<br>
+
 ## Implenting a custom transformer with Rust
 ---
 <br>
@@ -18,18 +32,20 @@ First, start a new cargo project:
 ```sh
 cargo init my-custom-wasm-transformer
 ```
+
+
 Go to `src/main.rs` in the newly created project and write some code:
 ```rust
 // This is actually the source of the `.wasm` file in this example. Feel free to edit it !
-
-use std::io;
-
 fn main() {
+    // Read input value from stdin
     let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
+    std::io::stdin().read_line(&mut input).unwrap();
 
+    // Transform the value as you see fit (in this case we just reverse the string)
     let output: String = input.chars().rev().collect();
 
+    // Write transformed value to stdout (simply print)
     println!("{}", output);
 }
 ```
@@ -43,9 +59,9 @@ Build:
 cargo build --release --target wasm32-wasi
 ```
 
-You will your freshly built custom wasm transformer here:
+You will find your freshly built custom wasm transformer here:
 
- `target/wasm32-wasi/debug/my-custom-wasm-transformer.wasm`
+ `target/wasm32-wasi/release/my-custom-wasm-transformer.wasm`
 
  The only thing that's left is to edit the `path` option in `replibyte.yaml`:
 
