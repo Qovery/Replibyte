@@ -2,7 +2,7 @@ use crate::transformer::Transformer;
 use crate::types::Column;
 
 use serde::{Deserialize, Serialize};
-use wasmer::{wat2wasm, Instance, Module, Store};
+use wasmer::{wat2wasm, ImportObject, Instance, Module, Store};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 pub type WasmError = Box<dyn std::error::Error>;
@@ -11,12 +11,16 @@ pub type WasmError = Box<dyn std::error::Error>;
 pub struct CustomWasmTransformerOptions {
     pub path: String,
 }
+struct WasmConfig {
+    wasi_env: WasiEnv,
+    import_object: ImportObject,
+    module: Module,
+}
 pub struct CustomWasmTransformer {
     database_name: String,
     table_name: String,
     column_name: String,
-    wasi_env: WasiEnv,
-    instance: Instance,
+    wasm_config: WasmConfig,
 }
 
 impl CustomWasmTransformer {
@@ -43,36 +47,37 @@ impl CustomWasmTransformer {
             .stdout(Box::new(output))
             .finalize()?;
 
-        // Import object related to WASI,
-        // and attach it to the Wasm instance
+        // Import object related to WASI
         let import_object = wasi_env.import_object(&module)?;
-        let instance = Instance::new(&module, &import_object)?;
 
-        Ok({
-            CustomWasmTransformer {
-                database_name: database_name.into(),
-                table_name: table_name.into(),
-                column_name: column_name.into(),
+        Ok(CustomWasmTransformer {
+            database_name: database_name.into(),
+            table_name: table_name.into(),
+            column_name: column_name.into(),
+            wasm_config: WasmConfig {
                 wasi_env,
-                instance,
-            }
+                import_object,
+                module,
+            },
         })
     }
     fn call_wasm_module(&self, value: &str) -> Result<String, WasmError> {
+        // Create a new wasm instance from the wasm configuration
+        let instance = Instance::new(&self.wasm_config.module, &self.wasm_config.import_object)?;
         // Access WasiState in a nested scope to ensure we're not holding
         // the mutex after we need it.
         {
-            let mut state = self.wasi_env.state();
+            let mut state = self.wasm_config.wasi_env.state();
             let wasi_stdin = state.fs.stdin_mut()?.as_mut().unwrap();
             // Write to the stdin pipe
             writeln!(wasi_stdin, "{}", value)?;
         }
 
         // Call the `_start` function
-        let start = self.instance.exports.get_function("_start")?;
+        let start = instance.exports.get_function("_start")?;
         start.call(&[])?; //TODO support calling with parameters
 
-        let mut state = self.wasi_env.state();
+        let mut state = self.wasm_config.wasi_env.state();
         let wasi_stdout = state.fs.stdout_mut()?.as_mut().unwrap();
         // Read from the stdout pipe
         let mut buf = String::new();
@@ -88,12 +93,13 @@ impl Default for CustomWasmTransformer {
             database_name: "database_name".into(),
             table_name: "table_name".into(),
             column_name: "column_name".into(),
-            wasi_env: WasiState::new("default").finalize().unwrap(),
-            instance: Instance::new(
-                &Module::new(
+            wasm_config: WasmConfig {
+                wasi_env: WasiState::new("default").finalize().unwrap(),
+                import_object: ImportObject::default(),
+                module: Module::new(
                     &Store::default(),
                     vec![
-                        // 'add one' transformer
+                        // simple 'add one' function (no io actions)
                         0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60,
                         0x01, 0x7f, 0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x0b, 0x01, 0x07,
                         0x61, 0x64, 0x64, 0x5f, 0x6f, 0x6e, 0x65, 0x00, 0x00, 0x0a, 0x09, 0x01,
@@ -103,9 +109,7 @@ impl Default for CustomWasmTransformer {
                     ],
                 )
                 .unwrap(),
-                &wasmer::ImportObject::default(),
-            )
-            .unwrap(),
+            },
         }
     }
 }
@@ -176,11 +180,21 @@ mod tests {
 
     #[test]
     fn transform_wasm_reverse_string() {
-        let transformer = get_wasm_transformer("../examples/wasm/wasm-transformer-reverse-string.wasm");
+        let transformer =
+            get_wasm_transformer("../examples/wasm/wasm-transformer-reverse-string.wasm");
+
+        // reverse the string once
         let column = Column::StringValue("string".to_string(), "reverse_it".to_string());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.string_value().unwrap();
 
         assert_eq!(transformed_value, "ti_esrever".to_string());
+
+        // then reverse it back to normal
+        let column = Column::StringValue("string".to_string(), transformed_value.to_string());
+        let transformed_column = transformer.transform(column);
+        let transformed_value = transformed_column.string_value().unwrap();
+
+        assert_eq!(transformed_value, "reverse_it".to_string());
     }
 }
