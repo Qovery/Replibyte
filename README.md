@@ -19,6 +19,7 @@
 - [x] On-the-fly data (de)compression (Zlib)
 - [x] On-the-fly data de/encryption (AES-256)
 - [x] Work on different VPC/network
+- [x] Use [custom transformers](examples/wasm)
 
 Here are the features we plan to support
 
