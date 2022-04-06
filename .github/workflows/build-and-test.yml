@@ -48,7 +48,7 @@ jobs:
           key: ${{ runner.os }}-integration-${{ matrix.rust-toolchain }}
 
       - name: Build RepliByte
-        run: cargo build --release
+        run: cargo build --release --all-features
 
       - name: Start Postgres and Minio Containers
         run: docker-compose -f "docker-compose-postgres-minio.yml" up -d --build
@@ -59,7 +59,7 @@ jobs:
       - name: Test RepliByte
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
-        run: cargo test
+        run: cargo test --all-features
 
       # - name: Bench RepliByte
       #   run: cargo bench

@@ -1,4 +1,5 @@
 use crate::transformer::credit_card::CreditCardTransformer;
+use crate::transformer::custom_wasm::CustomWasmTransformer;
 use crate::transformer::email::EmailTransformer;
 use crate::transformer::first_name::FirstNameTransformer;
 use crate::transformer::keep_first_char::KeepFirstCharTransformer;
@@ -17,6 +18,9 @@ pub mod random;
 pub mod redacted;
 pub mod transient;
 
+#[cfg(feature = "wasm")]
+pub mod custom_wasm;
+
 pub fn transformers() -> Vec<Box<dyn Transformer>> {
     vec![
         Box::new(EmailTransformer::default()),
@@ -27,11 +31,12 @@ pub fn transformers() -> Vec<Box<dyn Transformer>> {
         Box::new(TransientTransformer::default()),
         Box::new(CreditCardTransformer::default()),
         Box::new(RedactedTransformer::default()),
+        Box::new(CustomWasmTransformer::default()),
     ]
 }
 
 /// Trait to implement to create a custom Transformer.
-pub trait Transformer: Sync {
+pub trait Transformer {
     fn id(&self) -> &str;
     fn description(&self) -> &str;
     fn database_name(&self) -> &str;
