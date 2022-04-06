@@ -1,3 +1,5 @@
+use std::io::{self, ErrorKind};
+
 use crate::transformer::Transformer;
 use crate::types::Column;
 
@@ -68,7 +70,12 @@ impl CustomWasmTransformer {
         // the mutex after we need it.
         {
             let mut state = self.wasm_config.wasi_env.state();
-            let wasi_stdin = state.fs.stdin_mut()?.as_mut().unwrap();
+            let wasi_stdin = state.fs.stdin_mut()?.as_mut().ok_or_else(|| {
+                io::Error::new(
+                    ErrorKind::Other,
+                    "Couldn't get the VirtualFile object at stdin mutably",
+                )
+            })?;
             // Write to the stdin pipe
             writeln!(wasi_stdin, "{}", value)?;
         }
@@ -78,7 +85,12 @@ impl CustomWasmTransformer {
         start.call(&[])?; //TODO support calling with parameters
 
         let mut state = self.wasm_config.wasi_env.state();
-        let wasi_stdout = state.fs.stdout_mut()?.as_mut().unwrap();
+        let wasi_stdout = state.fs.stdout_mut()?.as_mut().ok_or_else(|| {
+            io::Error::new(
+                ErrorKind::Other,
+                "Couldn't get the VirtualFile object at stdout mutably",
+            )
+        })?;
         // Read from the stdout pipe
         let mut buf = String::new();
         wasi_stdout.read_to_string(&mut buf)?;
@@ -137,29 +149,31 @@ impl Transformer for CustomWasmTransformer {
 
     fn transform(&self, column: Column) -> Column {
         match column {
-            Column::StringValue(column_name, value) => {
-                Column::StringValue(column_name, self.call_wasm_module(value.as_str()).unwrap())
-            }
+            Column::StringValue(column_name, value) => Column::StringValue(
+                column_name,
+                self.call_wasm_module(value.as_str())
+                    .expect("Wasm module call failed"),
+            ),
             Column::NumberValue(column_name, value) => Column::NumberValue(
                 column_name,
                 self.call_wasm_module(value.to_string().as_str())
-                    .unwrap()
+                    .expect("Wasm module call failed")
                     .parse::<i128>()
-                    .unwrap(),
+                    .expect("Wasm module failed to return a number"),
             ),
             Column::FloatNumberValue(column_name, value) => Column::FloatNumberValue(
                 column_name,
                 self.call_wasm_module(value.to_string().as_str())
-                    .unwrap()
+                    .expect("Wasm module call failed")
                     .parse::<f64>()
-                    .unwrap(),
+                    .expect("Wasm module failed to return a number (float)"),
             ),
             Column::CharValue(column_name, value) => Column::CharValue(
                 column_name,
                 self.call_wasm_module(value.to_string().as_str())
-                    .unwrap()
+                    .expect("Wasm module call failed")
                     .parse::<char>()
-                    .unwrap(),
+                    .expect("Wasm module failed to return a char"),
             ),
             Column::None(column_name) => Column::None(column_name),
         }
