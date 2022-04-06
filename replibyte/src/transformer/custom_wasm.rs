@@ -1,54 +1,78 @@
-use crate::transformer::Transformer;
 use crate::types::Column;
-use wasmer_runtime::{func, imports, instantiate, Ctx, Instance, Value};
+use crate::{transformer::Transformer, types::NumberValue};
 
-/// This struct is dedicated to replacing a credit card string.
+use wasmer::{wat2wasm, Instance, Module, Store};
+use wasmer_wasi::{Pipe, WasiEnv, WasiState};
+
+pub type WasmError = Box<dyn std::error::Error>;
 pub struct CustomWasmTransformer {
     database_name: String,
     table_name: String,
     column_name: String,
-    instance: Option<Instance>,
+    wasi_env: WasiEnv,
+    instance: Instance,
 }
 
 impl CustomWasmTransformer {
-    pub fn new<S>(database_name: S, table_name: S, column_name: S, wasm_bytes: Vec<u8>) -> Self
+    pub fn new<S>(
+        database_name: S,
+        table_name: S,
+        column_name: S,
+        wasm_bytes: Vec<u8>,
+    ) -> Result<Self, WasmError>
     where
         S: Into<String>,
     {
-        let import_object = imports! {};
-        // Compile our webassembly into an `Instance`.
-        let mut instance = instantiate(&wasm_bytes, &import_object).unwrap();
-        CustomWasmTransformer {
-            database_name: database_name.into(),
-            table_name: table_name.into(),
-            column_name: column_name.into(),
-            instance: Some(instance),
-        }
-    }
-    fn custom_wasm_transform_i64(&self, value: i64) -> i64 {
-        // Call our exported function!
-        if let Some(instance) = &self.instance {
-            match instance.call("transform_i64", &[Value::I64(value)]) {
-                Ok(result) => result[0].to_u128() as i64,
-                Err(err) => {
-                    println!("Error: {:?}", err);
-                    value
-                }
-            }
-        } else {
-            value
-        }
-    }
-}
+        // Create a Store
+        let store = Store::default();
 
-impl Default for CustomWasmTransformer {
-    fn default() -> Self {
-        CustomWasmTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-            instance: Option::default(),
+        // Compile the Wasm module
+        let module = Module::new(&store, wasm_bytes)?;
+
+        // Create the `WasiEnv` with the stdio pipes
+        let input = Pipe::new();
+        let output = Pipe::new();
+        let mut wasi_env = WasiState::new("wasm-transformer")
+            .stdin(Box::new(input))
+            .stdout(Box::new(output))
+            .finalize()?;
+
+        // Import object related to WASI,
+        // and attach it to the Wasm instance
+        let import_object = wasi_env.import_object(&module)?;
+        let instance = Instance::new(&module, &import_object)?;
+
+        Ok({
+            CustomWasmTransformer {
+                database_name: database_name.into(),
+                table_name: table_name.into(),
+                column_name: column_name.into(),
+                wasi_env,
+                instance,
+            }
+        })
+    }
+    fn call_wasm_module(&self, value: &str) -> Result<String, WasmError> {
+        // Access WasiState in a nested scope to ensure we're not holding
+        // the mutex after we need it.
+        {
+            let mut state = self.wasi_env.state();
+            let wasi_stdin = state.fs.stdin_mut()?.as_mut().unwrap();
+            // Write to the stdin pipe
+            writeln!(wasi_stdin, "{}", value)?;
         }
+
+        // Call the `_start` function
+        let start = self.instance.exports.get_function("_start")?;
+        start.call(&[])?; //TODO support calling with parameters
+
+        let mut state = self.wasi_env.state();
+        let wasi_stdout = state.fs.stdout_mut()?.as_mut().unwrap();
+        // Read from the stdout pipe
+        let mut buf = String::new();
+        wasi_stdout.read_to_string(&mut buf)?;
+
+        Ok(buf.trim().into())
     }
 }
 
@@ -76,15 +100,7 @@ impl Transformer for CustomWasmTransformer {
     fn transform(&self, column: Column) -> Column {
         match column {
             Column::StringValue(column_name, value) => {
-                todo!()
-            }
-            Column::NumberValue(column_name, value) => Column::NumberValue(
-                column_name,
-                self.custom_wasm_transform_i64(value as i64) as i128,
-            ),
-            Column::FloatNumberValue(column_name, value) => {
-                // Column::StringValue(column_name, custom_wasm_transform_f64(value))
-                todo!()
+                Column::StringValue(column_name, self.call_wasm_module(value.as_str()).unwrap())
             }
             column => column,
         }
@@ -95,11 +111,14 @@ impl Transformer for CustomWasmTransformer {
 mod tests {
     use wasmer::wat2wasm;
 
-    use crate::{transformer::Transformer, types::Column};
+    use crate::{
+        transformer::Transformer,
+        types::{Column, NumberValue},
+    };
 
     use super::CustomWasmTransformer;
 
-    fn get_transformer() -> CustomWasmTransformer {
+    fn get_wat_transformer() -> CustomWasmTransformer {
         CustomWasmTransformer::new(
             "test",
             "users",
@@ -118,15 +137,32 @@ mod tests {
             .unwrap()
             .to_vec(),
         )
+        .unwrap()
+    }
+
+    fn get_wasm_transformer(path: &str) -> CustomWasmTransformer {
+        let wasm_bytes = std::fs::read(path).unwrap();
+        CustomWasmTransformer::new("test", "users", "number", wasm_bytes).unwrap()
     }
 
     #[test]
-    fn transform_i64_add_one() {
-        let transformer = get_transformer();
-        let column = Column::NumberValue("number".to_string(), 1);
+    fn transform_wat_add_one() {
+        let transformer = get_wat_transformer();
+        let column = Column::NumberValue("number".to_string(), NumberValue::I32(1));
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.number_value().unwrap();
 
-        assert_eq!(transformed_value, &(2 as i128));
+        assert_eq!(transformed_value, &(NumberValue::I32(2)));
+    }
+
+    #[test]
+    fn transform_wasm_reverse_string() {
+        let transformer =
+            get_wasm_transformer("../examples/wasm-transformer-reverse-string.wasm");
+        let column = Column::StringValue("string".to_string(), "reverse_it".to_string());
+        let transformed_column = transformer.transform(column);
+        let transformed_value = transformed_column.string_value().unwrap();
+
+        assert_eq!(transformed_value, "ti_esrever".to_string());
     }
 }

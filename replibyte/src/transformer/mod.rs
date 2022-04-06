@@ -9,7 +9,6 @@ use crate::transformer::transient::TransientTransformer;
 use crate::types::Column;
 
 pub mod credit_card;
-pub mod custom_wasm;
 pub mod email;
 pub mod first_name;
 pub mod keep_first_char;
@@ -17,6 +16,8 @@ pub mod phone_number;
 pub mod random;
 pub mod redacted;
 pub mod transient;
+#[cfg(feature = "wasm")]
+pub mod custom_wasm;
 
 pub fn transformers() -> Vec<Box<dyn Transformer>> {
     vec![
