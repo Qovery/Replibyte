@@ -1,10 +1,16 @@
 use crate::transformer::Transformer;
 use crate::types::Column;
 
+use serde::{Deserialize, Serialize};
 use wasmer::{wat2wasm, Instance, Module, Store};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 pub type WasmError = Box<dyn std::error::Error>;
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct CustomWasmTransformerOptions {
+    pub path: String,
+}
 pub struct CustomWasmTransformer {
     database_name: String,
     table_name: String,
@@ -76,13 +82,41 @@ impl CustomWasmTransformer {
     }
 }
 
+impl Default for CustomWasmTransformer {
+    fn default() -> Self {
+        CustomWasmTransformer {
+            database_name: "database_name".into(),
+            table_name: "table_name".into(),
+            column_name: "column_name".into(),
+            wasi_env: WasiState::new("default").finalize().unwrap(),
+            instance: Instance::new(
+                &Module::new(
+                    &Store::default(),
+                    vec![
+                        // 'add one' transformer
+                        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60,
+                        0x01, 0x7f, 0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x0b, 0x01, 0x07,
+                        0x61, 0x64, 0x64, 0x5f, 0x6f, 0x6e, 0x65, 0x00, 0x00, 0x0a, 0x09, 0x01,
+                        0x07, 0x00, 0x20, 0x00, 0x41, 0x01, 0x6a, 0x0b, 0x00, 0x1a, 0x04, 0x6e,
+                        0x61, 0x6d, 0x65, 0x01, 0x0a, 0x01, 0x00, 0x07, 0x61, 0x64, 0x64, 0x5f,
+                        0x6f, 0x6e, 0x65, 0x02, 0x07, 0x01, 0x00, 0x01, 0x00, 0x02, 0x70, 0x30,
+                    ],
+                )
+                .unwrap(),
+                &wasmer::ImportObject::default(),
+            )
+            .unwrap(),
+        }
+    }
+}
+
 impl Transformer for CustomWasmTransformer {
     fn id(&self) -> &str {
         "custom-wasm"
     }
 
     fn description(&self) -> &str {
-        "Provide a custom transformation function in a Wasm module (string or number (i32/i64, u32/u64, f32/f64) )."
+        "Provide a custom transformer as a wasm (WebAssembly) module."
     }
 
     fn database_name(&self) -> &str {
@@ -102,40 +136,38 @@ impl Transformer for CustomWasmTransformer {
             Column::StringValue(column_name, value) => {
                 Column::StringValue(column_name, self.call_wasm_module(value.as_str()).unwrap())
             }
-            column => column,
+            Column::NumberValue(column_name, value) => Column::NumberValue(
+                column_name,
+                self.call_wasm_module(value.to_string().as_str())
+                    .unwrap()
+                    .parse::<i128>()
+                    .unwrap(),
+            ),
+            Column::FloatNumberValue(column_name, value) => Column::FloatNumberValue(
+                column_name,
+                self.call_wasm_module(value.to_string().as_str())
+                    .unwrap()
+                    .parse::<f64>()
+                    .unwrap(),
+            ),
+            Column::CharValue(column_name, value) => Column::CharValue(
+                column_name,
+                self.call_wasm_module(value.to_string().as_str())
+                    .unwrap()
+                    .parse::<char>()
+                    .unwrap(),
+            ),
+            Column::None(column_name) => Column::None(column_name),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use wasmer::wat2wasm;
-
-    use crate::{transformer::Transformer, types::Column};
-
-    use super::CustomWasmTransformer;
-
-    fn get_wat_transformer() -> CustomWasmTransformer {
-        CustomWasmTransformer::new(
-            "test",
-            "users",
-            "number",
-            wat2wasm(
-                br#"
-                (module
-                    (type $add_one_t (func (param i64) (result i64)))
-                    (func $add_one_f (type $add_one_t) (param $value i64) (result i64)
-                    local.get $value
-                    i64.const 1
-                    i64.add)
-                    (export "transform_i64" (func $add_one_f)))
-                "#,
-            )
-            .unwrap()
-            .to_vec(),
-        )
-        .unwrap()
-    }
+    use crate::{
+        transformer::{custom_wasm::CustomWasmTransformer, Transformer},
+        types::Column,
+    };
 
     fn get_wasm_transformer(path: &str) -> CustomWasmTransformer {
         let wasm_bytes = std::fs::read(path).unwrap();
@@ -143,18 +175,8 @@ mod tests {
     }
 
     #[test]
-    fn transform_wat_add_one() {
-        let transformer = get_wat_transformer();
-        let column = Column::NumberValue("number".to_string(), 1);
-        let transformed_column = transformer.transform(column);
-        let transformed_value = transformed_column.number_value().unwrap();
-
-        assert_eq!(transformed_value, &2);
-    }
-
-    #[test]
     fn transform_wasm_reverse_string() {
-        let transformer = get_wasm_transformer("../examples/wasm-transformer-reverse-string.wasm");
+        let transformer = get_wasm_transformer("../examples/wasm/wasm-transformer-reverse-string.wasm");
         let column = Column::StringValue("string".to_string(), "reverse_it".to_string());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.string_value().unwrap();
