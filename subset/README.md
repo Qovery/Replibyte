@@ -7,9 +7,9 @@ Subset is a Rust crate to scale down a database to a more reasonable size. So it
 ```rust
 fn main() -> Result<(), Error> {
     // equivalent `SELECT * FROM public.users WHERE random() < 0.05;`
-    let ref_query = subset::PostgreSQL::SubsetQuery::RandomPercent("public", "users", 5);
+    let ref_query = subset::postgres::SubsetQuery::RandomPercent("public", "users", 5);
     
-    let psql = subset::PostgreSQL::new(schema_reader, dump_reader_callback, ref_query)?;
+    let psql = subset::Postgres::new(schema_reader, dump_reader_callback, ref_query)?;
     
     // Get graph
     let graph: Graph = psql.graph();
@@ -17,7 +17,7 @@ fn main() -> Result<(), Error> {
     
     // by calling rows()
     for row in psql.rows() {
-        // streamed data from query
+        // streamed data from dump_reader
     }
 }
 ```

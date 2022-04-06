@@ -359,14 +359,16 @@ fn get_row_type(tokens: &Vec<Token>) -> RowType {
     }
 
     if is_alter_table_statement(&tokens) {
-        let database_name_pos = match get_word_value_at_position(&tokens, 4) {
-            Some(word) if word == "ONLY" => 6,
-            _ => 4,
+        let database_name_pos = if match_keyword_at_position(Keyword::Only, &tokens, 4) {
+            6
+        } else {
+            4
         };
 
-        let table_name_pos = match get_word_value_at_position(&tokens, 4) {
-            Some(word) if word == "ONLY" => 8,
-            _ => 6,
+        let table_name_pos = if match_keyword_at_position(Keyword::Only, &tokens, 4) {
+            8
+        } else {
+            6
         };
 
         if let Some(database_name) = get_word_value_at_position(&tokens, database_name_pos) {

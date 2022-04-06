@@ -4,7 +4,7 @@ use std::str::Chars;
 
 use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Insert, Into as KeywordInto,
-    Key, NoKeyword, Not, Null, Primary, References, Table,
+    Key, NoKeyword, Not, Null, Only, Primary, References, Table,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -128,6 +128,7 @@ impl Token {
                     "ALTER" => Alter,
                     "CREATE" => Create,
                     "INSERT" => Insert,
+                    "ONLY" => Only,
                     "INTO" => KeywordInto,
                     "COPY" => Copy,
                     "DATABASE" => Database,
@@ -170,6 +171,7 @@ pub struct Word {
 pub enum Keyword {
     Create,
     Alter,
+    Only,
     Insert,
     Into,
     Copy,

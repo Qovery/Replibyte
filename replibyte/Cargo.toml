@@ -7,6 +7,7 @@ authors = ["Qovery"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+dump-parser = { path = "../dump-parser" }
 rand = "0.8.5"
 anyhow = "1.0.56"
 serde_yaml = "0.8"
@@ -18,7 +19,6 @@ aws-sdk-s3 = "0.9.0"
 aws-types = "0.9.0"
 tokio = { version = "1", features = ["full"] }
 rustls = "0.20.4"
-dump-parser = { path = "../dump-parser" }
 clap = { version = "3.1", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 lazy_static = "1.4.0"
