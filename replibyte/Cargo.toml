@@ -35,8 +35,13 @@ aes-gcm = "0.9"
 which = "4.2.5"
 url = "2.2.2"
 
-wasmer = { version = "2.2", optional = true }
-wasmer-wasi = { version = "2.2", optional = true }
+# FIXME removed until the CI release pipeline is fixed
+#wasmer = { version = "2.2", optional = true }
+wasmer = { version = "2.2" }
+# FIXME same as above
+#wasmer-wasi = { version = "2.2", optional = true }
+wasmer-wasi = { version = "2.2" }
 
-[features]
-wasm = ["wasmer", "wasmer-wasi"]
+# FIXME same as above
+#[features]
+#wasm = ["wasmer", "wasmer-wasi"]
