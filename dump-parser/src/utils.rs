@@ -7,6 +7,11 @@ use std::str;
 const LINE_SEPARATOR: char = ';';
 const LINE_SEPARATOR_PLACEHOLDER: &str = "<<TMP>>";
 
+pub enum ListQueryResult {
+    Continue,
+    Break,
+}
+
 pub fn list_queries_from_dump_file<'a, S, F>(
     dump_file_path: S,
     comment_chars: &str,
@@ -14,7 +19,7 @@ pub fn list_queries_from_dump_file<'a, S, F>(
 ) -> Result<(), DumpFileError>
 where
     S: Into<&'a str>,
-    F: FnMut(&str),
+    F: FnMut(&str) -> ListQueryResult,
 {
     let file = match File::open(dump_file_path.into()) {
         Ok(file) => file,
@@ -32,7 +37,7 @@ pub fn list_queries_from_dump_reader<R, F>(
 ) -> Result<(), DumpFileError>
 where
     R: Read,
-    F: FnMut(&str),
+    F: FnMut(&str) -> ListQueryResult,
 {
     let mut count_empty_lines = 0;
     let mut buf_bytes: Vec<u8> = Vec::new();
@@ -81,9 +86,11 @@ where
 
         let is_comment = is_comment_array_true.len() == is_comment_array.len();
 
+        let mut query_res = ListQueryResult::Continue;
+
         if is_comment {
             let comment_str = str::from_utf8(line_buf_bytes.as_slice()).unwrap(); // FIXME remove unwrap
-            query(comment_str);
+            query_res = query(comment_str);
             line_buf_bytes.clear();
         } else {
             let _ = buf_bytes.append(&mut line_buf_bytes);
@@ -99,14 +106,14 @@ where
 
                 if queries_str.len() == 1 {
                     // there is a only one query inside the str
-                    query(query_str);
+                    query_res = query(query_str);
                 } else {
                     // iterate and send all queries one by one
                     for query_str in queries_str {
                         let query_str = query_str.trim().replace(LINE_SEPARATOR_PLACEHOLDER, ";'");
                         if !query_str.is_empty() {
                             let query_str = format!("{};", query_str);
-                            query(query_str.as_str());
+                            query_res = query(query_str.as_str());
                         }
                     }
                 }
@@ -123,6 +130,11 @@ where
         if count_empty_lines > 49 {
             // EOF?
             break;
+        }
+
+        match query_res {
+            ListQueryResult::Continue => {}
+            ListQueryResult::Break => break,
         }
     }
 

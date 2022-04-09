@@ -8,7 +8,7 @@ use dump_parser::postgres::{
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
     Token,
 };
-use dump_parser::utils::list_queries_from_dump_reader;
+use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
 
 use crate::connector::Connector;
 use crate::source::Source;
@@ -90,6 +90,8 @@ impl<'a> Postgres<'a> {
         list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
             let tokens = get_tokens_from_query_str(query);
             //
+
+            ListQueryResult::Continue
         });
 
         Ok(())
@@ -234,6 +236,8 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                 no_change_query_callback(query_callback.borrow_mut(), query);
             }
         }
+
+        ListQueryResult::Continue
     }) {
         Ok(_) => {}
         Err(err) => panic!("{:?}", err),

@@ -7,4 +7,3 @@ edition = "2021"
 
 [dependencies]
 dump-parser = { path = "../dump-parser" }
-petgraph = "0.6.0"

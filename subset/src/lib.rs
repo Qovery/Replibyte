@@ -1,4 +1,12 @@
+use std::collections::HashSet;
+
 pub mod postgres;
+
+pub type Bytes = Vec<u8>;
+
+trait Subset {
+    fn data_rows<F: Fn(Bytes)>(&self, data: F); // TODO callback row by row
+}
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct SubsetTable {
@@ -18,6 +26,30 @@ impl SubsetTable {
             table: table.into(),
             relations,
         }
+    }
+
+    pub fn related_tables(&self) -> HashSet<&str> {
+        self.relations
+            .iter()
+            .map(|r| r.table.as_str())
+            .collect::<HashSet<_>>()
+    }
+
+    pub fn find_related_subset_tables<'a>(
+        &self,
+        subset_tables: &'a Vec<&SubsetTable>,
+    ) -> Vec<&'a SubsetTable> {
+        if subset_tables.is_empty() {
+            return Vec::new();
+        }
+
+        let related_tables = self.related_tables();
+
+        subset_tables
+            .iter()
+            .filter(|subset_table| related_tables.contains(subset_table.table.as_str()))
+            .map(|subset_table| *subset_table)
+            .collect::<Vec<_>>()
     }
 }
 
@@ -42,9 +74,4 @@ impl SubsetTableRelation {
             to_property: to_property.into(),
         }
     }
-}
-
-trait Subset {
-    fn ordered_tables(&self) -> Vec<SubsetTable>;
-    fn rows(&self); // TODO callback row by row
 }
