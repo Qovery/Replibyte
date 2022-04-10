@@ -721,6 +721,21 @@ pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Tok
         .collect::<Vec<_>>()
 }
 
+pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
+    get_column_values_from_insert_into_query(&tokens)
+        .iter()
+        .filter_map(|x| match *x {
+            Token::Word(word) => Some(word.value.clone()),
+            Token::SingleQuotedString(word) => Some(word.clone()),
+            Token::Number(value, is_negative) => Some(match is_negative {
+                false => value.clone(),
+                true => format!("-{}", value),
+            }),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+}
+
 pub fn get_tokens_from_query_str(query: &str) -> Vec<Token> {
     // query by query
     let mut tokenizer = Tokenizer::new(query);

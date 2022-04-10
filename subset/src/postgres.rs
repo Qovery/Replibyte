@@ -1,12 +1,13 @@
-use crate::postgres::SubsetQuery::RandomPercent;
+use crate::postgres::SubsetStrategy::RandomPercent;
 use crate::{Bytes, Subset, SubsetTable, SubsetTableRelation};
 use dump_parser::postgres::{
-    get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
+    get_column_names_from_insert_into_query, get_column_values_str_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
     Token,
 };
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
-use std::collections::HashMap;
+use std::borrow::BorrowMut;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::ops::Index;
@@ -34,7 +35,7 @@ struct TableStats {
     total_rows: usize,
 }
 
-pub enum SubsetQuery<'a> {
+pub enum SubsetStrategy<'a> {
     RandomPercent {
         database: &'a str,
         table: &'a str,
@@ -42,7 +43,7 @@ pub enum SubsetQuery<'a> {
     },
 }
 
-impl<'a> SubsetQuery<'a> {
+impl<'a> SubsetStrategy<'a> {
     pub fn random(database: &'a str, table: &'a str, percent: u8) -> Self {
         RandomPercent {
             database,
@@ -55,35 +56,34 @@ impl<'a> SubsetQuery<'a> {
 struct Postgres<'a> {
     subset_table_by_database_and_table_name: HashMap<(Database, Table), SubsetTable>,
     dump: &'a Path,
-    ref_query: SubsetQuery<'a>,
+    subset_strategy: SubsetStrategy<'a>,
 }
 
 impl<'a> Postgres<'a> {
     pub fn new<R: Read>(
         schema_reader: BufReader<R>,
         dump: &'a Path,
-        ref_query: SubsetQuery<'a>,
+        subset_strategy: SubsetStrategy<'a>,
     ) -> Result<Self, Error> {
         Ok(Postgres {
             subset_table_by_database_and_table_name: get_subset_table_by_database_and_table_name(
                 schema_reader,
             )?,
             dump,
-            ref_query,
+            subset_strategy,
         })
     }
 
     fn dump_reader(&self) -> BufReader<File> {
         BufReader::new(File::open(self.dump).unwrap())
     }
-}
 
-impl<'a> Subset for Postgres<'a> {
-    fn data_rows<F: Fn(Bytes)>(&self, data: F) {
-        let table_stats = table_stats_by_database_and_table_name(self.dump_reader());
-
-        let (database, table, rows) = match self.ref_query {
-            SubsetQuery::RandomPercent {
+    fn reference_rows(
+        &self,
+        table_stats: &HashMap<(Database, Table), TableStats>,
+    ) -> (&str, &str, Vec<String>) {
+        match self.subset_strategy {
+            SubsetStrategy::RandomPercent {
                 database,
                 table,
                 percent,
@@ -98,32 +98,107 @@ impl<'a> Subset for Postgres<'a> {
                     self.dump_reader(),
                 ),
             ),
-        };
+        }
+    }
 
-        let ref_subset_table = self
+    fn visits<F: FnMut(String)>(
+        &self,
+        row: String,
+        visited_tables: &mut HashSet<(Database, Table)>,
+        table_stats: &HashMap<(Database, Table), TableStats>,
+        data: &mut F,
+        last_to_visit: bool,
+    ) -> Result<(), Error> {
+        // FIXME unnecessary .as_bytes().to_vec()?
+        data(row.clone());
+
+        if last_to_visit {
+            return Ok(());
+        }
+
+        // tokenize `INSERT INTO ...` row
+        let row_tokens = get_tokens_from_query_str(row.as_str());
+
+        // find the database and table names from this row
+        let (row_database, row_table) =
+            get_insert_into_database_and_table_name(&row_tokens).unwrap();
+
+        let _ = visited_tables.insert((row_database.clone(), row_table.clone()));
+
+        // find the subset table from this row
+        let row_subset_table = self
             .subset_table_by_database_and_table_name
-            .get(&(database.to_string(), table.to_string()))
-            .unwrap(); // FIXME catch not found subset table
+            .get(&(row_database.to_string(), row_table.to_string()))
+            .unwrap();
 
-        let subset_tables = self
-            .subset_table_by_database_and_table_name
-            .values()
-            .collect::<Vec<_>>();
+        let row_column_names = get_column_names_from_insert_into_query(&row_tokens);
+        let row_column_values = get_column_values_str_from_insert_into_query(&row_tokens);
 
-        // ordered all subset tables from the subset table
-        let related_tables = ref_subset_table.find_related_subset_tables(&subset_tables);
+        for row_relation in &row_subset_table.relations {
+            let column = row_relation.from_property.as_str();
+            // find the value from the current row for the relation column
+            let column_idx = row_column_names.iter().position(|x| *x == column).unwrap(); // FIXME unwrap
+            let value = row_column_values.get(column_idx).unwrap();
 
-        // TODO pick percent rows from ref table
-        // TODO for each ref row - iter over each related tables and filter over the to_property value
-        // TODO for
+            let database_and_table_tuple =
+                (row_relation.database.clone(), row_relation.table.clone());
 
-        list_queries_from_dump_reader(self.dump_reader(), COMMENT_CHARS, |query| {
-            // TODO
+            // find the table stats for this row
+            let row_relation_table_stats = table_stats.get(&database_and_table_tuple).unwrap();
+            let s_last_to_visit = visited_tables.contains(&database_and_table_tuple);
 
-            ListQueryResult::Continue
-        });
+            filter_insert_into_rows(
+                row_relation.to_property.as_str(),
+                value.as_str(),
+                self.dump_reader(),
+                row_relation_table_stats,
+                |row| match self.visits(
+                    row.to_string(),
+                    visited_tables,
+                    table_stats,
+                    data,
+                    s_last_to_visit,
+                ) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        panic!("{}", err);
+                    }
+                },
+            );
+        }
 
-        // TODO
+        Ok(())
+    }
+}
+
+impl<'a> Subset for Postgres<'a> {
+    /// Return every subset rows
+    /// Algorithm used:
+    /// 1. find the reference table and take the X rows from this table with the appropriate SubsetStrategy
+    /// 2. iterate over each row and their relations (0 to N relations)
+    /// 3. for each rows from each relations, filter on the id from the parent related row id. (equivalent `SELECT * FROM table_1 INNER JOIN ... WHERE table_1.id = 'xxx';`
+    /// 4. do it recursively for table_1.relations[*].relations[*]... but the algo stops when reaching the end or reach a cyclic ref.
+    ///
+    /// Notes:
+    /// a. the algo must visits all the tables, even the one that has no relations.
+    fn data_rows<F: Fn(String)>(&self, mut data: F) -> Result<(), Error> {
+        let table_stats = table_stats_by_database_and_table_name(self.dump_reader());
+        let (database, table, rows) = self.reference_rows(&table_stats);
+
+        let mut visited_tables = HashSet::new();
+        visited_tables.insert((database.to_string(), table.to_string()));
+
+        for row in rows {
+            let _ = self.visits(
+                row,
+                visited_tables.borrow_mut(),
+                &table_stats,
+                &mut data,
+                false,
+            )?;
+        }
+
+        Ok(())
     }
 }
 
@@ -132,10 +207,10 @@ fn list_percent_of_insert_into_rows<R: Read>(
     table_stats: &TableStats,
     dump_reader: BufReader<R>,
 ) -> Vec<String> {
-    let mut insert_into_bytes = vec![];
+    let mut insert_into_rows = vec![];
 
-    if percent == 0 {
-        return insert_into_bytes;
+    if percent == 0 || table_stats.total_rows == 0 {
+        return insert_into_rows;
     }
 
     let percent = if percent > 100 { 100 } else { percent };
@@ -144,24 +219,36 @@ fn list_percent_of_insert_into_rows<R: Read>(
     let modulo = (table_stats.total_rows as f32 / total_rows_to_pick) as usize;
 
     let mut counter = 1usize;
+    list_insert_into_rows(dump_reader, table_stats, |rows| {
+        if counter % modulo == 0 {
+            insert_into_rows.push(rows.to_string());
+        }
+
+        counter += 1;
+    });
+
+    insert_into_rows
+}
+
+fn list_insert_into_rows<R: Read, F: FnMut(&str)>(
+    dump_reader: BufReader<R>,
+    table_stats: &TableStats,
+    mut rows: F,
+) {
     list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
         let tokens = trim_tokens(&tokens, Keyword::Insert);
 
         if match_keyword_at_position(Keyword::Insert, &tokens, 0)
             && match_keyword_at_position(Keyword::Into, &tokens, 2)
+            && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
+            && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
         {
-            if counter % modulo == 0 {
-                insert_into_bytes.push(query.to_string());
-            }
-
-            counter += 1;
+            rows(query.as_ref());
         }
 
         ListQueryResult::Continue
     });
-
-    insert_into_bytes
 }
 
 fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
@@ -184,7 +271,7 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
                     "table {} does not contain column {}",
                     table_stats.table, column
                 ),
-            ))
+            ));
         }
     };
 
@@ -199,18 +286,7 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
             && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
             && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
         {
-            let column_values = get_column_values_from_insert_into_query(&tokens)
-                .iter()
-                .filter_map(|x| match *x {
-                    Token::Word(word) => Some(word.value.clone()),
-                    Token::SingleQuotedString(word) => Some(word.clone()),
-                    Token::Number(x, y) => Some(match y {
-                        false => x.clone(),
-                        true => format!("-{}", x),
-                    }),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
+            let column_values = get_column_values_str_from_insert_into_query(&tokens);
 
             if *column_values.index(column_idx) == value {
                 rows(query)
@@ -239,7 +315,7 @@ fn table_stats_by_database_and_table_name<R: Read>(
     list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
 
-        let _ = match get_create_table(&tokens) {
+        let _ = match get_create_table_database_and_table_name(&tokens) {
             Some((database, table)) => {
                 table_stats_by_database_and_table_name.insert(
                     (database.clone(), table.clone()),
@@ -312,7 +388,7 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
     list_queries_from_dump_reader(schema_reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
 
-        if let Some((database, table)) = get_create_table(&tokens) {
+        if let Some((database, table)) = get_create_table_database_and_table_name(&tokens) {
             // add table into index
             let _ = subset_table_by_database_and_table_name.insert(
                 (database.clone(), table.clone()),
@@ -342,7 +418,7 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
     Ok(subset_table_by_database_and_table_name)
 }
 
-fn get_create_table(tokens: &Vec<Token>) -> Option<(Database, Table)> {
+fn get_create_table_database_and_table_name(tokens: &Vec<Token>) -> Option<(Database, Table)> {
     let tokens = trim_tokens(&tokens, Keyword::Create);
 
     if tokens.is_empty() {
@@ -351,6 +427,26 @@ fn get_create_table(tokens: &Vec<Token>) -> Option<(Database, Table)> {
 
     if match_keyword_at_position(Keyword::Create, &tokens, 0)
         && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    {
+        if let Some(database) = get_word_value_at_position(&tokens, 4) {
+            if let Some(table) = get_word_value_at_position(&tokens, 6) {
+                return Some((database.to_string(), table.to_string()));
+            }
+        }
+    }
+
+    None
+}
+
+fn get_insert_into_database_and_table_name(tokens: &Vec<Token>) -> Option<(Database, Table)> {
+    let tokens = trim_tokens(&tokens, Keyword::Insert);
+
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if match_keyword_at_position(Keyword::Insert, &tokens, 0)
+        && match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
         if let Some(database) = get_word_value_at_position(&tokens, 4) {
             if let Some(table) = get_word_value_at_position(&tokens, 6) {
@@ -439,109 +535,40 @@ fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
 #[cfg(test)]
 mod tests {
     use crate::postgres::{
-        filter_insert_into_rows, get_alter_table_foreign_key, get_create_table,
-        get_subset_table_by_database_and_table_name, list_percent_of_insert_into_rows,
-        table_stats_by_database_and_table_name, ForeignKey,
+        filter_insert_into_rows, get_alter_table_foreign_key,
+        get_create_table_database_and_table_name, get_subset_table_by_database_and_table_name,
+        list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, ForeignKey,
+        Postgres, SubsetStrategy,
     };
+    use crate::Subset;
     use dump_parser::postgres::Tokenizer;
+    use std::borrow::BorrowMut;
     use std::fs::File;
-    use std::io::{BufReader, Read};
-    use std::path::Path;
+    use std::io::BufReader;
+    use std::path::{Path, PathBuf};
+    use std::rc::Rc;
 
-    const SCHEMA: &str = r#"
---
--- Name: customer_customer_demo; Type: TABLE; Schema: public; Owner: -
---
+    fn dump_path() -> PathBuf {
+        Path::new("db")
+            .join("postgres")
+            .join("fulldump-with-inserts.sql")
+    }
 
-CREATE TABLE public.customer_customer_demo (
-    customer_id bpchar NOT NULL,
-    customer_type_id bpchar NOT NULL
-);
-
-
---
--- Name: customer_demographics; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.customer_demographics (
-    customer_type_id bpchar NOT NULL,
-    customer_desc text
-);
-
-
---
--- Name: customers; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.customers (
-    customer_id bpchar NOT NULL,
-    company_name character varying(40) NOT NULL,
-    contact_name character varying(30),
-    contact_title character varying(30),
-    address character varying(60),
-    city character varying(15),
-    region character varying(15),
-    postal_code character varying(10),
-    country character varying(15),
-    phone character varying(24),
-    fax character varying(24)
-);
-
---
--- Name: customer_customer_demo pk_customer_customer_demo; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customer_customer_demo
-    ADD CONSTRAINT pk_customer_customer_demo PRIMARY KEY (customer_id, customer_type_id);
-
-
---
--- Name: customer_demographics pk_customer_demographics; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customer_demographics
-    ADD CONSTRAINT pk_customer_demographics PRIMARY KEY (customer_type_id);
-
-
---
--- Name: customers pk_customers; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customers
-    ADD CONSTRAINT pk_customers PRIMARY KEY (customer_id);
-
---
--- Name: customer_customer_demo fk_customer_customer_demo_customer_demographics; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customer_customer_demo
-    ADD CONSTRAINT fk_customer_customer_demo_customer_demographics FOREIGN KEY (customer_type_id) REFERENCES public.customer_demographics(customer_type_id);
-
-
---
--- Name: customer_customer_demo fk_customer_customer_demo_customers; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customer_customer_demo
-    ADD CONSTRAINT fk_customer_customer_demo_customers FOREIGN KEY (customer_id) REFERENCES public.customers(customer_id);
-        "#;
+    fn schema_reader() -> BufReader<File> {
+        BufReader::new(
+            File::open(Path::new("db").join("postgres").join("fulldump-schema.sql")).unwrap(),
+        )
+    }
 
     fn dump_reader() -> BufReader<File> {
-        BufReader::new(
-            File::open(
-                Path::new("db")
-                    .join("postgres")
-                    .join("fulldump-with-inserts.sql"),
-            )
-            .unwrap(),
-        )
+        BufReader::new(File::open(dump_path()).unwrap())
     }
 
     #[test]
     fn check_statements_with_tokens() {
         let q = "SELECT * FROM toto;";
         let tokens = Tokenizer::new(q).tokenize().unwrap();
-        assert_eq!(get_create_table(&tokens), None);
+        assert_eq!(get_create_table_database_and_table_name(&tokens), None);
 
         let q = r#"
 CREATE TABLE public.order_details (
@@ -555,7 +582,7 @@ CREATE TABLE public.order_details (
         let tokens = Tokenizer::new(q).tokenize().unwrap();
 
         assert_eq!(
-            get_create_table(&tokens),
+            get_create_table_database_and_table_name(&tokens),
             Some(("public".to_string(), "order_details".to_string()))
         );
 
@@ -580,8 +607,7 @@ ALTER TABLE ONLY public.territories
 
     #[test]
     fn check_subset_table() {
-        let schema_reader = BufReader::new(SCHEMA.as_bytes());
-        let m = get_subset_table_by_database_and_table_name(schema_reader).unwrap();
+        let m = get_subset_table_by_database_and_table_name(schema_reader()).unwrap();
         assert!(m.len() > 0);
 
         let t = m
@@ -649,5 +675,24 @@ ALTER TABLE ONLY public.territories
         .unwrap();
 
         assert_eq!(found_rows.len(), 38)
+    }
+
+    #[test]
+    fn check_postgres_subset() {
+        let path = dump_path();
+
+        let p = Postgres::new(
+            schema_reader(),
+            path.as_path(),
+            SubsetStrategy::random("public", "orders", 50),
+        )
+        .unwrap();
+
+        p.data_rows(|row| {
+            assert!(!row.is_empty());
+        })
+        .unwrap();
+
+        // TODO check it is smaller than the full dump
     }
 }

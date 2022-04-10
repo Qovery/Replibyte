@@ -1,14 +1,15 @@
 use std::collections::HashSet;
+use std::io::Error;
 
 pub mod postgres;
 
 pub type Bytes = Vec<u8>;
 
 trait Subset {
-    fn data_rows<F: Fn(Bytes)>(&self, data: F); // TODO callback row by row
+    fn data_rows<F: Fn(String)>(&self, data: F) -> Result<(), Error>;
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct SubsetTable {
     pub database: String,
     pub table: String,
@@ -57,7 +58,7 @@ impl SubsetTable {
 /// database -> is the targeted database
 /// table -> is the targeted table
 /// from_property is the parent table property referencing the target table `to_property`
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct SubsetTableRelation {
     pub database: String,
     pub table: String,
