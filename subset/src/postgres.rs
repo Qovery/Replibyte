@@ -1,5 +1,5 @@
 use crate::postgres::SubsetStrategy::RandomPercent;
-use crate::{Bytes, Subset, SubsetTable, SubsetTableRelation};
+use crate::{utils, Bytes, Progress, Subset, SubsetTable, SubsetTableRelation};
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_str_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::ops::Index;
 use std::path::Path;
+use std::time::SystemTime;
 
 const COMMENT_CHARS: &str = "--";
 
@@ -147,6 +148,7 @@ impl<'a> Postgres<'a> {
             let row_relation_table_stats = table_stats.get(&database_and_table_tuple).unwrap();
             let s_last_to_visit = visited_tables.contains(&database_and_table_tuple);
 
+            // fetch data from the relational table
             filter_insert_into_rows(
                 row_relation.to_property.as_str(),
                 value.as_str(),
@@ -181,14 +183,27 @@ impl<'a> Subset for Postgres<'a> {
     ///
     /// Notes:
     /// a. the algo must visits all the tables, even the one that has no relations.
-    fn data_rows<F: Fn(String)>(&self, mut data: F) -> Result<(), Error> {
+    fn data_rows<F: FnMut(String), P: FnMut(Progress)>(
+        &self,
+        mut data: F,
+        mut progress: P,
+    ) -> Result<(), Error> {
         let table_stats = table_stats_by_database_and_table_name(self.dump_reader());
         let (database, table, rows) = self.reference_rows(&table_stats);
 
         let mut visited_tables = HashSet::new();
         visited_tables.insert((database.to_string(), table.to_string()));
 
+        let total_rows = rows.len();
+        let mut processed_rows = 0usize;
+        progress(Progress {
+            total_rows,
+            processed_rows,
+            last_process_time: 0,
+        });
+
         for row in rows {
+            let start_time = utils::epoch_millis();
             let _ = self.visits(
                 row,
                 visited_tables.borrow_mut(),
@@ -196,6 +211,14 @@ impl<'a> Subset for Postgres<'a> {
                 &mut data,
                 false,
             )?;
+
+            processed_rows += 1;
+
+            progress(Progress {
+                total_rows,
+                processed_rows,
+                last_process_time: utils::epoch_millis() - start_time,
+            });
         }
 
         Ok(())
@@ -688,9 +711,19 @@ ALTER TABLE ONLY public.territories
         )
         .unwrap();
 
-        p.data_rows(|row| {
-            assert!(!row.is_empty());
-        })
+        p.data_rows(
+            |row| {
+                assert!(!row.is_empty());
+            },
+            |progress| {
+                //
+                println!(
+                    "database subset progression: {}% (last process time: {}ms)",
+                    progress.percent(),
+                    progress.last_process_time
+                );
+            },
+        )
         .unwrap();
 
         // TODO check it is smaller than the full dump
