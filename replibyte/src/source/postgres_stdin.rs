@@ -1,7 +1,7 @@
 use std::io::{stdin, BufReader, Error};
 
 use crate::connector::Connector;
-use crate::source::postgres::read_and_transform;
+use crate::source::postgres::{read_and_transform, subset};
 use crate::types::{OriginalQuery, Query};
 use crate::Source;
 use crate::SourceOptions;
@@ -33,8 +33,18 @@ impl Source for PostgresStdin {
         options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
-        let reader = BufReader::new(stdin());
-        read_and_transform(reader, options, query_callback);
+        match &options.database_subset {
+            None => {
+                let reader = BufReader::new(stdin());
+                read_and_transform(reader, options, query_callback);
+            }
+            Some(subset_config) => {
+                let mut dump_reader = BufReader::new(stdin());
+                let reader = subset(dump_reader, subset_config)?;
+                read_and_transform(reader, options, query_callback);
+            }
+        };
+
         Ok(())
     }
 }

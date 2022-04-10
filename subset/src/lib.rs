@@ -6,7 +6,7 @@ mod utils;
 
 pub type Bytes = Vec<u8>;
 
-trait Subset {
+pub trait Subset {
     fn rows<F: FnMut(String), P: FnMut(Progress)>(&self, data: F, progress: P)
         -> Result<(), Error>;
 }

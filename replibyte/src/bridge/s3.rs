@@ -406,8 +406,6 @@ fn delete_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<(
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
-
     use fake::{Fake, Faker};
 
     use crate::bridge::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};

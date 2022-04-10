@@ -57,7 +57,7 @@ impl<'a> SubsetStrategy<'a> {
     }
 }
 
-struct PostgresSubset<'a> {
+pub struct PostgresSubset<'a> {
     subset_table_by_database_and_table_name: HashMap<(Database, Table), SubsetTable>,
     dump: &'a Path,
     subset_strategy: SubsetStrategy<'a>,
@@ -65,15 +65,14 @@ struct PostgresSubset<'a> {
 }
 
 impl<'a> PostgresSubset<'a> {
-    pub fn new<R: Read>(
-        schema_reader: BufReader<R>,
+    pub fn new(
         dump: &'a Path,
         subset_strategy: SubsetStrategy<'a>,
         subset_options: SubsetOptions<'a>,
     ) -> Result<Self, Error> {
         Ok(PostgresSubset {
             subset_table_by_database_and_table_name: get_subset_table_by_database_and_table_name(
-                schema_reader,
+                BufReader::new(File::open(dump).unwrap()),
             )?,
             dump,
             subset_strategy,
@@ -278,9 +277,9 @@ impl<'a> Subset for PostgresSubset<'a> {
                             table_stats.table.as_str(),
                         ))
                 {
-                    list_insert_into_rows(self.dump_reader(), table_stats, |row| {
+                    let _ = list_insert_into_rows(self.dump_reader(), table_stats, |row| {
                         data(row.to_string());
-                    });
+                    })?;
                 }
             }
         }
@@ -552,12 +551,12 @@ fn trim_tokens(tokens: &Vec<Token>, keyword: Keyword) -> Vec<Token> {
 }
 
 fn get_subset_table_by_database_and_table_name<R: Read>(
-    schema_reader: BufReader<R>,
+    dump_reader: BufReader<R>,
 ) -> Result<HashMap<(Database, Table), SubsetTable>, Error> {
     let mut subset_table_by_database_and_table_name =
         HashMap::<(Database, Table), SubsetTable>::new();
 
-    list_queries_from_dump_reader(schema_reader, COMMENT_CHARS, |query| {
+    list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         if let Some((database, table)) = get_create_table_database_and_table_name(&tokens) {
@@ -725,12 +724,6 @@ mod tests {
             .join("fulldump-with-inserts.sql")
     }
 
-    fn schema_reader() -> BufReader<File> {
-        BufReader::new(
-            File::open(Path::new("db").join("postgres").join("fulldump-schema.sql")).unwrap(),
-        )
-    }
-
     fn dump_reader() -> BufReader<File> {
         BufReader::new(File::open(dump_path()).unwrap())
     }
@@ -778,7 +771,7 @@ ALTER TABLE ONLY public.territories
 
     #[test]
     fn check_subset_table() {
-        let m = get_subset_table_by_database_and_table_name(schema_reader()).unwrap();
+        let m = get_subset_table_by_database_and_table_name(dump_reader()).unwrap();
         assert!(m.len() > 0);
 
         let t = m
@@ -854,7 +847,6 @@ ALTER TABLE ONLY public.territories
         let s = HashSet::new();
 
         let postgres_subset = PostgresSubset::new(
-            schema_reader(),
             path.as_path(),
             SubsetStrategy::random("public", "orders", 50),
             SubsetOptions::new(&s),

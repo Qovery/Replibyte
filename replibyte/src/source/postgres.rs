@@ -1,20 +1,27 @@
+use log::info;
 use std::borrow::BorrowMut;
-use std::collections::HashMap;
-use std::io::{BufReader, Error, ErrorKind, Read};
-use std::process::{ChildStdout, Command, Stdio};
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io;
+use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::process::{Command, Stdio};
 
+use crate::config::DatabaseSubsetConfigStrategy;
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
     Token,
 };
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
+use subset::postgres::{PostgresSubset, SubsetStrategy};
+use subset::{PassthroughTable, Subset, SubsetOptions};
 
 use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
 use crate::utils::binary_exists;
+use crate::DatabaseSubsetConfig;
 
 use super::SourceOptions;
 
@@ -60,33 +67,6 @@ impl<'a> Postgres<'a> {
             password,
         }
     }
-
-    fn get_schema(&self) -> Result<BufReader<ChildStdout>, Error> {
-        let s_port = self.port.to_string();
-
-        let mut process = Command::new("pg_dumpall")
-            .env("PGPASSWORD", self.password)
-            .args([
-                "--schema-only",
-                "--no-owner", // skip restoration of object ownership
-                "-h",
-                self.host,
-                "-p",
-                s_port.as_str(),
-                "-U",
-                self.username,
-            ])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-
-        let stdout = process
-            .stdout
-            .take()
-            .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
-
-        Ok(BufReader::new(stdout))
-    }
 }
 
 impl<'a> Connector for Postgres<'a> {
@@ -125,15 +105,17 @@ impl<'a> Source for Postgres<'a> {
             .take()
             .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
 
-        let reader = BufReader::new(stdout);
-
-        if let Some(subset_config) = &options.database_subset {
-            // TODO get database schema
-            // TODO write on disk database dump
-            // TODO make transformation
-        }
-
-        read_and_transform(reader, options, query_callback);
+        match &options.database_subset {
+            None => {
+                let reader = BufReader::new(stdout);
+                read_and_transform(reader, options, query_callback);
+            }
+            Some(subset_config) => {
+                let mut dump_reader = BufReader::new(stdout);
+                let reader = subset(dump_reader, subset_config)?;
+                read_and_transform(reader, options, query_callback);
+            }
+        };
 
         match process.wait() {
             Ok(exit_status) => {
@@ -149,6 +131,49 @@ impl<'a> Source for Postgres<'a> {
 
         Ok(())
     }
+}
+
+pub fn subset<R: Read>(
+    mut dump_reader: BufReader<R>,
+    subset_config: &DatabaseSubsetConfig,
+) -> Result<BufReader<File>, Error> {
+    let mut named_temp_file = tempfile::NamedTempFile::new()?;
+    let mut temp_dump_file = named_temp_file.as_file_mut();
+    let _ = io::copy(&mut dump_reader, &mut temp_dump_file)?;
+
+    let strategy = match subset_config.strategy {
+        DatabaseSubsetConfigStrategy::Random(opt) => SubsetStrategy::RandomPercent {
+            database: subset_config.database.as_str(),
+            table: subset_config.table.as_str(),
+            percent: opt.percent,
+        },
+    };
+
+    let passthrough_tables = subset_config
+        .passthrough_tables
+        .iter()
+        .map(|table| PassthroughTable::new(subset_config.database.as_str(), table.as_str()))
+        .collect::<HashSet<_>>();
+
+    let subset_options = SubsetOptions::new(&passthrough_tables);
+    let subset = PostgresSubset::new(named_temp_file.path(), strategy, subset_options)?;
+    let mut subset_file = tempfile::tempfile()?;
+
+    subset.rows(
+        |row| {
+            match subset_file.write(row.as_bytes()) {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!("{}", err)
+                }
+            };
+        },
+        |progress| {
+            info!("Database subset completion: {}%", progress.percent());
+        },
+    );
+
+    Ok(BufReader::new(subset_file))
 }
 
 /// consume reader and apply transformation on INSERT INTO queries if needed
@@ -428,7 +453,10 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{DatabaseSubsetConfig, SkipConfig};
+    use crate::config::{
+        DatabaseSubsetConfig, DatabaseSubsetConfigStrategy, DatabaseSubsetConfigStrategyRandom,
+        SkipConfig,
+    };
     use crate::source::SourceOptions;
     use crate::Source;
     use std::str;
@@ -654,5 +682,57 @@ mod tests {
                 );
             }
         });
+    }
+
+    #[test]
+    fn subset_options() {
+        let p = get_postgres();
+
+        let database_name = "public";
+        let table_name = "employees";
+
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+
+        let source_options = SourceOptions {
+            transformers: &vec![t1],
+            skip_config: &vec![],
+            database_subset: &Some(DatabaseSubsetConfig {
+                database: "public".to_string(),
+                table: "orders".to_string(),
+                strategy: DatabaseSubsetConfigStrategy::Random(
+                    DatabaseSubsetConfigStrategyRandom { percent: 50 },
+                ),
+                passthrough_tables: vec![],
+            }),
+        };
+
+        let mut total_rows_percent_50 = 0usize;
+        let _ = p.read(source_options, |_original_query, query| {
+            assert!(query.data().len() > 0);
+            total_rows_percent_50 += 1;
+        });
+
+        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+
+        let source_options = SourceOptions {
+            transformers: &vec![t1],
+            skip_config: &vec![],
+            database_subset: &Some(DatabaseSubsetConfig {
+                database: "public".to_string(),
+                table: "orders".to_string(),
+                strategy: DatabaseSubsetConfigStrategy::Random(
+                    DatabaseSubsetConfigStrategyRandom { percent: 30 },
+                ),
+                passthrough_tables: vec![],
+            }),
+        };
+
+        let mut total_rows_percent_30 = 0usize;
+        let _ = p.read(source_options, |_original_query, query| {
+            assert!(query.data().len() > 0);
+            total_rows_percent_30 += 1;
+        });
+
+        assert!(total_rows_percent_30 < total_rows_percent_50);
     }
 }

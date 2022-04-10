@@ -4,7 +4,7 @@ use crate::transformer::Transformer;
 use crate::types::Column;
 
 use serde::{Deserialize, Serialize};
-use wasmer::{wat2wasm, ImportObject, Instance, Module, Store};
+use wasmer::{ImportObject, Instance, Module, Store};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 pub type WasmError = Box<dyn std::error::Error>;

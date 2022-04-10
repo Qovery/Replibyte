@@ -8,6 +8,7 @@ authors = ["Qovery"]
 
 [dependencies]
 dump-parser = { path = "../dump-parser" }
+subset = { path = "../subset" }
 rand = "0.8.5"
 anyhow = "1.0.56"
 serde_yaml = "0.8"
@@ -34,6 +35,7 @@ bson = "2.1"
 aes-gcm = "0.9"
 which = "4.2.5"
 url = "2.2.2"
+tempfile = "3.3"
 
 # FIXME removed until the CI release pipeline is fixed
 #wasmer = { version = "2.2", optional = true }
