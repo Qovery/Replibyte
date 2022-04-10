@@ -55,19 +55,19 @@ impl<'a> SubsetStrategy<'a> {
     }
 }
 
-struct Postgres<'a> {
+struct PostgresSubset<'a> {
     subset_table_by_database_and_table_name: HashMap<(Database, Table), SubsetTable>,
     dump: &'a Path,
     subset_strategy: SubsetStrategy<'a>,
 }
 
-impl<'a> Postgres<'a> {
+impl<'a> PostgresSubset<'a> {
     pub fn new<R: Read>(
         schema_reader: BufReader<R>,
         dump: &'a Path,
         subset_strategy: SubsetStrategy<'a>,
     ) -> Result<Self, Error> {
-        Ok(Postgres {
+        Ok(PostgresSubset {
             subset_table_by_database_and_table_name: get_subset_table_by_database_and_table_name(
                 schema_reader,
             )?,
@@ -174,7 +174,7 @@ impl<'a> Postgres<'a> {
     }
 }
 
-impl<'a> Subset for Postgres<'a> {
+impl<'a> Subset for PostgresSubset<'a> {
     /// Return every subset rows
     /// Algorithm used:
     /// 1. find the reference table and take the X rows from this table with the appropriate SubsetStrategy
@@ -184,7 +184,7 @@ impl<'a> Subset for Postgres<'a> {
     ///
     /// Notes:
     /// a. the algo must visits all the tables, even the one that has no relations.
-    fn data_rows<F: FnMut(String), P: FnMut(Progress)>(
+    fn rows<F: FnMut(String), P: FnMut(Progress)>(
         &self,
         mut data: F,
         mut progress: P,
@@ -195,14 +195,32 @@ impl<'a> Subset for Postgres<'a> {
         let mut visited_tables = HashSet::new();
         visited_tables.insert((database.to_string(), table.to_string()));
 
-        let total_rows = rows.len();
+        // send schema header
+        let table_stats_values = table_stats.values().collect::<Vec<_>>();
+        let first_table_stats = *table_stats_values.first().unwrap();
+        let _ = schema_header(
+            self.dump_reader(),
+            first_table_stats.first_insert_into_row_index,
+            |row| {
+                data(row.to_string());
+            },
+        )?;
+
+        let total_rows = table_stats_values
+            .iter()
+            .fold(0usize, |acc, y| acc + y.total_rows);
+
+        let total_rows_to_process = rows.len();
         let mut processed_rows = 0usize;
+
         progress(Progress {
             total_rows,
+            total_rows_to_process,
             processed_rows,
             last_process_time: 0,
         });
 
+        // send INSERT INTO rows
         for row in rows {
             let start_time = utils::epoch_millis();
             let _ = self.visits(
@@ -217,12 +235,22 @@ impl<'a> Subset for Postgres<'a> {
 
             progress(Progress {
                 total_rows,
+                total_rows_to_process,
                 processed_rows,
                 last_process_time: utils::epoch_millis() - start_time,
             });
         }
-
         // TODO visit all the others tables
+
+        // send schema footer
+        let last_table_stats = *table_stats_values.last().unwrap();
+        let _ = schema_header(
+            self.dump_reader(),
+            last_table_stats.last_insert_into_row_index,
+            |row| {
+                data(row.to_string());
+            },
+        )?;
 
         Ok(())
     }
@@ -309,6 +337,7 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
     let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let mut query_res = ListQueryResult::Continue;
 
+        // optimization to avoid tokenizing unnecessary queries -- it's a 13x optim (benched)
         if query_idx >= table_stats.first_insert_into_row_index
             && query_idx <= table_stats.last_insert_into_row_index
         {
@@ -331,6 +360,50 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
         if query_idx > table_stats.last_insert_into_row_index {
             // early break to avoid parsing the dump while we have already parsed all the table rows
             query_res = ListQueryResult::Break;
+        }
+
+        query_idx += 1;
+        query_res
+    })?;
+
+    Ok(())
+}
+
+fn schema_header<R: Read, F: FnMut(&str)>(
+    dump_reader: BufReader<R>,
+    last_header_row_idx: usize,
+    mut rows: F,
+) -> Result<(), Error> {
+    let mut query_idx = 0usize;
+    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+        let mut query_res = ListQueryResult::Continue;
+
+        if query_idx <= last_header_row_idx {
+            rows(query)
+        }
+
+        if query_idx > last_header_row_idx {
+            query_res = ListQueryResult::Break;
+        }
+
+        query_idx += 1;
+        query_res
+    })?;
+
+    Ok(())
+}
+
+fn schema_footer<R: Read, F: FnMut(&str)>(
+    dump_reader: BufReader<R>,
+    first_header_row_idx: usize,
+    mut rows: F,
+) -> Result<(), Error> {
+    let mut query_idx = 0usize;
+    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+        let mut query_res = ListQueryResult::Continue;
+
+        if query_idx >= first_header_row_idx {
+            rows(query)
         }
 
         query_idx += 1;
@@ -581,7 +654,7 @@ mod tests {
     use crate::postgres::{
         filter_insert_into_rows, get_alter_table_foreign_key,
         get_create_table_database_and_table_name, get_subset_table_by_database_and_table_name,
-        list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, Postgres,
+        list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, PostgresSubset,
         SubsetStrategy,
     };
     use crate::Subset;
@@ -724,31 +797,51 @@ ALTER TABLE ONLY public.territories
     fn check_postgres_subset() {
         let path = dump_path();
 
-        let p = Postgres::new(
+        let postgres_subset = PostgresSubset::new(
             schema_reader(),
             path.as_path(),
             SubsetStrategy::random("public", "orders", 50),
         )
         .unwrap();
 
-        let mut rows = vec![];
-        p.data_rows(
-            |row| {
-                assert!(!row.is_empty());
-                rows.push(row);
-            },
-            |progress| {
-                //
-                println!(
-                    "database subset progression: {}% (last process time: {}ms)",
-                    progress.percent(),
-                    progress.last_process_time
-                );
-            },
-        )
-        .unwrap();
+        let mut total_rows = 0usize;
+        let mut total_rows_to_process = 0usize;
+        let mut total_rows_processed = 0usize;
+        postgres_subset
+            .rows(
+                |row| {
+                    assert!(!row.is_empty());
+                },
+                |progress| {
+                    if total_rows == 0 {
+                        total_rows = progress.total_rows;
+                    }
 
-        println!("{}/3362 rows", rows.len());
-        assert!(rows.len() < 3362 / 2) // 3362 -> total INSERT INTO rows in the .sql file
+                    if total_rows_to_process == 0 {
+                        total_rows_to_process = progress.total_rows_to_process;
+                    }
+
+                    total_rows_processed = progress.processed_rows;
+
+                    println!(
+                        "database subset progression: {}% (last process time: {}ms)",
+                        progress.percent(),
+                        progress.last_process_time
+                    );
+                },
+            )
+            .unwrap();
+
+        println!(
+            "{}/{} total database rows",
+            total_rows_processed, total_rows
+        );
+        println!(
+            "{}/{} rows processed",
+            total_rows_processed, total_rows_to_process
+        );
+        assert!(total_rows_processed < total_rows);
+        assert_eq!(total_rows_processed, total_rows_to_process);
+        assert!(rows.len() > 0)
     }
 }

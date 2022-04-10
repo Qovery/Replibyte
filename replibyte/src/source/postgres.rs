@@ -1,7 +1,7 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::io::{BufReader, Error, ErrorKind, Read};
-use std::process::{Command, Stdio};
+use std::process::{ChildStdout, Command, Stdio};
 
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
@@ -61,7 +61,7 @@ impl<'a> Postgres<'a> {
         }
     }
 
-    fn get_schema(&self) -> Result<(), Error> {
+    fn get_schema(&self) -> Result<BufReader<ChildStdout>, Error> {
         let s_port = self.port.to_string();
 
         let mut process = Command::new("pg_dumpall")
@@ -85,16 +85,7 @@ impl<'a> Postgres<'a> {
             .take()
             .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
 
-        let reader = BufReader::new(stdout);
-
-        let _ = list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
-            let tokens = get_tokens_from_query_str(query);
-            //
-
-            ListQueryResult::Continue
-        })?;
-
-        Ok(())
+        Ok(BufReader::new(stdout))
     }
 }
 
@@ -111,10 +102,6 @@ impl<'a> Source for Postgres<'a> {
         query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
-
-        if let Some(reference_query) = &options.database_subset {
-            // TODO get database schema + link between tables
-        }
 
         // use pg_dumpall instead of pg_dump to get all the users, roles and permissions
         let mut process = Command::new("pg_dumpall")
@@ -139,6 +126,12 @@ impl<'a> Source for Postgres<'a> {
             .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
 
         let reader = BufReader::new(stdout);
+
+        if let Some(subset_config) = &options.database_subset {
+            // TODO get database schema
+            // TODO write on disk database dump
+            // TODO make transformation
+        }
 
         read_and_transform(reader, options, query_callback);
 

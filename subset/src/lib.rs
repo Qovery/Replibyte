@@ -7,23 +7,25 @@ mod utils;
 pub type Bytes = Vec<u8>;
 
 pub struct Progress {
+    // total data rows
     pub total_rows: usize,
+    // total rows to processed
+    pub total_rows_to_process: usize,
+    // rows processed
     pub processed_rows: usize,
+    // last row processed exec time
     pub last_process_time: u128,
 }
 
 impl Progress {
     pub fn percent(&self) -> u8 {
-        ((self.processed_rows as f64 / self.total_rows as f64) * 100.0) as u8
+        ((self.processed_rows as f64 / self.total_rows_to_process as f64) * 100.0) as u8
     }
 }
 
 trait Subset {
-    fn data_rows<F: FnMut(String), P: FnMut(Progress)>(
-        &self,
-        data: F,
-        progress: P,
-    ) -> Result<(), Error>;
+    fn rows<F: FnMut(String), P: FnMut(Progress)>(&self, data: F, progress: P)
+        -> Result<(), Error>;
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
