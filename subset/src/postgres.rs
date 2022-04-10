@@ -34,6 +34,8 @@ struct TableStats {
     table: String,
     columns: Vec<String>,
     total_rows: usize,
+    first_insert_into_row_index: usize,
+    last_insert_into_row_index: usize,
 }
 
 pub enum SubsetStrategy<'a> {
@@ -221,6 +223,8 @@ impl<'a> Subset for Postgres<'a> {
             });
         }
 
+        // TODO visit all the others tables
+
         Ok(())
     }
 }
@@ -298,31 +302,35 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
         }
     };
 
-    let mut total_visited_rows = 0usize;
+    let mut query_idx = 0usize;
     list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let mut query_res = ListQueryResult::Continue;
-        let tokens = get_tokens_from_query_str(query);
-        let tokens = trim_tokens(&tokens, Keyword::Insert);
 
-        if match_keyword_at_position(Keyword::Insert, &tokens, 0)
-            && match_keyword_at_position(Keyword::Into, &tokens, 2)
-            && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
-            && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
+        if query_idx >= table_stats.first_insert_into_row_index
+            && query_idx <= table_stats.last_insert_into_row_index
         {
-            let column_values = get_column_values_str_from_insert_into_query(&tokens);
+            let tokens = get_tokens_from_query_str(query);
+            let tokens = trim_tokens(&tokens, Keyword::Insert);
 
-            if *column_values.index(column_idx) == value {
-                rows(query)
+            if match_keyword_at_position(Keyword::Insert, &tokens, 0)
+                && match_keyword_at_position(Keyword::Into, &tokens, 2)
+                && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
+                && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
+            {
+                let column_values = get_column_values_str_from_insert_into_query(&tokens);
+
+                if *column_values.index(column_idx) == value {
+                    rows(query)
+                }
             }
-
-            if total_visited_rows > table_stats.total_rows {
-                // early break to avoid parsing the dump while we have already parsed all the table rows
-                query_res = ListQueryResult::Break;
-            }
-
-            total_visited_rows += 1;
         }
 
+        if query_idx > table_stats.last_insert_into_row_index {
+            // early break to avoid parsing the dump while we have already parsed all the table rows
+            query_res = ListQueryResult::Break;
+        }
+
+        query_idx += 1;
         query_res
     });
 
@@ -335,6 +343,7 @@ fn table_stats_by_database_and_table_name<R: Read>(
     let mut table_stats_by_database_and_table_name =
         HashMap::<(Database, Table), TableStats>::new();
 
+    let mut query_idx = 0usize;
     list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
 
@@ -347,6 +356,8 @@ fn table_stats_by_database_and_table_name<R: Read>(
                         table,
                         columns: vec![],
                         total_rows: 0,
+                        first_insert_into_row_index: 0,
+                        last_insert_into_row_index: 0,
                     },
                 );
             }
@@ -375,16 +386,23 @@ fn table_stats_by_database_and_table_name<R: Read>(
                                 table_stats.columns = columns;
                             }
 
+                            if table_stats.first_insert_into_row_index == 0 {
+                                table_stats.first_insert_into_row_index = query_idx;
+                            }
+
+                            table_stats.last_insert_into_row_index = query_idx;
                             table_stats.total_rows += 1;
                         }
                         None => {
                             // should not happen because INSERT INTO must come after CREATE TABLE
+                            panic!("Unexpected: INSERT INTO happened before CREATE TABLE while creating table_stats")
                         }
                     }
                 }
             }
         }
 
+        query_idx += 1;
         ListQueryResult::Continue
     });
 
