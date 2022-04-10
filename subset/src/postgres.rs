@@ -1,5 +1,5 @@
 use crate::postgres::SubsetStrategy::RandomPercent;
-use crate::{utils, Bytes, Progress, Subset, SubsetTable, SubsetTableRelation};
+use crate::{utils, Progress, Subset, SubsetTable, SubsetTableRelation};
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_str_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
@@ -12,7 +12,6 @@ use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::ops::Index;
 use std::path::Path;
-use std::time::SystemTime;
 
 const COMMENT_CHARS: &str = "--";
 
@@ -84,13 +83,13 @@ impl<'a> Postgres<'a> {
     fn reference_rows(
         &self,
         table_stats: &HashMap<(Database, Table), TableStats>,
-    ) -> (&str, &str, Vec<String>) {
+    ) -> Result<(&str, &str, Vec<String>), Error> {
         match self.subset_strategy {
             SubsetStrategy::RandomPercent {
                 database,
                 table,
                 percent,
-            } => (
+            } => Ok((
                 database,
                 table,
                 list_percent_of_insert_into_rows(
@@ -99,8 +98,8 @@ impl<'a> Postgres<'a> {
                         .get(&(database.to_string(), table.to_string()))
                         .unwrap(),
                     self.dump_reader(),
-                ),
-            ),
+                )?,
+            )),
         }
     }
 
@@ -190,8 +189,8 @@ impl<'a> Subset for Postgres<'a> {
         mut data: F,
         mut progress: P,
     ) -> Result<(), Error> {
-        let table_stats = table_stats_by_database_and_table_name(self.dump_reader());
-        let (database, table, rows) = self.reference_rows(&table_stats);
+        let table_stats = table_stats_by_database_and_table_name(self.dump_reader())?;
+        let (database, table, rows) = self.reference_rows(&table_stats)?;
 
         let mut visited_tables = HashSet::new();
         visited_tables.insert((database.to_string(), table.to_string()));
@@ -233,11 +232,11 @@ fn list_percent_of_insert_into_rows<R: Read>(
     percent: u8,
     table_stats: &TableStats,
     dump_reader: BufReader<R>,
-) -> Vec<String> {
+) -> Result<Vec<String>, Error> {
     let mut insert_into_rows = vec![];
 
     if percent == 0 || table_stats.total_rows == 0 {
-        return insert_into_rows;
+        return Ok(insert_into_rows);
     }
 
     let percent = if percent > 100 { 100 } else { percent };
@@ -246,36 +245,40 @@ fn list_percent_of_insert_into_rows<R: Read>(
     let modulo = (table_stats.total_rows as f32 / total_rows_to_pick) as usize;
 
     let mut counter = 1usize;
-    list_insert_into_rows(dump_reader, table_stats, |rows| {
+    let _ = list_insert_into_rows(dump_reader, table_stats, |rows| {
         if counter % modulo == 0 {
             insert_into_rows.push(rows.to_string());
         }
 
         counter += 1;
-    });
+    })?;
 
-    insert_into_rows
+    Ok(insert_into_rows)
 }
 
 fn list_insert_into_rows<R: Read, F: FnMut(&str)>(
     dump_reader: BufReader<R>,
     table_stats: &TableStats,
     mut rows: F,
-) {
-    list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
-        let tokens = get_tokens_from_query_str(query);
-        let tokens = trim_tokens(&tokens, Keyword::Insert);
+) -> Result<(), Error> {
+    Ok(list_queries_from_dump_reader(
+        dump_reader,
+        COMMENT_CHARS,
+        |query| {
+            let tokens = get_tokens_from_query_str(query);
+            let tokens = trim_tokens(&tokens, Keyword::Insert);
 
-        if match_keyword_at_position(Keyword::Insert, &tokens, 0)
-            && match_keyword_at_position(Keyword::Into, &tokens, 2)
-            && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
-            && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
-        {
-            rows(query.as_ref());
-        }
+            if match_keyword_at_position(Keyword::Insert, &tokens, 0)
+                && match_keyword_at_position(Keyword::Into, &tokens, 2)
+                && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
+                && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
+            {
+                rows(query.as_ref());
+            }
 
-        ListQueryResult::Continue
-    });
+            ListQueryResult::Continue
+        },
+    )?)
 }
 
 fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
@@ -303,7 +306,7 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
     };
 
     let mut query_idx = 0usize;
-    list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         if query_idx >= table_stats.first_insert_into_row_index
@@ -332,19 +335,19 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
 
         query_idx += 1;
         query_res
-    });
+    })?;
 
     Ok(())
 }
 
 fn table_stats_by_database_and_table_name<R: Read>(
     dump_reader: BufReader<R>,
-) -> HashMap<(Database, Table), TableStats> {
+) -> Result<HashMap<(Database, Table), TableStats>, Error> {
     let mut table_stats_by_database_and_table_name =
         HashMap::<(Database, Table), TableStats>::new();
 
     let mut query_idx = 0usize;
-    list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         let _ = match get_create_table_database_and_table_name(&tokens) {
@@ -404,9 +407,9 @@ fn table_stats_by_database_and_table_name<R: Read>(
 
         query_idx += 1;
         ListQueryResult::Continue
-    });
+    })?;
 
-    table_stats_by_database_and_table_name
+    Ok(table_stats_by_database_and_table_name)
 }
 
 fn trim_tokens(tokens: &Vec<Token>, keyword: Keyword) -> Vec<Token> {
@@ -578,12 +581,11 @@ mod tests {
     use crate::postgres::{
         filter_insert_into_rows, get_alter_table_foreign_key,
         get_create_table_database_and_table_name, get_subset_table_by_database_and_table_name,
-        list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, ForeignKey,
-        Postgres, SubsetStrategy,
+        list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, Postgres,
+        SubsetStrategy,
     };
     use crate::Subset;
     use dump_parser::postgres::Tokenizer;
-    use std::borrow::BorrowMut;
     use std::fs::File;
     use std::io::BufReader;
     use std::path::{Path, PathBuf};
@@ -679,26 +681,26 @@ ALTER TABLE ONLY public.territories
 
     #[test]
     fn check_table_stats() {
-        let table_stats = table_stats_by_database_and_table_name(dump_reader());
+        let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
         assert!(table_stats.len() > 0);
         // TODO add more tests to check table.rows size
     }
 
     #[test]
     fn check_percent_of_rows() {
-        let table_stats = table_stats_by_database_and_table_name(dump_reader());
+        let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
         let first_table_stats = table_stats
             .get(&("public".to_string(), "order_details".to_string()))
             .unwrap();
 
-        let rows = list_percent_of_insert_into_rows(5, first_table_stats, dump_reader());
+        let rows = list_percent_of_insert_into_rows(5, first_table_stats, dump_reader()).unwrap();
 
         assert!(rows.len() < first_table_stats.total_rows)
     }
 
     #[test]
     fn check_filter_insert_into_rows() {
-        let table_stats = table_stats_by_database_and_table_name(dump_reader());
+        let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
         let first_table_stats = table_stats
             .get(&("public".to_string(), "order_details".to_string()))
             .unwrap();
@@ -729,9 +731,11 @@ ALTER TABLE ONLY public.territories
         )
         .unwrap();
 
+        let mut rows = vec![];
         p.data_rows(
             |row| {
                 assert!(!row.is_empty());
+                rows.push(row);
             },
             |progress| {
                 //
@@ -744,6 +748,7 @@ ALTER TABLE ONLY public.territories
         )
         .unwrap();
 
-        // TODO check it is smaller than the full dump
+        println!("{}/3362 rows", rows.len());
+        assert!(rows.len() < 3362 / 2) // 3362 -> total INSERT INTO rows in the .sql file
     }
 }

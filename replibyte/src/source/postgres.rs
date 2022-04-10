@@ -87,12 +87,12 @@ impl<'a> Postgres<'a> {
 
         let reader = BufReader::new(stdout);
 
-        list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
+        let _ = list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
             let tokens = get_tokens_from_query_str(query);
             //
 
             ListQueryResult::Continue
-        });
+        })?;
 
         Ok(())
     }

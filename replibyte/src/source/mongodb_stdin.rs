@@ -32,7 +32,7 @@ impl Source for MongoDBStdin {
             todo!("database subset not supported yet for MongoDB source")
         }
 
-        read_and_transform(reader, options, query_callback);
+        let _ = read_and_transform(reader, options, query_callback)?;
         Ok(())
     }
 }
