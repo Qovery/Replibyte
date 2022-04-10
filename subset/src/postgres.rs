@@ -8,7 +8,7 @@ use dump_parser::postgres::{
     Token,
 };
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
@@ -177,16 +177,17 @@ impl<'a> PostgresSubset<'a> {
                     ))
             {
                 // fetch all data from the relation table
-                list_insert_into_rows(self.dump_reader(), row_relation_table_stats, row_clb);
+                let _ =
+                    list_insert_into_rows(self.dump_reader(), row_relation_table_stats, row_clb)?;
             } else {
                 // fetch data from the relational table but only for the related data from the relations.
-                filter_insert_into_rows(
+                let _ = filter_insert_into_rows(
                     row_relation.to_property.as_str(),
                     value.as_str(),
                     self.dump_reader(),
                     row_relation_table_stats,
                     row_clb,
-                );
+                )?;
             }
         }
 
@@ -286,7 +287,7 @@ impl<'a> Subset for PostgresSubset<'a> {
 
         // send schema footer
         let last_table_stats = *table_stats_values.last().unwrap();
-        let _ = schema_header(
+        let _ = schema_footer(
             self.dump_reader(),
             last_table_stats.last_insert_into_row_index,
             |row| {
@@ -717,7 +718,6 @@ mod tests {
     use std::fs::File;
     use std::io::BufReader;
     use std::path::{Path, PathBuf};
-    use std::rc::Rc;
 
     fn dump_path() -> PathBuf {
         Path::new("db")
