@@ -6,6 +6,11 @@ mod utils;
 
 pub type Bytes = Vec<u8>;
 
+trait Subset {
+    fn rows<F: FnMut(String), P: FnMut(Progress)>(&self, data: F, progress: P)
+        -> Result<(), Error>;
+}
+
 pub struct Progress {
     // total data rows
     pub total_rows: usize,
@@ -23,9 +28,29 @@ impl Progress {
     }
 }
 
-trait Subset {
-    fn rows<F: FnMut(String), P: FnMut(Progress)>(&self, data: F, progress: P)
-        -> Result<(), Error>;
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub struct PassthroughTable<'a> {
+    pub database: &'a str,
+    pub table: &'a str,
+}
+
+impl<'a> PassthroughTable<'a> {
+    pub fn new<S: Into<&'a str>>(database: S, table: S) -> Self {
+        PassthroughTable {
+            database: database.into(),
+            table: table.into(),
+        }
+    }
+}
+
+pub struct SubsetOptions<'a> {
+    pub passthrough_tables: &'a HashSet<PassthroughTable<'a>>,
+}
+
+impl<'a> SubsetOptions<'a> {
+    pub fn new(passthrough_tables: &'a HashSet<PassthroughTable<'a>>) -> Self {
+        SubsetOptions { passthrough_tables }
+    }
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
