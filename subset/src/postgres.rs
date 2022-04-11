@@ -223,16 +223,13 @@ impl<'a> Subset for PostgresSubset<'a> {
 
         // send schema header
         let table_stats_values = table_stats.values().collect::<Vec<_>>();
-        let last_header_row_idx = table_stats_values
-            .iter()
-            .filter(|ts| ts.first_insert_into_row_index > 0) // first_insert_into_row_index can be equals to 0 if there is no INSERT INTO...
-            .min_by_key(|ts| ts.first_insert_into_row_index)
-            .map(|ts| ts.first_insert_into_row_index)
-            .unwrap(); // FIXME catch this
-
-        let _ = schema_header(self.dump_reader(), last_header_row_idx, |row| {
-            data(row.to_string());
-        })?;
+        let _ = dump_header(
+            self.dump_reader(),
+            last_header_row_idx(&table_stats_values),
+            |row| {
+                data(row.to_string());
+            },
+        )?;
 
         let total_rows = table_stats_values
             .iter()
@@ -287,15 +284,13 @@ impl<'a> Subset for PostgresSubset<'a> {
         }
 
         // send schema footer
-        let first_footer_row_idx = table_stats_values
-            .iter()
-            .max_by_key(|ts| ts.last_insert_into_row_index)
-            .map(|ts| ts.last_insert_into_row_index)
-            .unwrap(); // FIXME catch this
-
-        let _ = schema_footer(self.dump_reader(), first_footer_row_idx, |row| {
-            data(row.to_string());
-        })?;
+        let _ = dump_footer(
+            self.dump_reader(),
+            first_footer_row_idx(&table_stats_values),
+            |row| {
+                data(row.to_string());
+            },
+        )?;
 
         Ok(())
     }
@@ -426,7 +421,31 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
     Ok(())
 }
 
-fn schema_header<R: Read, F: FnMut(&str)>(
+/// return the last row index from dump header (with generated table stats)
+fn last_header_row_idx(table_stats_values: &Vec<&TableStats>) -> usize {
+    table_stats_values
+        .iter()
+        .filter(|ts| ts.first_insert_into_row_index > 0) // first_insert_into_row_index can be equals to 0 if there is no INSERT INTO...
+        .min_by_key(|ts| ts.first_insert_into_row_index)
+        .map(|ts| ts.first_insert_into_row_index)
+        .unwrap()
+        - 1 // FIXME catch this even if it should not happen
+}
+
+/// return the first row index from dump header (with generated table stats)
+fn first_footer_row_idx(table_stats_values: &Vec<&TableStats>) -> usize {
+    table_stats_values
+        .iter()
+        .max_by_key(|ts| ts.last_insert_into_row_index)
+        .map(|ts| ts.last_insert_into_row_index)
+        .unwrap()
+        + 1 // FIXME catch this even if it should not happen
+}
+
+/// Get Postgres dump header - everything before the first `INSERT INTO ...` row
+/// pg_dump export dump data in 3 phases: `CREATE TABLE ...`, `INSERT INTO ...`, and `ALTER TABLE ...`.
+/// this function return all the `CREATE TABLE ...` rows.
+fn dump_header<R: Read, F: FnMut(&str)>(
     dump_reader: BufReader<R>,
     last_header_row_idx: usize,
     mut rows: F,
@@ -450,14 +469,17 @@ fn schema_header<R: Read, F: FnMut(&str)>(
     Ok(())
 }
 
-fn schema_footer<R: Read, F: FnMut(&str)>(
+/// Get Postgres dump footer - everything after the last `INSERT INTO ...` row
+/// pg_dump export dump data in 3 phases: `CREATE TABLE ...`, `INSERT INTO ...`, and `ALTER TABLE ...`.
+/// this function return all the `ALTER TABLE ...` rows.
+fn dump_footer<R: Read, F: FnMut(&str)>(
     dump_reader: BufReader<R>,
     first_footer_row_idx: usize,
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
     let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
-        if query_idx > first_footer_row_idx {
+        if query_idx >= first_footer_row_idx {
             rows(query)
         }
 
@@ -707,8 +729,9 @@ fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
 #[cfg(test)]
 mod tests {
     use crate::postgres::{
-        filter_insert_into_rows, get_alter_table_foreign_key,
-        get_create_table_database_and_table_name, get_subset_table_by_database_and_table_name,
+        dump_footer, dump_header, filter_insert_into_rows, first_footer_row_idx,
+        get_alter_table_foreign_key, get_create_table_database_and_table_name,
+        get_subset_table_by_database_and_table_name, last_header_row_idx,
         list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, PostgresSubset,
         SubsetStrategy,
     };
@@ -840,6 +863,48 @@ ALTER TABLE ONLY public.territories
         .unwrap();
 
         assert_eq!(found_rows.len(), 38)
+    }
+
+    #[test]
+    fn check_header_dump() {
+        let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
+
+        assert!(!table_stats.is_empty());
+
+        let table_stats_values = table_stats.values().collect::<Vec<_>>();
+        let idx = last_header_row_idx(&table_stats_values);
+
+        assert!(idx > 0);
+
+        let mut rows = vec![];
+        let _ = dump_header(dump_reader(), idx, |row| {
+            rows.push(row.to_string());
+        })
+        .unwrap();
+
+        assert_eq!(rows.iter().filter(|x| x.contains("INSERT INTO")).count(), 0);
+        assert!(!rows.is_empty());
+    }
+
+    #[test]
+    fn check_footer_dump() {
+        let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
+
+        assert!(!table_stats.is_empty());
+
+        let table_stats_values = table_stats.values().collect::<Vec<_>>();
+        let idx = first_footer_row_idx(&table_stats_values);
+
+        assert!(idx > 0);
+
+        let mut rows = vec![];
+        let _ = dump_footer(dump_reader(), idx, |row| {
+            rows.push(row.to_string());
+        })
+        .unwrap();
+
+        assert_eq!(rows.iter().filter(|x| x.contains("INSERT INTO")).count(), 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
