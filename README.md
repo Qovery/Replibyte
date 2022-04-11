@@ -20,12 +20,12 @@
 - [x] On-the-fly data de/encryption (AES-256)
 - [x] Work on different VPC/network
 - [x] Use [custom transformers](examples/wasm)
+- [x] Database Subsetting: Scale down a production database to a more reasonable size (Postgres only ATM)
 
 Here are the features we plan to support
 
 - [ ] Start a local database with the prod data in a single command ([WIP](https://github.com/Qovery/replibyte/issues/32))
 - [ ] Auto-detect and version database schema change
-- [ ] Database Subsetting: Scale down a production database to a more reasonable size ([WIP](https://github.com/Qovery/replibyte/issues/40))
 - [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
 - [ ] Incremental data synchronization (Incremental backup)

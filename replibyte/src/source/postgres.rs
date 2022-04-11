@@ -149,8 +149,11 @@ pub fn subset<R: Read>(
         },
     };
 
+    let empty_vec = Vec::new();
     let passthrough_tables = subset_config
         .passthrough_tables
+        .as_ref()
+        .unwrap_or(&empty_vec)
         .iter()
         .map(|table| PassthroughTable::new(subset_config.database.as_str(), table.as_str()))
         .collect::<HashSet<_>>();
@@ -159,7 +162,6 @@ pub fn subset<R: Read>(
     let subset = PostgresSubset::new(named_temp_file.path(), strategy, subset_options)?;
 
     let mut named_subset_file = tempfile::NamedTempFile::new()?;
-    let x = named_subset_file.path().to_str().unwrap();
     let mut subset_file = named_subset_file.as_file();
 
     let _ = subset.read(
@@ -703,7 +705,7 @@ mod tests {
                 strategy: DatabaseSubsetConfigStrategy::Random(
                     DatabaseSubsetConfigStrategyRandom { percent: 50 },
                 ),
-                passthrough_tables: vec![],
+                passthrough_tables: None,
             }),
         };
 
@@ -724,7 +726,7 @@ mod tests {
                 strategy: DatabaseSubsetConfigStrategy::Random(
                     DatabaseSubsetConfigStrategyRandom { percent: 30 },
                 ),
-                passthrough_tables: vec![],
+                passthrough_tables: None,
             }),
         };
 

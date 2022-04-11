@@ -148,14 +148,15 @@ pub struct SkipConfig {
 pub struct DatabaseSubsetConfig {
     pub database: String,
     pub table: String,
+    #[serde(flatten)]
     pub strategy: DatabaseSubsetConfigStrategy,
     // copy the entire table - not affected by the subset algorithm
-    pub passthrough_tables: Vec<String>,
+    pub passthrough_tables: Option<Vec<String>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[serde(tag = "strategy", content = "strategy_options")]
+#[serde(tag = "strategy_name", content = "strategy_options")]
 pub enum DatabaseSubsetConfigStrategy {
     Random(DatabaseSubsetConfigStrategyRandom),
 }
