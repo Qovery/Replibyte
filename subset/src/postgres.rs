@@ -111,13 +111,19 @@ impl<'a> PostgresSubset<'a> {
         &self,
         row: String,
         visited_tables: &mut HashSet<(Database, Table)>,
+        cyclic_inserted_rows: &mut HashSet<String>,
         table_stats: &HashMap<(Database, Table), TableStats>,
         data: &mut F,
         visit_relations: bool,
     ) -> Result<(), Error> {
-        data(format!("{}\n", row));
-
-        if !visit_relations {
+        if !visit_relations && !cyclic_inserted_rows.contains(row.as_str()) {
+            // check that this row has not been already forwarded
+            // TODO hash row to consume less mem
+            cyclic_inserted_rows.insert(row.clone());
+            data(format!("{}\n", row));
+            return Ok(());
+        } else if !visit_relations || cyclic_inserted_rows.contains(row.as_str()) {
+            // do nothing
             return Ok(());
         }
 
@@ -127,6 +133,20 @@ impl<'a> PostgresSubset<'a> {
         // find the database and table names from this row
         let (row_database, row_table) =
             get_insert_into_database_and_table_name(&row_tokens).unwrap();
+
+        if self.subset_options.passthrough_tables.is_empty()
+            || !self
+                .subset_options
+                .passthrough_tables
+                .contains(&PassthroughTable::new(
+                    row_database.as_str(),
+                    row_table.as_str(),
+                ))
+        {
+            // only insert if the row is not from passthrough tables list
+            // otherwise we'll have duplicated rows
+            data(format!("{}\n", row));
+        }
 
         let _ = visited_tables.insert((row_database.clone(), row_table.clone()));
 
@@ -155,6 +175,7 @@ impl<'a> PostgresSubset<'a> {
             let row_clb = |row: &str| match self.visits(
                 row.to_string(),
                 visited_tables,
+                cyclic_inserted_rows,
                 table_stats,
                 data,
                 s_visit_relations,
@@ -165,28 +186,13 @@ impl<'a> PostgresSubset<'a> {
                 }
             };
 
-            if !self.subset_options.passthrough_tables.is_empty()
-                && self
-                    .subset_options
-                    .passthrough_tables
-                    .contains(&PassthroughTable::new(
-                        row_relation.database.as_str(),
-                        row_relation.table.as_str(),
-                    ))
-            {
-                // fetch all data from the relation table
-                let _ =
-                    list_insert_into_rows(self.dump_reader(), row_relation_table_stats, row_clb)?;
-            } else {
-                // fetch data from the relational table but only for the related data from the relations.
-                let _ = filter_insert_into_rows(
-                    row_relation.to_property.as_str(),
-                    value.as_str(),
-                    self.dump_reader(),
-                    row_relation_table_stats,
-                    row_clb,
-                )?;
-            }
+            let _ = filter_insert_into_rows(
+                row_relation.to_property.as_str(),
+                value.as_str(),
+                self.dump_reader(),
+                row_relation_table_stats,
+                row_clb,
+            )?;
         }
 
         Ok(())
@@ -212,6 +218,7 @@ impl<'a> Subset for PostgresSubset<'a> {
         let (database, table, rows) = self.reference_rows(&table_stats)?;
 
         let mut visited_tables = HashSet::new();
+        let mut cyclic_inserted_rows = HashSet::new();
         visited_tables.insert((database.to_string(), table.to_string()));
 
         // send schema header
@@ -247,6 +254,7 @@ impl<'a> Subset for PostgresSubset<'a> {
             let _ = self.visits(
                 row,
                 visited_tables.borrow_mut(),
+                cyclic_inserted_rows.borrow_mut(),
                 &table_stats,
                 &mut data,
                 true,
@@ -262,24 +270,17 @@ impl<'a> Subset for PostgresSubset<'a> {
             });
         }
 
-        if !self.subset_options.passthrough_tables.is_empty()
-            && visited_tables.len() < table_stats_values.len()
-        {
-            // copy all rows from tables that have not been visited
-            // only if they are part of the passthrough tables option
+        for passthrough_table in self.subset_options.passthrough_tables {
+            // copy all rows from passthrough tables
             for table_stats in &table_stats_values {
-                if !visited_tables
-                    .contains(&(table_stats.database.clone(), table_stats.table.clone()))
-                    && self
-                        .subset_options
-                        .passthrough_tables
-                        .contains(&PassthroughTable::new(
-                            table_stats.database.as_str(),
-                            table_stats.table.as_str(),
-                        ))
+                if table_stats.database.as_str() == passthrough_table.database
+                    && table_stats.table.as_str() == passthrough_table.table
                 {
                     let _ = list_insert_into_rows(self.dump_reader(), table_stats, |row| {
-                        data(row.to_string());
+                        if !cyclic_inserted_rows.contains(row) {
+                            // check just in case
+                            data(row.to_string());
+                        }
                     })?;
                 }
             }
@@ -456,7 +457,7 @@ fn schema_footer<R: Read, F: FnMut(&str)>(
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
     let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
-        if query_idx >= first_footer_row_idx {
+        if query_idx > first_footer_row_idx {
             rows(query)
         }
 
@@ -711,7 +712,7 @@ mod tests {
         list_percent_of_insert_into_rows, table_stats_by_database_and_table_name, PostgresSubset,
         SubsetStrategy,
     };
-    use crate::{Subset, SubsetOptions};
+    use crate::{PassthroughTable, Subset, SubsetOptions};
     use dump_parser::postgres::Tokenizer;
     use std::collections::HashSet;
     use std::fs::File;
@@ -844,7 +845,8 @@ ALTER TABLE ONLY public.territories
     #[test]
     fn check_postgres_subset() {
         let path = dump_path();
-        let s = HashSet::new();
+        let mut s = HashSet::new();
+        s.insert(PassthroughTable::new("public", "us_states"));
 
         let postgres_subset = PostgresSubset::new(
             path.as_path(),
@@ -853,8 +855,7 @@ ALTER TABLE ONLY public.territories
         )
         .unwrap();
 
-        // TODO check passthrough tables
-
+        let mut rows = vec![];
         let mut total_rows = 0usize;
         let mut total_rows_to_process = 0usize;
         let mut total_rows_processed = 0usize;
@@ -862,6 +863,7 @@ ALTER TABLE ONLY public.territories
             .read(
                 |row| {
                     assert!(!row.is_empty());
+                    rows.push(row);
                 },
                 |progress| {
                     if total_rows == 0 {
@@ -893,5 +895,11 @@ ALTER TABLE ONLY public.territories
         );
         assert!(total_rows_processed < total_rows);
         assert_eq!(total_rows_processed, total_rows_to_process);
+        assert_eq!(
+            rows.iter()
+                .filter(|x| x.contains("INSERT INTO public.us_states"))
+                .count(),
+            51
+        );
     }
 }

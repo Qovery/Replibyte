@@ -6,6 +6,8 @@ source:
     strategy_name: random
     strategy_options:
       percent: 50
+    passthrough_tables:
+      - us_states
   transformers:
     - database: public
       table: employees
