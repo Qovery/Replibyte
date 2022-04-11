@@ -157,9 +157,12 @@ pub fn subset<R: Read>(
 
     let subset_options = SubsetOptions::new(&passthrough_tables);
     let subset = PostgresSubset::new(named_temp_file.path(), strategy, subset_options)?;
-    let mut subset_file = tempfile::tempfile()?;
 
-    subset.rows(
+    let mut named_subset_file = tempfile::NamedTempFile::new()?;
+    let x = named_subset_file.path().to_str().unwrap();
+    let mut subset_file = named_subset_file.as_file();
+
+    let _ = subset.read(
         |row| {
             match subset_file.write(row.as_bytes()) {
                 Ok(_) => {}
@@ -171,9 +174,11 @@ pub fn subset<R: Read>(
         |progress| {
             info!("Database subset completion: {}%", progress.percent());
         },
-    );
+    )?;
 
-    Ok(BufReader::new(subset_file))
+    Ok(BufReader::new(
+        File::open(named_subset_file.path()).unwrap(),
+    ))
 }
 
 /// consume reader and apply transformation on INSERT INTO queries if needed
@@ -687,10 +692,6 @@ mod tests {
     #[test]
     fn subset_options() {
         let p = get_postgres();
-
-        let database_name = "public";
-        let table_name = "employees";
-
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
 
         let source_options = SourceOptions {

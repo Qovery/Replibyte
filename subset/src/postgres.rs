@@ -115,8 +115,7 @@ impl<'a> PostgresSubset<'a> {
         data: &mut F,
         visit_relations: bool,
     ) -> Result<(), Error> {
-        // FIXME unnecessary .as_bytes().to_vec()?
-        data(row.clone());
+        data(format!("{}\n", row));
 
         if !visit_relations {
             return Ok(());
@@ -204,7 +203,7 @@ impl<'a> Subset for PostgresSubset<'a> {
     ///
     /// Notes:
     /// a. the algo must visits all the tables, even the one that has no relations.
-    fn rows<F: FnMut(String), P: FnMut(Progress)>(
+    fn read<F: FnMut(String), P: FnMut(Progress)>(
         &self,
         mut data: F,
         mut progress: P,
@@ -217,14 +216,16 @@ impl<'a> Subset for PostgresSubset<'a> {
 
         // send schema header
         let table_stats_values = table_stats.values().collect::<Vec<_>>();
-        let first_table_stats = *table_stats_values.first().unwrap();
-        let _ = schema_header(
-            self.dump_reader(),
-            first_table_stats.first_insert_into_row_index,
-            |row| {
-                data(row.to_string());
-            },
-        )?;
+        let last_header_row_idx = table_stats_values
+            .iter()
+            .filter(|ts| ts.first_insert_into_row_index > 0) // first_insert_into_row_index can be equals to 0 if there is no INSERT INTO...
+            .min_by_key(|ts| ts.first_insert_into_row_index)
+            .map(|ts| ts.first_insert_into_row_index)
+            .unwrap(); // FIXME catch this
+
+        let _ = schema_header(self.dump_reader(), last_header_row_idx, |row| {
+            data(row.to_string());
+        })?;
 
         let total_rows = table_stats_values
             .iter()
@@ -285,14 +286,15 @@ impl<'a> Subset for PostgresSubset<'a> {
         }
 
         // send schema footer
-        let last_table_stats = *table_stats_values.last().unwrap();
-        let _ = schema_footer(
-            self.dump_reader(),
-            last_table_stats.last_insert_into_row_index,
-            |row| {
-                data(row.to_string());
-            },
-        )?;
+        let first_footer_row_idx = table_stats_values
+            .iter()
+            .max_by_key(|ts| ts.last_insert_into_row_index)
+            .map(|ts| ts.last_insert_into_row_index)
+            .unwrap(); // FIXME catch this
+
+        let _ = schema_footer(self.dump_reader(), first_footer_row_idx, |row| {
+            data(row.to_string());
+        })?;
 
         Ok(())
     }
@@ -449,19 +451,17 @@ fn schema_header<R: Read, F: FnMut(&str)>(
 
 fn schema_footer<R: Read, F: FnMut(&str)>(
     dump_reader: BufReader<R>,
-    first_header_row_idx: usize,
+    first_footer_row_idx: usize,
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
     let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
-        let mut query_res = ListQueryResult::Continue;
-
-        if query_idx >= first_header_row_idx {
+        if query_idx >= first_footer_row_idx {
             rows(query)
         }
 
         query_idx += 1;
-        query_res
+        ListQueryResult::Continue
     })?;
 
     Ok(())
@@ -859,7 +859,7 @@ ALTER TABLE ONLY public.territories
         let mut total_rows_to_process = 0usize;
         let mut total_rows_processed = 0usize;
         postgres_subset
-            .rows(
+            .read(
                 |row| {
                     assert!(!row.is_empty());
                 },
