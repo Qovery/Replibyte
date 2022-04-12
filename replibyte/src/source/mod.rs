@@ -9,6 +9,7 @@ pub mod mongodb;
 pub mod mongodb_stdin;
 pub mod postgres;
 pub mod postgres_stdin;
+pub mod mysql;
 
 pub trait Source: Connector {
     fn read<F: FnMut(OriginalQuery, Query)>(

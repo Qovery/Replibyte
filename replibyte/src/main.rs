@@ -31,6 +31,7 @@ use crate::destination::postgres_docker::{
 };
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB as SourceMongoDB;
+use crate::source::mysql::Mysql as SourceMysql;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::{Source, SourceOptions};
@@ -239,7 +240,16 @@ fn main() -> anyhow::Result<()> {
                                 task.run(progress_callback)?
                             }
                             ConnectionUri::Mysql(host, port, username, password, database) => {
-                                todo!() // FIXME
+                                let mysql = SourceMysql::new(
+                                    host.as_str(),
+                                    port,
+                                    database.as_str(),
+                                    username.as_str(),
+                                    password.as_str(),
+                                );
+
+                                let task = FullBackupTask::new(mysql, bridge, options);
+                                task.run(progress_callback)?
                             }
                             ConnectionUri::MongoDB(
                                 host,

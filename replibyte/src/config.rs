@@ -396,7 +396,7 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
             get_password(&url)?,
             get_database(&url, Some("public"))?,
         ),
-        scheme if scheme.to_lowercase() == "mysql" => ConnectionUri::Postgres(
+        scheme if scheme.to_lowercase() == "mysql" => ConnectionUri::Mysql(
             get_host(&url)?,
             get_port(&url, 3306)?,
             get_username(&url)?,
@@ -474,6 +474,39 @@ mod tests {
         assert!(parse_connection_uri("postgres://root:password@localhost:5432").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost").is_ok());
         assert!(parse_connection_uri("postgres://root:password").is_err());
+    }
+
+    #[test]
+    fn parse_mysql_connection_uri() {
+        assert!(parse_connection_uri("mysql://root:password@localhost:3306/db").is_ok());
+        assert!(parse_connection_uri("mysql://root:password@localhost/db").is_ok());
+        assert!(parse_connection_uri("mysql://root:password@localhost").is_err());
+        assert!(parse_connection_uri("mysql://root:password").is_err());
+    }
+
+    #[test]
+    fn parse_mysql_connection_uri_with_db() {
+        assert_eq!(
+            parse_connection_uri("mysql://root:password@localhost:3306/db").unwrap(),
+            ConnectionUri::Mysql(
+                "localhost".to_string(),
+                3306,
+                "root".to_string(),
+                "password".to_string(),
+                "db".to_string()
+            ),
+        );
+
+        assert_eq!(
+            parse_connection_uri("mysql://root:password@localhost/db").unwrap(),
+            ConnectionUri::Mysql(
+                "localhost".to_string(),
+                3306,
+                "root".to_string(),
+                "password".to_string(),
+                "db".to_string()
+            ),
+        );
     }
 
     #[test]

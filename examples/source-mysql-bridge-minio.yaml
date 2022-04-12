@@ -1,0 +1,18 @@
+source:
+  connection_uri: mysql://root:password@127.0.0.1:3306/world
+  transformers:
+    - database: world
+      table: city
+      columns:
+        - name: Name
+          transformer_name: random
+bridge:
+  bucket: replibyte-test
+  region: us-east-2
+  access_key_id: minioadmin
+  secret_access_key: minioadmin
+  endpoint:
+    custom: 'http://localhost:9000'
+destination:
+  # it's different to the source
+  connection_uri: mysql://root:password@127.0.0.1:3307/world
