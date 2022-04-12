@@ -119,7 +119,7 @@ impl<'a> PostgresSubset<'a> {
         if !visit_relations && !cyclic_inserted_rows.contains(row.as_str()) {
             // check that this row has not been already forwarded
             // TODO hash row to consume less mem
-            cyclic_inserted_rows.insert(row.clone());
+            let _ = cyclic_inserted_rows.insert(row.clone());
             data(format!("{}\n", row));
             return Ok(());
         } else if !visit_relations || cyclic_inserted_rows.contains(row.as_str()) {
@@ -245,16 +245,20 @@ impl<'a> Subset for PostgresSubset<'a> {
             last_process_time: 0,
         });
 
+        let database_and_table_tuple = (database.to_string(), table.to_string());
+
         // send INSERT INTO rows
         for row in rows {
             let start_time = utils::epoch_millis();
+            let visit_relations = !visited_tables.contains(&database_and_table_tuple);
+
             let _ = self.visits(
                 row,
                 visited_tables.borrow_mut(),
                 cyclic_inserted_rows.borrow_mut(),
                 &table_stats,
                 &mut data,
-                true,
+                visit_relations,
             )?;
 
             processed_rows += 1;

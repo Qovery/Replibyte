@@ -466,6 +466,7 @@ mod tests {
     };
     use crate::source::SourceOptions;
     use crate::Source;
+    use std::collections::HashSet;
     use std::str;
     use std::vec;
 
@@ -709,11 +710,25 @@ mod tests {
             }),
         };
 
-        let mut total_rows_percent_50 = 0usize;
+        let mut rows_percent_50 = vec![];
         let _ = p.read(source_options, |_original_query, query| {
             assert!(query.data().len() > 0);
-            total_rows_percent_50 += 1;
+            rows_percent_50.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
+
+        // check that there is no duplicated rows
+        assert_eq!(
+            rows_percent_50
+                .iter()
+                .filter(|x| x.contains("INSERT INTO"))
+                .collect::<HashSet<_>>()
+                .len(),
+            rows_percent_50
+                .iter()
+                .filter(|x| x.contains("INSERT INTO"))
+                .collect::<Vec<_>>()
+                .len(),
+        );
 
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
 
@@ -730,12 +745,26 @@ mod tests {
             }),
         };
 
-        let mut total_rows_percent_30 = 0usize;
+        let mut rows_percent_30 = vec![];
         let _ = p.read(source_options, |_original_query, query| {
             assert!(query.data().len() > 0);
-            total_rows_percent_30 += 1;
+            rows_percent_30.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
 
-        assert!(total_rows_percent_30 < total_rows_percent_50);
+        // check that there is no duplicated rows
+        assert_eq!(
+            rows_percent_30
+                .iter()
+                .filter(|x| x.contains("INSERT INTO"))
+                .collect::<HashSet<_>>()
+                .len(),
+            rows_percent_30
+                .iter()
+                .filter(|x| x.contains("INSERT INTO"))
+                .collect::<Vec<_>>()
+                .len(),
+        );
+
+        assert!(rows_percent_30.len() < rows_percent_50.len());
     }
 }

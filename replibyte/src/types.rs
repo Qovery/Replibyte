@@ -14,7 +14,7 @@ pub fn to_bytes(queries: Queries) -> Bytes {
         .collect::<Vec<_>>()
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Query(pub Vec<u8>);
 
 impl Query {
