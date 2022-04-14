@@ -110,22 +110,10 @@ impl<'a> PostgresSubset<'a> {
     fn visits<F: FnMut(String)>(
         &self,
         row: String,
-        visited_tables: &mut HashSet<(Database, Table)>,
-        cyclic_inserted_rows: &mut HashSet<String>,
         table_stats: &HashMap<(Database, Table), TableStats>,
         data: &mut F,
-        visit_relations: bool,
     ) -> Result<(), Error> {
-        if !visit_relations && !cyclic_inserted_rows.contains(row.as_str()) {
-            // check that this row has not been already forwarded
-            // TODO hash row to consume less mem
-            let _ = cyclic_inserted_rows.insert(row.clone());
-            data(format!("{}\n", row));
-            return Ok(());
-        } else if !visit_relations || cyclic_inserted_rows.contains(row.as_str()) {
-            // do nothing
-            return Ok(());
-        }
+        data(format!("{}\n", row));
 
         // tokenize `INSERT INTO ...` row
         let row_tokens = get_tokens_from_query_str(row.as_str());
@@ -148,8 +136,6 @@ impl<'a> PostgresSubset<'a> {
             data(format!("{}\n", row));
         }
 
-        let _ = visited_tables.insert((row_database.clone(), row_table.clone()));
-
         // find the subset table from this row
         let row_subset_table = self
             .subset_table_by_database_and_table_name
@@ -170,16 +156,8 @@ impl<'a> PostgresSubset<'a> {
 
             // find the table stats for this row
             let row_relation_table_stats = table_stats.get(&database_and_table_tuple).unwrap();
-            let s_visit_relations = !visited_tables.contains(&database_and_table_tuple);
 
-            let row_clb = |row: &str| match self.visits(
-                row.to_string(),
-                visited_tables,
-                cyclic_inserted_rows,
-                table_stats,
-                data,
-                s_visit_relations,
-            ) {
+            let row_clb = |row: &str| match self.visits(row.to_string(), table_stats, data) {
                 Ok(_) => {}
                 Err(err) => {
                     panic!("{}", err);
@@ -217,10 +195,6 @@ impl<'a> Subset for PostgresSubset<'a> {
         let table_stats = table_stats_by_database_and_table_name(self.dump_reader())?;
         let (database, table, rows) = self.reference_rows(&table_stats)?;
 
-        let mut visited_tables = HashSet::new();
-        let mut cyclic_inserted_rows = HashSet::new();
-        visited_tables.insert((database.to_string(), table.to_string()));
-
         // send schema header
         let table_stats_values = table_stats.values().collect::<Vec<_>>();
         let _ = dump_header(
@@ -245,21 +219,10 @@ impl<'a> Subset for PostgresSubset<'a> {
             last_process_time: 0,
         });
 
-        let database_and_table_tuple = (database.to_string(), table.to_string());
-
         // send INSERT INTO rows
         for row in rows {
             let start_time = utils::epoch_millis();
-            let visit_relations = !visited_tables.contains(&database_and_table_tuple);
-
-            let _ = self.visits(
-                row,
-                visited_tables.borrow_mut(),
-                cyclic_inserted_rows.borrow_mut(),
-                &table_stats,
-                &mut data,
-                visit_relations,
-            )?;
+            let _ = self.visits(row, &table_stats, &mut data)?;
 
             processed_rows += 1;
 
@@ -278,10 +241,7 @@ impl<'a> Subset for PostgresSubset<'a> {
                     && table_stats.table.as_str() == passthrough_table.table
                 {
                     let _ = list_insert_into_rows(self.dump_reader(), table_stats, |row| {
-                        if !cyclic_inserted_rows.contains(row) {
-                            // check just in case
-                            data(row.to_string());
-                        }
+                        data(row.to_string());
                     })?;
                 }
             }

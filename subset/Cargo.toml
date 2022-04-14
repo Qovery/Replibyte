@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 dump-parser = { path = "../dump-parser" }
+tempfile = "3.3"

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::io::Error;
 
+mod dedup;
 pub mod postgres;
 mod utils;
 
