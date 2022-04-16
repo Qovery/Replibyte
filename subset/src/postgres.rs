@@ -11,7 +11,7 @@ use dump_parser::postgres::{
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{BufRead, BufReader, Error, ErrorKind, Read, Write};
 use std::ops::Index;
 use std::path::Path;
 
@@ -196,7 +196,7 @@ impl<'a> Subset for PostgresSubset<'a> {
         let _ = read(
             self,
             |data| {
-                match dedup_temp_file.write_all(data.as_bytes()) {
+                match dedup_temp_file.write_all(format!("{}\n", data).as_bytes()) {
                     Ok(_) => {}
                     Err(err) => {
                         panic!("{}", err);
@@ -223,10 +223,10 @@ impl<'a> Subset for PostgresSubset<'a> {
 
         let file = File::open(dedup_named_temp_file.as_ref())?;
         let reader = BufReader::new(file);
-        let _ = list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
-            data(query.to_string());
-            ListQueryResult::Continue
-        })?;
+        for line in reader.lines() {
+            let line = line?;
+            data(line);
+        }
 
         Ok(())
     }

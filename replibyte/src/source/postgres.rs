@@ -164,9 +164,10 @@ pub fn subset<R: Read>(
     let mut named_subset_file = tempfile::NamedTempFile::new()?;
     let mut subset_file = named_subset_file.as_file();
 
+    let x = named_subset_file.path().to_str().unwrap();
     let _ = subset.read(
         |row| {
-            match subset_file.write(row.as_bytes()) {
+            match subset_file.write(format!("{}\n", row).as_bytes()) {
                 Ok(_) => {}
                 Err(err) => {
                     panic!("{}", err)

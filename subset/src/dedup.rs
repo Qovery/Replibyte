@@ -77,6 +77,7 @@ pub fn dedup_lines_from_file<F: Fn(Line) -> bool, G: FnMut(Line) -> GroupHash>(
         .open(file_path)?;
 
     let _ = original_file.write(header_buffer.as_slice())?;
+    let _ = original_file.write(b"\n")?;
 
     // read each hash file and insert contents into original file
     for hash in hashes {
@@ -84,13 +85,14 @@ pub fn dedup_lines_from_file<F: Fn(Line) -> bool, G: FnMut(Line) -> GroupHash>(
         let hash_reader = BufReader::new(hash_file);
         for hash_line in hash_reader.lines() {
             let hash_line = hash_line?;
-            let _ = original_file.write(hash_line.as_bytes())?;
-            let _ = original_file.write(b"\n")?;
+            let _ = original_file.write(format!("{}\n", hash_line).as_bytes())?;
         }
     }
 
     // cope footer buffer to file
     let _ = original_file.write(footer_buffer.as_slice())?;
+    let _ = original_file.write(b"\n")?;
+
     Ok(())
 }
 
