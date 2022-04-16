@@ -59,7 +59,7 @@ impl S3 {
                 Ok(uri) => s3_config_builder
                     .endpoint_resolver(SdkEndpoint::immutable(uri))
                     .build(),
-                Err(err) => s3_config_builder.build(),
+                Err(_) => s3_config_builder.build(),
             },
         };
 

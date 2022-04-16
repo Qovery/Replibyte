@@ -1,4 +1,4 @@
-use crate::dedup::dedup_lines_from_file;
+use crate::dedup::does_line_exist_and_set;
 use crate::postgres::SubsetStrategy::RandomPercent;
 use crate::{
     utils, PassthroughTable, Progress, Subset, SubsetOptions, SubsetTable, SubsetTableRelation,
@@ -11,7 +11,7 @@ use dump_parser::postgres::{
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error, ErrorKind, Read, Write};
+use std::io::{BufReader, Error, ErrorKind, Read};
 use std::ops::Index;
 use std::path::Path;
 
@@ -189,44 +189,34 @@ impl<'a> Subset for PostgresSubset<'a> {
         mut data: F,
         mut progress: P,
     ) -> Result<(), Error> {
-        let dedup_named_temp_file = tempfile::NamedTempFile::new()?;
-        let mut dedup_temp_file = dedup_named_temp_file.as_file();
+        let temp_dir = tempfile::tempdir()?;
 
-        //
         let _ = read(
             self,
-            |data| {
-                match dedup_temp_file.write_all(format!("{}\n", data).as_bytes()) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        panic!("{}", err);
+            |line| {
+                if line.contains("INSERT INTO") {
+                    // Dedup INSERT INTO queries
+                    // check if the line has not already been sent
+                    match does_line_exist_and_set(
+                        temp_dir.path(),
+                        &get_insert_into_md5_hash(line.as_str()),
+                        line.as_str(),
+                    ) {
+                        Ok(does_line_exist) => {
+                            if !does_line_exist {
+                                data(line);
+                            }
+                        }
+                        Err(err) => {
+                            panic!("{}", err);
+                        }
                     }
-                };
+                } else {
+                    data(line);
+                }
             },
             progress,
         )?;
-
-        // dedup
-        let _ = dedup_lines_from_file(
-            dedup_named_temp_file.as_ref(),
-            |line| line.contains("INSERT INTO"),
-            |line| {
-                let tokens = get_tokens_from_query_str(line);
-                let tokens = trim_pre_whitespaces(tokens);
-                let database = get_word_value_at_position(&tokens, 4).unwrap();
-                let table = get_word_value_at_position(&tokens, 6).unwrap();
-                let key = format!("{}-{}", database, table);
-                let digest = md5::compute(key.as_bytes());
-                format!("{:x}", digest)
-            },
-        )?;
-
-        let file = File::open(dedup_named_temp_file.as_ref())?;
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            let line = line?;
-            data(line);
-        }
 
         Ok(())
     }
@@ -302,6 +292,16 @@ fn read<F: FnMut(String), P: FnMut(Progress)>(
     )?;
 
     Ok(())
+}
+
+fn get_insert_into_md5_hash(query: &str) -> String {
+    let tokens = get_tokens_from_query_str(query);
+    let tokens = trim_pre_whitespaces(tokens);
+    let database = get_word_value_at_position(&tokens, 4).unwrap();
+    let table = get_word_value_at_position(&tokens, 6).unwrap();
+    let key = format!("{}-{}", database, table);
+    let digest = md5::compute(key.as_bytes());
+    format!("{:x}", digest)
 }
 
 fn list_percent_of_insert_into_rows<R: Read>(
