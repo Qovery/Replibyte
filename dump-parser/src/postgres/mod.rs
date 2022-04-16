@@ -766,7 +766,7 @@ pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
 mod tests {
     use crate::postgres::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-        trim_pre_whitespaces, Keyword, Token, Tokenizer, Whitespace,
+        trim_pre_whitespaces, Token, Tokenizer, Whitespace,
     };
 
     #[test]

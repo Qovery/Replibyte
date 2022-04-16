@@ -20,7 +20,7 @@
 - [x] On-the-fly data de/encryption (AES-256)
 - [x] Work on different VPC/network
 - [x] Use [custom transformers](examples/wasm)
-- [x] Database Subsetting: Scale down a production database to a more reasonable size (Postgres only ATM)
+- [x] Database Subsetting: Scale down a production database to a more reasonable size
 
 Here are the features we plan to support
 
@@ -138,8 +138,16 @@ Create your `prod-conf.yaml` configuration file to source your production databa
 ```yaml
 source:
   connection_uri: $DATABASE_URL
-  encryption_key: $MY_PRIVATE_ENC_KEY # optional 
-  transformers:
+  encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on bridge
+  database_subset: # optional - downscale database while keeping it consistent
+    database: public
+    table: orders
+    strategy_name: random
+    strategy_options:
+      percent: 50
+    passthrough_tables:
+      - us_states
+  transformers: # optional - hide sensitive data
     - database: public
       table: employees
       columns:
@@ -204,12 +212,13 @@ sequenceDiagram
     participant AWS S3 (Bridge)
     PostgreSQL (Source)->>RepliByte: 1. Dump data
     loop
-        RepliByte->>RepliByte: 2. Hide or fake sensitive data
-        RepliByte->>RepliByte: 3. Compress data
-        RepliByte->>RepliByte: 4. Encrypt data
+        RepliByte->>RepliByte: 2. Subsetting (optional)
+        RepliByte->>RepliByte: 3. Hide or fake sensitive data (optional)
+        RepliByte->>RepliByte: 4. Compress data (optional)
+        RepliByte->>RepliByte: 5. Encrypt data (optional)
     end
-    RepliByte->>AWS S3 (Bridge): 5. Upload obfuscated dump data
-    RepliByte->>AWS S3 (Bridge): 6. Write index file
+    RepliByte->>AWS S3 (Bridge): 6. Upload obfuscated dump data
+    RepliByte->>AWS S3 (Bridge): 7. Write index file
 ```
 
 1. RepliByte connects to the _PostgreSQL Source_ database and makes a full SQL dump of it.
@@ -230,8 +239,8 @@ sequenceDiagram
     AWS S3 (Bridge)->>RepliByte: 1. Read index file
     AWS S3 (Bridge)->>RepliByte: 2. Download dump SQL file
     loop
-        RepliByte->>RepliByte: 3. Decrypt data
-        RepliByte->>RepliByte: 4. Uncompress data
+        RepliByte->>RepliByte: 3. Decrypt data (if required)
+        RepliByte->>RepliByte: 4. Uncompress data (if required)
     end
     RepliByte->>PostgreSQL (Destination): 5. Restore dump SQL
 ```
