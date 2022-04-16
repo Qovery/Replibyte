@@ -8,8 +8,7 @@ use dump_parser::postgres::{
     Token,
 };
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
-use std::borrow::BorrowMut;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::ops::Index;
@@ -87,23 +86,19 @@ impl<'a> PostgresSubset<'a> {
     fn reference_rows(
         &self,
         table_stats: &HashMap<(Database, Table), TableStats>,
-    ) -> Result<(&str, &str, Vec<String>), Error> {
+    ) -> Result<Vec<String>, Error> {
         match self.subset_strategy {
             SubsetStrategy::RandomPercent {
                 database,
                 table,
                 percent,
-            } => Ok((
-                database,
-                table,
-                list_percent_of_insert_into_rows(
-                    percent,
-                    table_stats
-                        .get(&(database.to_string(), table.to_string()))
-                        .unwrap(),
-                    self.dump_reader(),
-                )?,
-            )),
+            } => Ok(list_percent_of_insert_into_rows(
+                percent,
+                table_stats
+                    .get(&(database.to_string(), table.to_string()))
+                    .unwrap(),
+                self.dump_reader(),
+            )?),
         }
     }
 
@@ -157,6 +152,7 @@ impl<'a> PostgresSubset<'a> {
             // find the table stats for this row
             let row_relation_table_stats = table_stats.get(&database_and_table_tuple).unwrap();
 
+            // TODO acyclic graph
             let row_clb = |row: &str| match self.visits(row.to_string(), table_stats, data) {
                 Ok(_) => {}
                 Err(err) => {
@@ -193,7 +189,7 @@ impl<'a> Subset for PostgresSubset<'a> {
         mut progress: P,
     ) -> Result<(), Error> {
         let table_stats = table_stats_by_database_and_table_name(self.dump_reader())?;
-        let (database, table, rows) = self.reference_rows(&table_stats)?;
+        let rows = self.reference_rows(&table_stats)?;
 
         // send schema header
         let table_stats_values = table_stats.values().collect::<Vec<_>>();
