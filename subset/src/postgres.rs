@@ -935,7 +935,6 @@ ALTER TABLE ONLY public.territories
         postgres_subset
             .read(
                 |row| {
-                    assert!(!row.is_empty());
                     rows.push(row);
                 },
                 |progress| {
