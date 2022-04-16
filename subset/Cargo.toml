@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 dump-parser = { path = "../dump-parser" }
 tempfile = "3.3"
+md5 = "0.7"

@@ -1,16 +1,17 @@
+use crate::dedup::dedup_lines_from_file;
 use crate::postgres::SubsetStrategy::RandomPercent;
 use crate::{
     utils, PassthroughTable, Progress, Subset, SubsetOptions, SubsetTable, SubsetTableRelation,
 };
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_str_from_insert_into_query,
-    get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
-    Token,
+    get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position,
+    trim_pre_whitespaces, Keyword, Token,
 };
 use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind, Read};
+use std::io::{BufReader, Error, ErrorKind, Read, Write};
 use std::ops::Index;
 use std::path::Path;
 
@@ -188,72 +189,119 @@ impl<'a> Subset for PostgresSubset<'a> {
         mut data: F,
         mut progress: P,
     ) -> Result<(), Error> {
-        let table_stats = table_stats_by_database_and_table_name(self.dump_reader())?;
-        let rows = self.reference_rows(&table_stats)?;
+        let dedup_named_temp_file = tempfile::NamedTempFile::new()?;
+        let mut dedup_temp_file = dedup_named_temp_file.as_file();
 
-        // send schema header
-        let table_stats_values = table_stats.values().collect::<Vec<_>>();
-        let _ = dump_header(
-            self.dump_reader(),
-            last_header_row_idx(&table_stats_values),
-            |row| {
-                data(row.to_string());
+        //
+        let _ = read(
+            self,
+            |data| {
+                match dedup_temp_file.write_all(data.as_bytes()) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        panic!("{}", err);
+                    }
+                };
+            },
+            progress,
+        )?;
+
+        // dedup
+        let _ = dedup_lines_from_file(
+            dedup_named_temp_file.as_ref(),
+            |line| line.contains("INSERT INTO"),
+            |line| {
+                let tokens = get_tokens_from_query_str(line);
+                let tokens = trim_pre_whitespaces(tokens);
+                let database = get_word_value_at_position(&tokens, 4).unwrap();
+                let table = get_word_value_at_position(&tokens, 6).unwrap();
+                let key = format!("{}-{}", database, table);
+                let digest = md5::compute(key.as_bytes());
+                format!("{:x}", digest)
             },
         )?;
 
-        let total_rows = table_stats_values
-            .iter()
-            .fold(0usize, |acc, y| acc + y.total_rows);
+        let file = File::open(dedup_named_temp_file.as_ref())?;
+        let reader = BufReader::new(file);
+        let _ = list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
+            data(query.to_string());
+            ListQueryResult::Continue
+        })?;
 
-        let total_rows_to_process = rows.len();
-        let mut processed_rows = 0usize;
+        Ok(())
+    }
+}
+
+fn read<F: FnMut(String), P: FnMut(Progress)>(
+    postgres_subset: &PostgresSubset,
+    mut data: F,
+    mut progress: P,
+) -> Result<(), Error> {
+    let table_stats = table_stats_by_database_and_table_name(postgres_subset.dump_reader())?;
+    let rows = postgres_subset.reference_rows(&table_stats)?;
+
+    // send schema header
+    let table_stats_values = table_stats.values().collect::<Vec<_>>();
+    let _ = dump_header(
+        postgres_subset.dump_reader(),
+        last_header_row_idx(&table_stats_values),
+        |row| {
+            data(row.to_string());
+        },
+    )?;
+
+    let total_rows = table_stats_values
+        .iter()
+        .fold(0usize, |acc, y| acc + y.total_rows);
+
+    let total_rows_to_process = rows.len();
+    let mut processed_rows = 0usize;
+
+    progress(Progress {
+        total_rows,
+        total_rows_to_process,
+        processed_rows,
+        last_process_time: 0,
+    });
+
+    // send INSERT INTO rows
+    for row in rows {
+        let start_time = utils::epoch_millis();
+        let _ = postgres_subset.visits(row, &table_stats, &mut data)?;
+
+        processed_rows += 1;
 
         progress(Progress {
             total_rows,
             total_rows_to_process,
             processed_rows,
-            last_process_time: 0,
+            last_process_time: utils::epoch_millis() - start_time,
         });
+    }
 
-        // send INSERT INTO rows
-        for row in rows {
-            let start_time = utils::epoch_millis();
-            let _ = self.visits(row, &table_stats, &mut data)?;
-
-            processed_rows += 1;
-
-            progress(Progress {
-                total_rows,
-                total_rows_to_process,
-                processed_rows,
-                last_process_time: utils::epoch_millis() - start_time,
-            });
-        }
-
-        for passthrough_table in self.subset_options.passthrough_tables {
-            // copy all rows from passthrough tables
-            for table_stats in &table_stats_values {
-                if table_stats.database.as_str() == passthrough_table.database
-                    && table_stats.table.as_str() == passthrough_table.table
-                {
-                    let _ = list_insert_into_rows(self.dump_reader(), table_stats, |row| {
-                        data(row.to_string());
-                    })?;
-                }
+    for passthrough_table in postgres_subset.subset_options.passthrough_tables {
+        // copy all rows from passthrough tables
+        for table_stats in &table_stats_values {
+            if table_stats.database.as_str() == passthrough_table.database
+                && table_stats.table.as_str() == passthrough_table.table
+            {
+                let _ = list_insert_into_rows(postgres_subset.dump_reader(), table_stats, |row| {
+                    data(row.to_string());
+                })?;
             }
         }
-
-        // send schema footer
-        let _ = dump_footer(
-            self.dump_reader(),
-            first_footer_row_idx(&table_stats_values),
-            |row| {
-                data(row.to_string());
-            },
-        )?;
-
-        Ok(())
     }
+
+    // send schema footer
+    let _ = dump_footer(
+        postgres_subset.dump_reader(),
+        first_footer_row_idx(&table_stats_values),
+        |row| {
+            data(row.to_string());
+        },
+    )?;
+
+    Ok(())
 }
 
 fn list_percent_of_insert_into_rows<R: Read>(

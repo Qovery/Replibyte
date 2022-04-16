@@ -18,7 +18,7 @@ pub type GroupHash = String;
 /// 2. Group lines by pattern on disk or memory
 /// 3. Deduplicate groups
 /// 4. Rewrite file portion with deduplicated data
-pub fn dedup_lines<F: Fn(Line) -> bool, G: FnMut(Line) -> GroupHash>(
+pub fn dedup_lines_from_file<F: Fn(Line) -> bool, G: FnMut(Line) -> GroupHash>(
     file_path: &Path,
     match_line: F,
     mut group: G,
@@ -76,7 +76,7 @@ pub fn dedup_lines<F: Fn(Line) -> bool, G: FnMut(Line) -> GroupHash>(
         .truncate(true)
         .open(file_path)?;
 
-    let _ = original_file.write_all(header_buffer.as_slice())?;
+    let _ = original_file.write(header_buffer.as_slice())?;
 
     // read each hash file and insert contents into original file
     for hash in hashes {
@@ -85,12 +85,12 @@ pub fn dedup_lines<F: Fn(Line) -> bool, G: FnMut(Line) -> GroupHash>(
         for hash_line in hash_reader.lines() {
             let hash_line = hash_line?;
             let _ = original_file.write(hash_line.as_bytes())?;
+            let _ = original_file.write(b"\n")?;
         }
     }
 
     // cope footer buffer to file
-    let _ = original_file.write_all(footer_buffer.as_slice())?;
-
+    let _ = original_file.write(footer_buffer.as_slice())?;
     Ok(())
 }
 
@@ -107,7 +107,7 @@ fn dedup_line_with_file(
     };
 
     let mut buf = String::new();
-    let mut reader = BufReader::new(file);
+    let mut reader = BufReader::new(&file);
     while let Ok(amount) = reader.read_line(&mut buf) {
         if amount == 0 {
             // EOF
@@ -126,22 +126,23 @@ fn dedup_line_with_file(
     let mut file = OpenOptions::new()
         .write(true)
         .append(true)
+        .truncate(false)
         .open(file_path.as_path())?;
 
-    let _ = write!(file, "{}", line)?;
+    let _ = file.write(line.as_bytes())?;
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::dedup::dedup_lines;
+    use crate::dedup::dedup_lines_from_file;
     use dump_parser::postgres::{
         get_tokens_from_query_str, get_word_value_at_position, trim_pre_whitespaces, Keyword,
     };
     use std::collections::hash_map::DefaultHasher;
     use std::collections::HashSet;
-    use std::hash::{Hash, Hasher};
+    use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
 
     const DUPLICATED_LINES: &str = r#"
@@ -221,10 +222,11 @@ ALTER TABLE ONLY public.order_details
     #[test]
     fn check_dedup_file() {
         let named_temp_file = tempfile::NamedTempFile::new().unwrap();
+        let path = named_temp_file.path().to_str().unwrap();
         let mut file = named_temp_file.as_file();
         let _ = file.write_all(DUPLICATED_LINES.as_bytes()).unwrap();
 
-        let _ = dedup_lines(
+        let _ = dedup_lines_from_file(
             named_temp_file.as_ref(),
             |line| line.contains("INSERT INTO"),
             |line| {
@@ -238,16 +240,20 @@ ALTER TABLE ONLY public.order_details
         )
         .unwrap();
 
-        let reader = BufReader::new(file);
+        let reader = BufReader::new(File::open(path).unwrap());
         let mut hash_set = HashSet::new();
 
         for line in reader.lines() {
             let line = line.unwrap();
-            if hash_set.contains(line.as_str()) {
-                assert!(false);
-            }
+            if line.contains("INSERT INTO") {
+                if hash_set.contains(line.as_str()) {
+                    assert!(false);
+                }
 
-            hash_set.insert(line);
+                let _ = hash_set.insert(line);
+            }
         }
+
+        assert!(hash_set.len() > 1);
     }
 }
