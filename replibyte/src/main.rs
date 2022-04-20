@@ -10,6 +10,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use clap::Parser;
+use ctrlc;
 use indicatif::{ProgressBar, ProgressStyle};
 use timeago::Formatter;
 
@@ -17,11 +18,17 @@ use utils::to_human_readable_unit;
 
 use crate::bridge::s3::S3;
 use crate::bridge::{Bridge, ReadOptions};
-use crate::cli::{BackupCommand, SubCommand, TransformerCommand, CLI};
+use crate::cli::{BackupCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, ConnectionUri, DatabaseSubsetConfig};
 use crate::connector::Connector;
 use crate::destination::mongodb::MongoDB as DestinationMongoDB;
+use crate::destination::mongodb_docker::{
+    MongoDBDocker, DEFAULT_MONGO_CONTAINER_PORT, DEFAULT_MONGO_IMAGE_TAG,
+};
 use crate::destination::postgres::Postgres as DestinationPostgres;
+use crate::destination::postgres_docker::{
+    PostgresDocker, DEFAULT_POSTGRES_CONTAINER_PORT, DEFAULT_POSTGRES_IMAGE_TAG,
+};
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB as SourceMongoDB;
 use crate::source::postgres::Postgres as SourcePostgres;
@@ -125,6 +132,14 @@ fn list_transformers() {
     let _ = table.printstd();
 }
 
+fn wait_until_ctrlc(msg: &str) {
+    let (tx, rx) = mpsc::channel();
+    ctrlc::set_handler(move || tx.send(()).expect("cound not send signal on channel"))
+        .expect("Error setting Ctrl-C handler");
+    println!("{}", msg);
+    rx.recv().expect("Could not receive from channel.");
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = CLI::parse();
@@ -162,7 +177,10 @@ fn main() -> anyhow::Result<()> {
 
     match sub_commands {
         // skip progress when output = true
-        SubCommand::Restore(args) if args.output => {}
+        SubCommand::Restore(cmd) => match cmd {
+            RestoreCommand::Local(args) => if args.output {},
+            RestoreCommand::Remote(args) => if args.output {},
+        },
         _ => {
             let _ = thread::spawn(move || show_progress_bar(rx_pb));
         }
@@ -280,70 +298,174 @@ fn main() -> anyhow::Result<()> {
                 let _ = list_transformers();
             }
         },
-        SubCommand::Restore(cmd) => match config.destination {
-            Some(destination) => {
-                let options = match cmd.value.as_str() {
-                    "latest" => ReadOptions::Latest,
-                    v => ReadOptions::Backup {
-                        name: v.to_string(),
-                    },
-                };
+        SubCommand::Restore(cmd) => {
+            match cmd {
+                RestoreCommand::Local(args) => {
+                    let options = match args.value.as_str() {
+                        "latest" => ReadOptions::Latest,
+                        v => ReadOptions::Backup {
+                            name: v.to_string(),
+                        },
+                    };
 
-                if cmd.output {
-                    let postgres = PostgresStdout::default();
-                    let task = FullRestoreTask::new(postgres, bridge, options);
-                    let _ = task.run(|_, _| {})?; // do not display the progress bar
+                    if args.image == "postgres".to_string()
+                        || args.image == "postgresql".to_string()
+                    {
+                        let port = args.port.unwrap_or(DEFAULT_POSTGRES_CONTAINER_PORT);
+                        let tag = match &args.tag {
+                            Some(tag) => tag,
+                            None => DEFAULT_POSTGRES_IMAGE_TAG,
+                        };
+
+                        let mut postgres = PostgresDocker::new(tag.to_string(), port);
+                        let task = FullRestoreTask::new(&mut postgres, bridge, options);
+                        let _ = task.run(progress_callback)?;
+
+                        println!("To connect to your Postgres database, use the following connection string:");
+                        println!("> postgres://root:password@localhost:{}/root", port);
+                        wait_until_ctrlc("Waiting for Ctrl-C to stop the container");
+
+                        match postgres.container {
+                            Some(container) => {
+                                if args.remove {
+                                    match container.rm() {
+                                        Ok(_) => {
+                                            println!("Container removed!");
+                                            return Ok(());
+                                        }
+                                        Err(err) => return Err(anyhow::Error::from(err)),
+                                    }
+                                }
+
+                                match container.stop() {
+                                    Ok(_) => {
+                                        println!("container stopped!");
+                                        return Ok(());
+                                    }
+                                    Err(err) => return Err(anyhow::Error::from(err)),
+                                }
+                            }
+                            None => {
+                                return Err(anyhow::Error::from(Error::new(
+                                    ErrorKind::Other,
+                                    "command error: unable to retrieve container ID",
+                                )))
+                            }
+                        }
+                    }
+
+                    if args.image == "mongodb".to_string() {
+                        let port = args.port.unwrap_or(DEFAULT_MONGO_CONTAINER_PORT);
+                        let tag = match &args.tag {
+                            Some(tag) => tag,
+                            None => DEFAULT_MONGO_IMAGE_TAG,
+                        };
+
+                        let mut mongodb = MongoDBDocker::new(tag.to_string(), port);
+                        let task = FullRestoreTask::new(&mut mongodb, bridge, options);
+                        let _ = task.run(progress_callback)?;
+
+                        println!("To connect to your MongoDB database, use the following connection string:");
+                        println!("> mongodb://root:password@localhost:{}/root", port);
+                        wait_until_ctrlc("Waiting for Ctrl-C to stop the container");
+
+                        match mongodb.container {
+                            Some(container) => {
+                                if args.remove {
+                                    match container.rm() {
+                                        Ok(_) => {
+                                            println!("Container removed!");
+                                            return Ok(());
+                                        }
+                                        Err(err) => return Err(anyhow::Error::from(err)),
+                                    }
+                                }
+
+                                match container.stop() {
+                                    Ok(_) => {
+                                        println!("container stopped!");
+                                        return Ok(());
+                                    }
+                                    Err(err) => return Err(anyhow::Error::from(err)),
+                                }
+                            }
+                            None => {
+                                return Err(anyhow::Error::from(Error::new(
+                                    ErrorKind::Other,
+                                    "command error: unable to retrieve container ID",
+                                )))
+                            }
+                        }
+                    }
+
                     return Ok(());
                 }
+                RestoreCommand::Remote(args) => match config.destination {
+                    Some(destination) => {
+                        let options = match args.value.as_str() {
+                            "latest" => ReadOptions::Latest,
+                            v => ReadOptions::Backup {
+                                name: v.to_string(),
+                            },
+                        };
 
-                match destination.connection_uri()? {
-                    ConnectionUri::Postgres(host, port, username, password, database) => {
-                        let postgres = DestinationPostgres::new(
-                            host.as_str(),
-                            port,
-                            database.as_str(),
-                            username.as_str(),
-                            password.as_str(),
-                            true,
-                        );
+                        if args.output {
+                            let mut postgres = PostgresStdout::default();
+                            let task = FullRestoreTask::new(&mut postgres, bridge, options);
+                            let _ = task.run(|_, _| {})?; // do not display the progress bar
+                            return Ok(());
+                        }
 
-                        let task = FullRestoreTask::new(postgres, bridge, options);
-                        task.run(progress_callback)?
+                        match destination.connection_uri()? {
+                            ConnectionUri::Postgres(host, port, username, password, database) => {
+                                let mut postgres = DestinationPostgres::new(
+                                    host.as_str(),
+                                    port,
+                                    database.as_str(),
+                                    username.as_str(),
+                                    password.as_str(),
+                                    true,
+                                );
+
+                                let task = FullRestoreTask::new(&mut postgres, bridge, options);
+                                task.run(progress_callback)?
+                            }
+                            ConnectionUri::Mysql(host, port, username, password, database) => {
+                                todo!() // FIXME
+                            }
+                            ConnectionUri::MongoDB(
+                                host,
+                                port,
+                                username,
+                                password,
+                                database,
+                                authentication_db,
+                            ) => {
+                                let mut mongodb = DestinationMongoDB::new(
+                                    host.as_str(),
+                                    port,
+                                    database.as_str(),
+                                    username.as_str(),
+                                    password.as_str(),
+                                    authentication_db.as_str(),
+                                );
+
+                                let task = FullRestoreTask::new(&mut mongodb, bridge, options);
+                                task.run(progress_callback)?
+                            }
+                        }
+
+                        println!("Restore successful!")
                     }
-                    ConnectionUri::Mysql(host, port, username, password, database) => {
-                        todo!() // FIXME
+                    None => {
+                        return Err(anyhow::Error::from(Error::new(
+                            ErrorKind::Other,
+                            "missing <destination> object in the configuration file",
+                        )));
                     }
-                    ConnectionUri::MongoDB(
-                        host,
-                        port,
-                        username,
-                        password,
-                        database,
-                        authentication_db,
-                    ) => {
-                        let mongodb = DestinationMongoDB::new(
-                            host.as_str(),
-                            port,
-                            database.as_str(),
-                            username.as_str(),
-                            password.as_str(),
-                            authentication_db.as_str(),
-                        );
-
-                        let task = FullRestoreTask::new(mongodb, bridge, options);
-                        task.run(progress_callback)?
-                    }
-                }
-
-                println!("Restore successful!")
+                },
             }
-            None => {
-                return Err(anyhow::Error::from(Error::new(
-                    ErrorKind::Other,
-                    "missing <destination> object in the configuration file",
-                )));
-            }
-        },
+        }
     };
 
     Ok(())

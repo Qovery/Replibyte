@@ -24,7 +24,8 @@ pub enum SubCommand {
     #[clap(subcommand)]
     Transformer(TransformerCommand),
     /// all restore commands
-    Restore(RestoreArgs),
+    #[clap(subcommand)]
+    Restore(RestoreCommand),
 }
 
 /// all backup commands
@@ -44,6 +45,15 @@ pub enum TransformerCommand {
 }
 
 /// all restore commands
+#[derive(Subcommand, Debug)]
+pub enum RestoreCommand {
+    /// Restore backup inside a local Docker container
+    Local(RestoreLocalArgs),
+    /// Restore backup inside the configured destination
+    Remote(RestoreArgs),
+}
+
+/// all restore commands
 #[derive(Args, Debug)]
 pub struct RestoreArgs {
     /// restore backup -- set `latest` or `<backup name>` - use `backup list` command to list all backups available
@@ -52,6 +62,29 @@ pub struct RestoreArgs {
     /// stream output on stdout
     #[clap(short, long)]
     pub output: bool,
+}
+
+/// restore backup in a local Docker container
+#[derive(Args, Debug)]
+pub struct RestoreLocalArgs {
+    /// restore backup -- set `latest` or `<backup name>` - use `backup list` command to list all backups available
+    #[clap(short, long, value_name = "[latest | backup name]")]
+    pub value: String,
+    /// stream output on stdout
+    #[clap(short, long)]
+    pub output: bool,
+    /// Docker image tag for the container to spawn
+    #[clap(short, long)]
+    pub tag: Option<String>,
+    /// Docker container port to map on the host
+    #[clap(short, long)]
+    pub port: Option<u16>,
+    /// Remove the Docker container on Ctrl-c
+    #[clap(short, long)]
+    pub remove: bool,
+    /// Docker image type
+    #[clap(short, long, value_name = "[postgresql | mysql | mongodb]")]
+    pub image: String,
 }
 
 /// all backup run commands

@@ -21,10 +21,10 @@
 - [x] Work on different VPC/network
 - [x] Use [custom transformers](examples/wasm)
 - [x] Database Subsetting: Scale down a production database to a more reasonable size
+- [x] Start a local database with the prod data in a single command
 
 Here are the features we plan to support
 
-- [ ] Start a local database with the prod data in a single command ([WIP](https://github.com/Qovery/replibyte/issues/32))
 - [ ] Auto-detect and version database schema change
 - [ ] Auto-detect sensitive fields and generate fake data
 - [ ] Auto-clean up bridge data
@@ -64,6 +64,7 @@ chmod +x replibyte
 # make it accessible from everywhere
 mv replibyte /usr/local/bin/
 ```
+
 </details>
 
 <details>
@@ -98,21 +99,23 @@ Feel free to edit `./examples/replibyte.yaml` with your configuration.
 
 [![What is RepliByte](assets/video_.png)](https://www.youtube.com/watch?v=IKeLnZvECQw)
 
-Example with PostgreSQL as a *Source* and *Destination* database **AND** S3 as a *Bridge* (cf [configuration file](#Configuration))
+Example with PostgreSQL as a _Source_ and _Destination_ database **AND** S3 as a _Bridge_ (cf [configuration file](#Configuration))
 
-Backup your PostgreSQL databases into S3
+### Backup your PostgreSQL databases into S3
 
 ```shell
 replibyte -c prod-conf.yaml backup run
 ```
 
-Backup from local PostgreSQL dump file into S3
+### Backup from local PostgreSQL dump file into S3
 
 ```shell
 cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
 ```
 
-Restore your PostgreSQL databases from S3
+### Restore your PostgreSQL databases from S3 into the configured destination
+
+Show your backups:
 
 ```shell
 replibyte -c prod-conf.yaml backup list
@@ -123,12 +126,41 @@ PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am  true      
 PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am  true        true
 ```
 
+Restore the latest one:
+
 ```shell
-replibyte -c prod-conf.yaml restore -v latest
+replibyte -c prod-conf.yaml restore remote -v latest
+```
 
-OR 
+OR restore a specific one:
 
-replibyte -c prod-conf.yaml restore -v backup-1647706359405
+```
+replibyte -c prod-conf.yaml restore remote -v backup-1647706359405
+```
+
+### Restore your PostgreSQL databases from S3 into a local Docker container
+
+List all your backups to choose one:
+
+```shell
+replibyte -c prod-conf.yaml backup list
+
+type          name                    size    when                    compressed  encrypted
+PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am   true        true
+PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am  true        true
+PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am  true        true
+```
+
+Restore the latest one into a Postgres container bound on 5433 (default: 5432) port:
+
+```shell
+replibyte -c prod-conf.yaml restore local -v latest --image postgres --port 5433
+```
+
+OR restore a specific one:
+
+```
+replibyte -c prod-conf.yaml restore local -v backup-1647706359405 --image postgres --port 5433
 ```
 
 ### Configuration
@@ -270,7 +302,7 @@ The S3 wire protocol, used by RepliByte bridge, is supported by most cloud provi
 services.
 
 | Cloud Service Provider | S3 service name                                                           | S3 compatible  |
-|------------------------|---------------------------------------------------------------------------|----------------|
+| ---------------------- | ------------------------------------------------------------------------- | -------------- |
 | Amazon Web Services    | [S3](https://aws.amazon.com/s3/)                                          | Yes (Original) |
 | Google Cloud Platform  | [Cloud Storage](https://cloud.google.com/storage)                         | Yes            |
 | Microsoft Azure        | [Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) | Yes            |
@@ -319,8 +351,8 @@ Here is the manifest file that you can find at the root of your target `Bridge` 
 }
 ```
 
-* *size* is in bytes
-* *created_at* is an epoch timestamp in millis
+- _size_ is in bytes
+- _created_at_ is an epoch timestamp in millis
 
 ## Motivation
 
@@ -337,7 +369,7 @@ ambition!
 - Synchronize **the whole** PostgreSQL/MongoDB **instance** and **replace sensitive data** with fake data.
 - Synchronize **specific** PostgreSQL/MongoDB **tables** and **replace sensitive data** with fake data.
 - Synchronize **specific** PostgreSQL/MongoDB **databases** and **replace sensitive data** with fake data.
-- Synchronize **a subset** of your production database. 
+- Synchronize **a subset** of your production database.
 - **Migrate** from one **database** hosting platform to the other.
 
 ## What is not RepliByte
