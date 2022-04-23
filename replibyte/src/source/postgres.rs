@@ -1,4 +1,3 @@
-use log::info;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -6,16 +5,18 @@ use std::io;
 use std::io::{BufReader, Error, ErrorKind, Read, Write};
 use std::process::{Command, Stdio};
 
-use crate::config::DatabaseSubsetConfigStrategy;
+use log::info;
+
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
     Token,
 };
-use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
+use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
 use subset::postgres::{PostgresSubset, SubsetStrategy};
 use subset::{PassthroughTable, Subset, SubsetOptions};
 
+use crate::config::DatabaseSubsetConfigStrategy;
 use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
@@ -24,8 +25,6 @@ use crate::utils::binary_exists;
 use crate::DatabaseSubsetConfig;
 
 use super::SourceOptions;
-
-pub const COMMENT_CHARS: &str = "--";
 
 enum RowType {
     InsertInto {
@@ -207,7 +206,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
         let _ = skip_tables_map.insert(format!("{}.{}", skip.database, skip.table), true);
     }
 
-    match list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
+    match list_sql_queries_from_dump_reader(reader, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         match get_row_type(&tokens) {
@@ -461,21 +460,21 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{
-        DatabaseSubsetConfig, DatabaseSubsetConfigStrategy, DatabaseSubsetConfigStrategyRandom,
-        SkipConfig,
-    };
-    use crate::source::SourceOptions;
-    use crate::Source;
     use std::collections::HashSet;
     use std::str;
     use std::vec;
 
+    use crate::config::{
+        DatabaseSubsetConfig, DatabaseSubsetConfigStrategy, DatabaseSubsetConfigStrategyRandom,
+        SkipConfig,
+    };
     use crate::source::postgres::{to_query, Postgres};
+    use crate::source::SourceOptions;
     use crate::transformer::random::RandomTransformer;
     use crate::transformer::transient::TransientTransformer;
     use crate::transformer::Transformer;
     use crate::types::{Column, InsertIntoQuery};
+    use crate::Source;
 
     fn get_postgres() -> Postgres<'static> {
         Postgres::new("localhost", 5432, "root", "root", "password")

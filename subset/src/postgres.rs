@@ -8,14 +8,12 @@ use dump_parser::postgres::{
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position,
     trim_pre_whitespaces, Keyword, Token,
 };
-use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
+use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::ops::Index;
 use std::path::Path;
-
-const COMMENT_CHARS: &str = "--";
 
 type Database = String;
 type Table = String;
@@ -338,7 +336,7 @@ fn list_insert_into_rows<R: Read, F: FnMut(&str)>(
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
-    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         // optimization to avoid tokenizing unnecessary queries -- it's a 13x optim (benched)
@@ -394,7 +392,7 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
     };
 
     let mut query_idx = 0usize;
-    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         // optimization to avoid tokenizing unnecessary queries -- it's a 13x optim (benched)
@@ -459,7 +457,7 @@ fn dump_header<R: Read, F: FnMut(&str)>(
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
-    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         if query_idx <= last_header_row_idx {
@@ -486,7 +484,7 @@ fn dump_footer<R: Read, F: FnMut(&str)>(
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
-    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
         if query_idx >= first_footer_row_idx {
             rows(query)
         }
@@ -505,7 +503,7 @@ fn table_stats_by_database_and_table_name<R: Read>(
         HashMap::<(Database, Table), TableStats>::new();
 
     let mut query_idx = 0usize;
-    let _ = list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         let _ = match get_create_table_database_and_table_name(&tokens) {
@@ -556,7 +554,8 @@ fn table_stats_by_database_and_table_name<R: Read>(
                         }
                         None => {
                             // should not happen because INSERT INTO must come after CREATE TABLE
-                            panic!("Unexpected: INSERT INTO happened before CREATE TABLE while creating table_stats")
+                            println!("Query: {}", query);
+                            panic!("Unexpected: INSERT INTO happened before CREATE TABLE while creating table_stats structure")
                         }
                     }
                 }
@@ -587,7 +586,7 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
     let mut subset_table_by_database_and_table_name =
         HashMap::<(Database, Table), SubsetTable>::new();
 
-    list_queries_from_dump_reader(dump_reader, COMMENT_CHARS, |query| {
+    list_sql_queries_from_dump_reader(dump_reader, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         if let Some((database, table)) = get_create_table_database_and_table_name(&tokens) {

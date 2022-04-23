@@ -24,7 +24,7 @@ As long as you start with reading from stdin and end with printing to stdout, yo
 
 <br>
 
-## Implenting a custom transformer with Rust
+## Implementing a custom transformer with Rust
 ---
 <br>
 
