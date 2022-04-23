@@ -24,6 +24,7 @@ impl Container {
         image: &Image,
         options: &ContainerOptions,
         args: Vec<&str>,
+        command: Option<Vec<&str>>,
     ) -> Result<Container, Error> {
         let port_mapping = format!("{}:{}", options.host_port, options.container_port);
         let image_version = format!("{}:{}", image.name, image.tag);
@@ -36,10 +37,16 @@ impl Container {
         run_args.push("-d");
         run_args.push(image_version.as_str());
 
+        if let Some(command) = command {
+            for arg in command {
+                run_args.push(arg);
+            }
+        }
+
         let output = Command::new(DOCKER_BINARY_NAME).args(run_args).output()?;
 
         // FIX: this is a workaround to wait until the container is up
-        thread::sleep(Duration::from_millis(5000));
+        thread::sleep(Duration::from_millis(20_000));
 
         match output.status.success() {
             true => match String::from_utf8(output.stdout) {
@@ -134,7 +141,7 @@ mod tests {
             "POSTGRES_USER=root",
         ];
 
-        let container = Container::new(&image, &options, args).unwrap();
+        let container = Container::new(&image, &options, args, None).unwrap();
 
         assert!(container.id != "".to_string());
         assert!(container.stop().is_ok());

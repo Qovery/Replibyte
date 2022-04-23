@@ -8,6 +8,7 @@ pub mod mongodb;
 pub mod mongodb_docker;
 pub mod mongodb_stdout;
 pub mod mysql;
+pub mod mysql_docker;
 pub mod mysql_stdout;
 pub mod postgres;
 pub mod postgres_docker;

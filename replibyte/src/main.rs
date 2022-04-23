@@ -26,6 +26,9 @@ use crate::destination::mongodb_docker::{
     MongoDBDocker, DEFAULT_MONGO_CONTAINER_PORT, DEFAULT_MONGO_IMAGE_TAG,
 };
 use crate::destination::mysql::Mysql as DestinationMysql;
+use crate::destination::mysql_docker::{
+    MysqlDocker, DEFAULT_MYSQL_CONTAINER_PORT, DEFAULT_MYSQL_IMAGE_TAG,
+};
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_docker::{
     PostgresDocker, DEFAULT_POSTGRES_CONTAINER_PORT, DEFAULT_POSTGRES_IMAGE_TAG,
@@ -381,6 +384,50 @@ fn main() -> anyhow::Result<()> {
                         wait_until_ctrlc("Waiting for Ctrl-C to stop the container");
 
                         match mongodb.container {
+                            Some(container) => {
+                                if args.remove {
+                                    match container.rm() {
+                                        Ok(_) => {
+                                            println!("Container removed!");
+                                            return Ok(());
+                                        }
+                                        Err(err) => return Err(anyhow::Error::from(err)),
+                                    }
+                                }
+
+                                match container.stop() {
+                                    Ok(_) => {
+                                        println!("container stopped!");
+                                        return Ok(());
+                                    }
+                                    Err(err) => return Err(anyhow::Error::from(err)),
+                                }
+                            }
+                            None => {
+                                return Err(anyhow::Error::from(Error::new(
+                                    ErrorKind::Other,
+                                    "command error: unable to retrieve container ID",
+                                )))
+                            }
+                        }
+                    }
+
+                    if args.image == "mysql".to_string() {
+                        let port = args.port.unwrap_or(DEFAULT_MYSQL_CONTAINER_PORT);
+                        let tag = match &args.tag {
+                            Some(tag) => tag,
+                            None => DEFAULT_MYSQL_IMAGE_TAG,
+                        };
+
+                        let mut mysql = MysqlDocker::new(tag.to_string(), port);
+                        let task = FullRestoreTask::new(&mut mysql, bridge, options);
+                        let _ = task.run(progress_callback)?;
+
+                        println!("To connect to your MySQL database, use the following connection string:");
+                        println!("> mysql://root:password@127.0.0.1:{}/root", port);
+                        wait_until_ctrlc("Waiting for Ctrl-C to stop the container");
+
+                        match mysql.container {
                             Some(container) => {
                                 if args.remove {
                                     match container.rm() {
