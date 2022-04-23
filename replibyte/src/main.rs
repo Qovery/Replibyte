@@ -25,6 +25,7 @@ use crate::destination::mongodb::MongoDB as DestinationMongoDB;
 use crate::destination::mongodb_docker::{
     MongoDBDocker, DEFAULT_MONGO_CONTAINER_PORT, DEFAULT_MONGO_IMAGE_TAG,
 };
+use crate::destination::mysql::Mysql as DestinationMysql;
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_docker::{
     PostgresDocker, DEFAULT_POSTGRES_CONTAINER_PORT, DEFAULT_POSTGRES_IMAGE_TAG,
@@ -441,7 +442,15 @@ fn main() -> anyhow::Result<()> {
                                 task.run(progress_callback)?
                             }
                             ConnectionUri::Mysql(host, port, username, password, database) => {
-                                todo!() // FIXME
+                                let mut mysql = DestinationMysql::new(
+                                    host.as_str(),
+                                    port,
+                                    database.as_str(),
+                                    username.as_str(),
+                                    password.as_str(),
+                                );
+                                let task = FullRestoreTask::new(&mut mysql, bridge, options);
+                                task.run(progress_callback)?;
                             }
                             ConnectionUri::MongoDB(
                                 host,

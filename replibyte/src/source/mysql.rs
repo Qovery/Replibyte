@@ -86,8 +86,13 @@ impl<'a> Source for Mysql<'a> {
                 "-u",
                 self.username,
                 &format!("-p{}", self.password),
+                "--add-drop-database", // add DROP DATABASE statement before each CREATE DATABASE statement
+                "--add-drop-table", // add DROP TABLE statement before each CREATE TABLE statement
                 "--skip-extended-insert", // have a row by INSERT INTO statement
-                "--complete-insert",      // have column names in INSERT INTO rows
+                "--complete-insert", // have column names in INSERT INTO rows
+                "--single-transaction", // https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html#option_mysqldump_single-transaction
+                "--quick", // reads out large tables in a way that doesn't require having enough RAM to fit the full table in memory
+                "--databases",
                 self.database,
             ])
             .stdout(Stdio::piped())
