@@ -76,7 +76,6 @@ impl<'a> Source for Mysql<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
-        // use pg_dumpall instead of pg_dump to get all the users, roles and permissions
         let mut process = Command::new("mysqldump")
             .args([
                 "-h",
@@ -405,11 +404,11 @@ mod tests {
     use super::Mysql;
 
     fn get_mysql() -> Mysql<'static> {
-        Mysql::new("localhost", 3306, "db", "root", "password")
+        Mysql::new("127.0.0.1", 3306, "world", "root", "password")
     }
 
     fn get_invalid_mysql() -> Mysql<'static> {
-        Mysql::new("localhost", 3306, "db", "root", "wrongpassword")
+        Mysql::new("127.0.0.1", 3306, "world", "root", "wrong_password")
     }
 
     #[test]
@@ -422,6 +421,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
         };
+
         assert!(p.read(source_options, |_original_query, _query| {}).is_ok());
 
         let p = get_invalid_mysql();
