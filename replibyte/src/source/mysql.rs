@@ -123,7 +123,7 @@ impl<'a> Source for Mysql<'a> {
     }
 }
 
-fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
+pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     reader: BufReader<R>,
     options: SourceOptions,
     mut query_callback: F,

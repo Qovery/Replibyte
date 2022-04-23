@@ -36,6 +36,7 @@ use crate::destination::postgres_docker::{
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB as SourceMongoDB;
 use crate::source::mysql::Mysql as SourceMysql;
+use crate::source::mysql_stdin::MysqlStdin;
 use crate::source::postgres::Postgres as SourcePostgres;
 use crate::source::postgres_stdin::PostgresStdin;
 use crate::source::{Source, SourceOptions};
@@ -287,6 +288,18 @@ fn main() -> anyhow::Result<()> {
 
                             let postgres = PostgresStdin::default();
                             let task = FullBackupTask::new(postgres, bridge, options);
+                            task.run(progress_callback)?
+                        }
+                        Some(v) if v == "mysql" => {
+                            if args.file.is_some() {
+                                let dump_file = File::open(args.file.as_ref().unwrap())?;
+                                let mut stdin = stdin(); // FIXME
+                                let reader = BufReader::new(dump_file);
+                                let _ = stdin.read_to_end(&mut reader.buffer().to_vec())?;
+                            }
+
+                            let mysql = MysqlStdin::default();
+                            let task = FullBackupTask::new(mysql, bridge, options);
                             task.run(progress_callback)?
                         }
                         Some(v) => {
