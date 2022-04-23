@@ -56,6 +56,9 @@ jobs:
       - name: Start MongoDB Container
         run: docker-compose -f "docker-compose-mongodb.yml" up -d --build
 
+      - name: Start MySQL Container
+        run: docker-compose -f "docker-compose-mysql.yml" up -d --build
+
       - name: Test RepliByte
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -74,3 +77,7 @@ jobs:
       - name: Stop MongoDB Container
         if: always()
         run: docker-compose -f "docker-compose-mongodb.yml" down --remove-orphans
+      
+      - name: Stop MySQL Container
+        if: always()
+        run: docker-compose -f "docker-compose-mysql.yml" down --remove-orphans
