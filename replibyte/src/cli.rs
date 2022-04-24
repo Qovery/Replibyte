@@ -12,6 +12,9 @@ pub struct CLI {
     pub config: PathBuf,
     #[clap(subcommand)]
     pub sub_commands: SubCommand,
+    /// disable telemetry
+    #[clap(short, long)]
+    pub no_telemetry: bool,
 }
 
 /// sub commands

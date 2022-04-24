@@ -11,7 +11,7 @@
 
 ## Features
 
-- [x] Support PostgreSQL and MongoDB (more [connectors](#connectors) coming soon)
+- [x] Support PostgreSQL, MySQL and MongoDB
 - [x] Complete data synchronization (Full-backup)
 - [x] Generate random/fake information
 - [x] Backup TB of data (read [Design](#design))
@@ -36,7 +36,7 @@ Here are the features we plan to support
 
 <summary>Install on MacOSX</summary>
 
-⚠️ RepliByte homebrew auto release is in maintenance. Consider using Docker or building from source in the meantime ⚠️ 
+⚠️ RepliByte homebrew auto release is in maintenance. Consider using Docker or building from source in the meantime ⚠️
 
 ```shell
 brew tap Qovery/replibyte
@@ -430,9 +430,9 @@ There is no API, RepliByte is fully stateless and store the backup list into the
 
 ## Local development
 
-For local development, you will need to install [Docker](https://www.docker.com/) and
-run `docker compose -f ./docker-compose-dev.yml` to start the local databases. At the moment, `docker-compose` includes 2
-PostgreSQL database instances, 2 MySQL instances, 2 MongoDB instances and a [MinIO](https://min.io/) bridge. One source, one destination by database and one bridge. In the future, we will provide more options.
+For local development, you will need to install [Docker](https://www.docker.com/) and run `docker compose -f ./docker-compose-dev.yml` to
+start the local databases. At the moment, `docker-compose` includes 2 PostgreSQL database instances, 2 MySQL instances, 2 MongoDB instances
+and a [MinIO](https://min.io/) bridge. One source, one destination by database and one bridge. In the future, we will provide more options.
 
 The Minio console is accessible at http://localhost:9001.
 
@@ -459,6 +459,17 @@ Check the open [issues](https://github.com/Qovery/replibyte/issues) and their pr
 1. Open an [issue](https://github.com/Qovery/replibyte/issues).
 2. Join our #replibyte channel on [our discord](https://discord.qovery.com).
 3. Drop us an email to `github+replibyte {at} qovery {dot} com`.
+
+## Telemetry
+
+RepliByte collects anonymized data from users in order to improve our product. Feel free to inspect the
+code [here](replibyte/src/telemetry.rs). This can be deactivated at any time, and any data that has already been collected can be deleted on
+request (hello+replibyte {at} qovery {dot} com).
+
+### Collected data
+
+- Command line parameters
+- Options used (subset, transformer, compression) in the configuration file.
 
 ## Live Coding Session
 

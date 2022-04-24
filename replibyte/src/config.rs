@@ -16,7 +16,7 @@ use url::Url;
 
 const DEFAULT_MONGODB_AUTH_DB: &str = "admin";
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Config {
     // pub bind: Ipv4Addr,
     // pub port: u16,
@@ -47,7 +47,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct BridgeConfig {
     // At the moment we do support only S3 as B,
     // in a near future we'll need to make it generic
@@ -95,7 +95,7 @@ impl BridgeConfig {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct SourceConfig {
     pub connection_uri: String,
     pub compression: Option<bool>,
@@ -118,7 +118,7 @@ impl SourceConfig {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DestinationConfig {
     pub connection_uri: String,
     pub compression: Option<bool>,
@@ -138,13 +138,13 @@ impl DestinationConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct SkipConfig {
     pub database: String,
     pub table: String,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DatabaseSubsetConfig {
     pub database: String,
     pub table: String,
@@ -154,7 +154,7 @@ pub struct DatabaseSubsetConfig {
     pub passthrough_tables: Option<Vec<String>>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "strategy_name", content = "strategy_options")]
 pub enum DatabaseSubsetConfigStrategy {
@@ -166,14 +166,14 @@ pub struct DatabaseSubsetConfigStrategyRandom {
     pub percent: u8,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct TransformerConfig {
     pub database: String,
     pub table: String,
     pub columns: Vec<ColumnConfig>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ColumnConfig {
     pub name: String,
 
@@ -181,7 +181,7 @@ pub struct ColumnConfig {
     pub transformer: TransformerTypeConfig,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "transformer_name", content = "transformer_options")]
 pub enum TransformerTypeConfig {
@@ -284,7 +284,7 @@ type Password = String;
 type Database = String;
 type AuthenticationDatabase = String;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ConnectionUri {
     Postgres(Host, Port, Username, Password, Database),
     Mysql(Host, Port, Username, Password, Database),
@@ -424,7 +424,7 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
     Ok(connection_uri)
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Endpoint {
     #[serde(rename = "custom")]
     Custom(String),

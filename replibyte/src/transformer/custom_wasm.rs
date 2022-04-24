@@ -9,7 +9,7 @@ use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 pub type WasmError = Box<dyn std::error::Error>;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct CustomWasmTransformerOptions {
     pub path: String,
 }

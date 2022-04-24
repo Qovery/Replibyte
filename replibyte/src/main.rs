@@ -4,9 +4,9 @@ extern crate prettytable;
 use std::fs::File;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{env, thread};
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -17,6 +17,8 @@ use crate::cli::{BackupCommand, RestoreCommand, SubCommand, TransformerCommand, 
 use crate::config::{Config, DatabaseSubsetConfig};
 use crate::source::{Source, SourceOptions};
 use crate::tasks::{MaxBytes, TransferredBytes};
+use crate::telemetry::{ClientOptions, TelemetryClient, TELEMETRY_TOKEN};
+use crate::utils::epoch_millis;
 
 mod bridge;
 mod cli;
@@ -27,6 +29,7 @@ mod destination;
 mod runtime;
 mod source;
 mod tasks;
+mod telemetry;
 mod transformer;
 mod types;
 mod utils;
@@ -69,8 +72,16 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
 }
 
 fn main() -> anyhow::Result<()> {
+    let start_exec_time = utils::epoch_millis();
+    let env_args = env::args().collect::<Vec<String>>();
+
     env_logger::init();
     let args = CLI::parse();
+
+    let telemetry_client = match args.no_telemetry {
+        true => None,
+        false => Some(TelemetryClient::new(ClientOptions::from(TELEMETRY_TOKEN))),
+    };
 
     let file = File::open(args.config)?;
     let config: Config = serde_yaml::from_reader(file)?;
@@ -100,8 +111,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
-
     let sub_commands: &SubCommand = &args.sub_commands;
+
+    let telemetry_config = config.clone();
+
+    if let Some(telemetry_client) = &telemetry_client {
+        let _ = telemetry_client.capture_command(&telemetry_config, sub_commands, &env_args, None);
+    }
 
     match sub_commands {
         // skip progress when output = true
@@ -118,7 +134,7 @@ fn main() -> anyhow::Result<()> {
         let _ = tx_pb.send((bytes, max_bytes));
     };
 
-    match sub_commands {
+    let _ = match sub_commands {
         SubCommand::Backup(cmd) => match cmd {
             BackupCommand::List => {
                 let _ = commands::backup::list(&mut bridge)?;
@@ -142,11 +158,16 @@ fn main() -> anyhow::Result<()> {
                 commands::restore::remote(args, bridge, config, progress_callback)
             }
         },
-    }
-}
+    };
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn read_from_postgres() {}
+    if let Some(telemetry_client) = &telemetry_client {
+        let _ = telemetry_client.capture_command(
+            &telemetry_config,
+            sub_commands,
+            &env_args,
+            Some(epoch_millis() - start_exec_time),
+        );
+    }
+
+    Ok(())
 }
