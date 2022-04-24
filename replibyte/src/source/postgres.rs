@@ -563,10 +563,7 @@ mod tests {
             },
         );
 
-        assert_eq!(
-            query.data(),
-            b"INSERT INTO test (is_valid) VALUES ('true');"
-        );
+        assert_eq!(query.data(), b"INSERT INTO test (is_valid) VALUES (true);");
 
         let query = to_query(
             Some("public"),
