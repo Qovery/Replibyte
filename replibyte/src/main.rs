@@ -27,7 +27,8 @@ use crate::destination::mongodb_docker::{
 };
 use crate::destination::postgres::Postgres as DestinationPostgres;
 use crate::destination::postgres_docker::{
-    PostgresDocker, DEFAULT_POSTGRES_CONTAINER_PORT, DEFAULT_POSTGRES_IMAGE_TAG,
+    PostgresDocker, DEFAULT_POSTGRES_CONTAINER_PORT, DEFAULT_POSTGRES_DB,
+    DEFAULT_POSTGRES_IMAGE_TAG, DEFAULT_POSTGRES_PASSWORD, DEFAULT_POSTGRES_USER,
 };
 use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB as SourceMongoDB;
@@ -322,7 +323,13 @@ fn main() -> anyhow::Result<()> {
                         let _ = task.run(progress_callback)?;
 
                         println!("To connect to your Postgres database, use the following connection string:");
-                        println!("> postgres://root:password@localhost:{}/root", port);
+                        println!(
+                            "> postgres://{}:{}@localhost:{}/{}",
+                            DEFAULT_POSTGRES_USER,
+                            DEFAULT_POSTGRES_PASSWORD,
+                            port,
+                            DEFAULT_POSTGRES_DB
+                        );
                         wait_until_ctrlc("Waiting for Ctrl-C to stop the container");
 
                         match postgres.container {
