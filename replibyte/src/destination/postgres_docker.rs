@@ -10,9 +10,9 @@ use std::io::{Error, ErrorKind, Write};
 const DEFAULT_POSTGRES_IMAGE: &str = "postgres";
 pub const DEFAULT_POSTGRES_IMAGE_TAG: &str = "13";
 pub const DEFAULT_POSTGRES_CONTAINER_PORT: u16 = 5432;
-const DEFAULT_POSTGRES_USER: &str = "postgres";
-const DEFAULT_POSTGRES_PASSWORD: &str = "password";
-const DEFAULT_POSTGRES_DB: &str = "postgres";
+pub const DEFAULT_POSTGRES_USER: &str = "postgres";
+pub const DEFAULT_POSTGRES_PASSWORD: &str = "password";
+pub const DEFAULT_POSTGRES_DB: &str = "postgres";
 
 pub struct PostgresDocker {
     pub image: Image,
