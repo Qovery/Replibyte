@@ -76,6 +76,7 @@ impl Transformer for RandomTransformer {
             Column::CharValue(column_name, _) => {
                 Column::CharValue(column_name, random.gen::<char>())
             }
+            Column::BooleanValue(column_name, value) => Column::BooleanValue(column_name, value),
             Column::None(column_name) => Column::None(column_name),
         }
     }

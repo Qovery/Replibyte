@@ -86,7 +86,7 @@ where
             buffer_size * (chunk_part as usize + 1),
         );
 
-        let _ = self.source.read(self.options, |original_query, query| {
+        let _ = self.source.read(self.options, |_original_query, query| {
             if consumed_buffer_size + query.data().len() > buffer_size {
                 chunk_part += 1;
                 consumed_buffer_size = 0;

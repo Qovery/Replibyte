@@ -57,7 +57,7 @@ impl Transformer for PhoneNumberTransformer {
 
     fn transform(&self, column: Column) -> Column {
         match column {
-            Column::StringValue(column_name, value) => {
+            Column::StringValue(column_name, _) => {
                 Column::StringValue(column_name, PhoneNumber(EN).fake())
             }
             column => column,
