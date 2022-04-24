@@ -110,7 +110,7 @@ impl<'a> Source for Postgres<'a> {
                 read_and_transform(reader, options, query_callback);
             }
             Some(subset_config) => {
-                let mut dump_reader = BufReader::new(stdout);
+                let dump_reader = BufReader::new(stdout);
                 let reader = subset(dump_reader, subset_config)?;
                 read_and_transform(reader, options, query_callback);
             }
@@ -160,10 +160,9 @@ pub fn subset<R: Read>(
     let subset_options = SubsetOptions::new(&passthrough_tables);
     let subset = PostgresSubset::new(named_temp_file.path(), strategy, subset_options)?;
 
-    let mut named_subset_file = tempfile::NamedTempFile::new()?;
+    let named_subset_file = tempfile::NamedTempFile::new()?;
     let mut subset_file = named_subset_file.as_file();
 
-    let x = named_subset_file.path().to_str().unwrap();
     let _ = subset.read(
         |row| {
             match subset_file.write(format!("{}\n", row).as_bytes()) {
@@ -434,6 +433,10 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
             Column::CharValue(column_name, value) => {
                 column_names.push(column_name);
                 values.push(format!("'{}'", value));
+            }
+            Column::BooleanValue(column_name, value) => {
+                column_names.push(column_name);
+                values.push(value.to_string());
             }
             Column::None(column_name) => {
                 column_names.push(column_name);

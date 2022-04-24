@@ -35,6 +35,7 @@ pub enum Column {
     FloatNumberValue(String, f64),
     StringValue(String, String),
     CharValue(String, char),
+    BooleanValue(String, bool),
     None(String),
 }
 
@@ -45,6 +46,7 @@ impl Column {
             Column::FloatNumberValue(name, _) => name.as_str(),
             Column::StringValue(name, _) => name.as_str(),
             Column::CharValue(name, _) => name.as_str(),
+            Column::BooleanValue(name, _) => name.as_str(),
             Column::None(name) => name.as_str(),
         }
     }
@@ -73,6 +75,13 @@ impl Column {
     pub fn char_value(&self) -> Option<&char> {
         match self {
             Column::CharValue(_, value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn boolean_value(&self) -> Option<&bool> {
+        match self {
+            Column::BooleanValue(_, value) => Some(value),
             _ => None,
         }
     }

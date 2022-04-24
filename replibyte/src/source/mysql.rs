@@ -370,6 +370,10 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
                 column_names.push(column_name);
                 values.push(format!("'{}'", value));
             }
+            Column::BooleanValue(column_name, value) => {
+                column_names.push(column_name);
+                values.push(value.to_string());
+            }
             Column::None(column_name) => {
                 column_names.push(column_name);
                 values.push("NULL".to_string());

@@ -71,6 +71,7 @@ impl Transformer for FirstNameTransformer {
                 Column::StringValue(column_name, new_value)
             }
             Column::CharValue(column_name, value) => Column::CharValue(column_name, value),
+            Column::BooleanValue(column_name, value) => Column::BooleanValue(column_name, value),
             Column::None(column_name) => Column::None(column_name),
         }
     }

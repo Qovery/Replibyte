@@ -39,7 +39,7 @@ impl Source for PostgresStdin {
                 read_and_transform(reader, options, query_callback);
             }
             Some(subset_config) => {
-                let mut dump_reader = BufReader::new(stdin());
+                let dump_reader = BufReader::new(stdin());
                 let reader = subset(dump_reader, subset_config)?;
                 read_and_transform(reader, options, query_callback);
             }

@@ -175,6 +175,13 @@ impl Transformer for CustomWasmTransformer {
                     .parse::<char>()
                     .expect("Wasm module failed to return a char"),
             ),
+            Column::BooleanValue(column_name, value) => Column::BooleanValue(
+                column_name,
+                self.call_wasm_module(value.to_string().as_str())
+                    .expect("Wasm module call failed")
+                    .parse::<bool>()
+                    .expect("Wasm module failed to return a boolean"),
+            ),
             Column::None(column_name) => Column::None(column_name),
         }
     }
