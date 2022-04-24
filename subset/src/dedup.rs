@@ -24,6 +24,7 @@ pub fn does_line_exist_and_set(
         .truncate(false)
         .open(file_path.as_path())?;
 
+    let line = format!("{}\n", line.trim_start().trim_end());
     let _ = file.write(line.as_bytes())?;
 
     Ok(false)

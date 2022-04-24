@@ -151,7 +151,7 @@ impl<'a> PostgresSubset<'a> {
             // find the table stats for this row
             let row_relation_table_stats = table_stats.get(&database_and_table_tuple).unwrap();
 
-            // TODO acyclic graph
+            // TODO break acyclic graph
             let row_clb = |row: &str| match self.visits(row.to_string(), table_stats, data) {
                 Ok(_) => {}
                 Err(err) => {
