@@ -716,19 +716,20 @@ mod tests {
             rows_percent_50.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
 
+        let x = rows_percent_50
+            .iter()
+            .filter(|x| x.contains("INSERT INTO"))
+            .map(|x| x.as_str())
+            .collect::<HashSet<_>>();
+
+        let y = rows_percent_50
+            .iter()
+            .filter(|x| x.contains("INSERT INTO"))
+            .map(|x| x.as_str())
+            .collect::<Vec<_>>();
+
         // check that there is no duplicated rows
-        assert_eq!(
-            rows_percent_50
-                .iter()
-                .filter(|x| x.contains("INSERT INTO"))
-                .collect::<HashSet<_>>()
-                .len(),
-            rows_percent_50
-                .iter()
-                .filter(|x| x.contains("INSERT INTO"))
-                .collect::<Vec<_>>()
-                .len(),
-        );
+        assert_eq!(x.len(), y.len());
 
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
 

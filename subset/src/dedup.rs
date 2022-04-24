@@ -42,13 +42,15 @@ pub fn does_line_exist(
 
     let mut buf = String::new();
     let mut reader = BufReader::new(&file);
+    // remove potential whitespaces and \n
+    let line = line.trim_start().trim_end();
     while let Ok(amount) = reader.read_line(&mut buf) {
         if amount == 0 {
             // EOF
             break;
         }
 
-        if buf.as_str() == line {
+        if buf.as_str().trim_start().trim_end() == line {
             // the line already exist in the file, we can stop here
             return Ok(true);
         }
