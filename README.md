@@ -36,6 +36,8 @@ Here are the features we plan to support
 
 <summary>Install on MacOSX</summary>
 
+⚠️ RepliByte homebrew auto release is in maintenance. Consider using Docker or building from source in the meantime ⚠️ 
+
 ```shell
 brew tap Qovery/replibyte
 brew install replibyte
@@ -77,9 +79,26 @@ Download [the latest Windows release](https://github.com/Qovery/replibyte/releas
 
 <details>
 
-<summary>Run with Docker</summary>
+<summary>Install from source</summary>
 
-### Docker
+```shell
+git clone https://github.com/Qovery/replibyte.git && cd replibyte 
+
+# Install cargo
+# visit: https://doc.rust-lang.org/cargo/getting-started/installation.html
+
+# Build with cargo
+cargo build --release
+
+# Run RepliByte
+./target/release/replibyte -h
+```
+
+</details>
+
+<details>
+
+<summary>Run replibyte with Docker</summary>
 
 ```shell
 git clone https://github.com/Qovery/replibyte.git
