@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 
 use log::info;
 
+use dump_parser::postgres::Keyword::NoKeyword;
 use dump_parser::postgres::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
@@ -324,6 +325,13 @@ fn transform_columns(
             Token::HexStringLiteral(column_value) => {
                 Column::StringValue(column_name.to_string(), column_value.clone())
             }
+            Token::Word(w)
+                if (w.value == "true" || w.value == "false")
+                    && w.quote_style == None
+                    && w.keyword == NoKeyword =>
+            {
+                Column::BooleanValue(column_name.to_string(), w.value.parse::<bool>().unwrap())
+            }
             _ => Column::None(column_name.to_string()),
         };
 
@@ -545,6 +553,19 @@ mod tests {
         assert_eq!(
             query.data(),
             b"INSERT INTO test (first_name) VALUES ('romaric');"
+        );
+
+        let query = to_query(
+            None,
+            InsertIntoQuery {
+                table_name: "test".to_string(),
+                columns: vec![Column::BooleanValue("is_valid".to_string(), true)],
+            },
+        );
+
+        assert_eq!(
+            query.data(),
+            b"INSERT INTO test (is_valid) VALUES ('true');"
         );
 
         let query = to_query(

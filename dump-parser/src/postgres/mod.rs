@@ -317,12 +317,12 @@ impl<'a> Tokenizer<'a> {
                         s += s2.as_str();
                         return Ok(Some(Token::Number(s, false)));
                     }
+
                     Ok(Some(Token::make_word(&s, None)))
                 }
                 // string
                 '\'' => {
                     let s = self.tokenize_single_quoted_string(chars)?;
-
                     Ok(Some(Token::SingleQuotedString(s)))
                 }
                 // numbers and period
@@ -766,7 +766,7 @@ pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
 mod tests {
     use crate::postgres::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-        trim_pre_whitespaces, Token, Tokenizer, Whitespace,
+        trim_pre_whitespaces, Token, Tokenizer, Whitespace, Word,
     };
 
     #[test]
@@ -938,6 +938,29 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
                 &Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
                 &Token::SingleQuotedString("Maria Anders".to_string()),
                 &Token::make_keyword("NULL"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_insert_into_with_boolean_column_type() {
+        let q = r"
+INSERT INTO public.customers (first_name, is_valid)
+VALUES ('Romaric', true);
+";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        let column_values = get_column_values_from_insert_into_query(&tokens);
+
+        assert_eq!(
+            column_values,
+            vec![
+                &Token::SingleQuotedString("Romaric".to_string()),
+                &Token::make_word("true", None),
             ]
         );
     }

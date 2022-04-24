@@ -1025,4 +1025,27 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,NULL,'2022-
             true
         );
     }
+
+    #[test]
+    fn test_insert_into_with_boolean_column_type() {
+        let q = r"
+INSERT INTO `customers` (`first_name`, `is_valid`)
+VALUES ('Romaric', true);
+";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        let column_values = get_column_values_from_insert_into_query(&tokens);
+
+        assert_eq!(
+            column_values,
+            vec![
+                &Token::SingleQuotedString("Romaric".to_string()),
+                &Token::make_word("true", None),
+            ]
+        );
+    }
 }

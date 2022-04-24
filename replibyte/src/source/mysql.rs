@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::process::{Command, Stdio};
 
+use dump_parser::mysql::Keyword::NoKeyword;
 use dump_parser::mysql::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
@@ -261,6 +262,13 @@ fn transform_columns(
             }
             Token::HexStringLiteral(column_value) => {
                 Column::StringValue(column_name.to_string(), column_value.clone())
+            }
+            Token::Word(w)
+                if (w.value == "true" || w.value == "false")
+                    && w.quote_style == None
+                    && w.keyword == NoKeyword =>
+            {
+                Column::BooleanValue(column_name.to_string(), w.value.parse::<bool>().unwrap())
             }
             _ => Column::None(column_name.to_string()),
         };
