@@ -7,47 +7,47 @@ use crate::types::Bytes;
 use crate::utils::binary_exists;
 use std::io::{Error, ErrorKind, Write};
 
-const DEFAULT_POSTGRES_IMAGE: &str = "postgres";
-pub const DEFAULT_POSTGRES_IMAGE_TAG: &str = "13";
-pub const DEFAULT_POSTGRES_CONTAINER_PORT: u16 = 5432;
-pub const DEFAULT_POSTGRES_USER: &str = "postgres";
-pub const DEFAULT_POSTGRES_PASSWORD: &str = "password";
-pub const DEFAULT_POSTGRES_DB: &str = "postgres";
+const DEFAULT_MYSQL_IMAGE: &str = "mysql";
+pub const DEFAULT_MYSQL_IMAGE_TAG: &str = "8";
+pub const DEFAULT_MYSQL_CONTAINER_PORT: u16 = 3306;
+const DEFAULT_MYSQL_PASSWORD: &str = "password";
 
-pub struct PostgresDocker {
+pub struct MysqlDocker {
     pub image: Image,
     pub options: ContainerOptions,
     pub container: Option<Container>,
 }
 
-impl PostgresDocker {
+impl MysqlDocker {
     pub fn new(tag: String, port: u16) -> Self {
         Self {
             image: Image {
-                name: DEFAULT_POSTGRES_IMAGE.to_string(),
+                name: DEFAULT_MYSQL_IMAGE.to_string(),
                 tag,
             },
             options: ContainerOptions {
                 host_port: port,
-                container_port: DEFAULT_POSTGRES_CONTAINER_PORT,
+                container_port: DEFAULT_MYSQL_CONTAINER_PORT,
             },
             container: None,
         }
     }
 }
 
-impl Connector for PostgresDocker {
+impl Connector for MysqlDocker {
     fn init(&mut self) -> Result<(), Error> {
         let _ = binary_exists(DOCKER_BINARY_NAME)?;
         let _ = daemon_is_running()?;
 
-        let password_env = format!("POSTGRES_PASSWORD={}", DEFAULT_POSTGRES_PASSWORD);
-        let user_env = format!("POSTGRES_USER={}", DEFAULT_POSTGRES_USER);
+        let password_env = format!("MYSQL_ROOT_PASSWORD={}", DEFAULT_MYSQL_PASSWORD);
         let container = Container::new(
             &self.image,
             &self.options,
-            vec!["-e", password_env.as_str(), "-e", user_env.as_str()],
-            None,
+            vec!["-e", password_env.as_str()],
+            Some(vec![
+                "mysqld",
+                "--default-authentication-plugin=mysql_native_password",
+            ]),
         )?;
 
         self.container = Some(container);
@@ -55,16 +55,12 @@ impl Connector for PostgresDocker {
     }
 }
 
-impl Destination for PostgresDocker {
+impl Destination for MysqlDocker {
     fn write(&self, data: Bytes) -> Result<(), Error> {
-        let cmd = format!(
-            "PGPASSWORD={} psql --username {} {}",
-            DEFAULT_POSTGRES_PASSWORD, DEFAULT_POSTGRES_USER, DEFAULT_POSTGRES_DB
-        );
-
         match &self.container {
             Some(container) => {
-                let mut container_exec = container.exec(&cmd)?;
+                let mut container_exec =
+                    container.exec("exec mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\"")?;
                 let _ = container_exec
                     .stdin
                     .take()
@@ -91,28 +87,28 @@ impl Destination for PostgresDocker {
 
 #[cfg(test)]
 mod tests {
-    use super::PostgresDocker;
+    use super::MysqlDocker;
     use crate::connector::Connector;
     use crate::destination::Destination;
 
-    fn get_postgres() -> PostgresDocker {
-        PostgresDocker::new("13".to_string(), 5454)
+    fn get_mysql() -> MysqlDocker {
+        MysqlDocker::new("8".to_string(), 3308)
     }
 
-    fn get_invalid_postgres() -> PostgresDocker {
-        PostgresDocker::new("bad_tag".to_string(), 5454)
+    fn get_invalid_mysql() -> MysqlDocker {
+        MysqlDocker::new("bad_tag".to_string(), 3308)
     }
 
     #[test]
     fn connect() {
-        let mut p = get_postgres();
-        let _ = p.init().expect("can't init postgres");
+        let mut p = get_mysql();
+        let _ = p.init().expect("can't init mysql");
         assert!(p.write(b"SELECT 1".to_vec()).is_ok());
 
         // cleanup container
         let _ = p.container.unwrap().rm();
 
-        let mut p = get_invalid_postgres();
+        let mut p = get_invalid_mysql();
         assert!(p.init().is_err());
         assert!(p.write(b"SELECT 1".to_vec()).is_err());
     }

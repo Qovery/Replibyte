@@ -4,12 +4,14 @@ use crate::errors::DumpFileError;
 
 pub mod errors;
 pub mod mongodb;
+pub mod mysql;
 pub mod postgres;
 pub mod utils;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub enum Type {
     Postgres,
+    Mysql,
 }
 
 pub trait LogicalDatabase<'a, T>

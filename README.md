@@ -288,7 +288,7 @@ sequenceDiagram
 - [x] PostgreSQL
 - [x] MongoDB
 - [x] Local dump file
-- [ ] MySQL (Coming Soon)
+- [x] MySQL
 
 ### Supported Transformers
 
@@ -317,7 +317,7 @@ services.
 - [x] PostgreSQL
 - [x] MongoDB
 - [x] Local dump file
-- [ ] MySQL (Coming Soon)
+- [x] MySQL
 
 ## Design
 
@@ -412,9 +412,8 @@ There is no API, RepliByte is fully stateless and store the backup list into the
 ## Local development
 
 For local development, you will need to install [Docker](https://www.docker.com/) and
-run `docker compose -f ./docker-compose-postgres-minio.yml` to start the local databases. At the moment, `docker-compose` includes 2
-PostgreSQL database instances and a [Minio](https://min.io/) bridge. One source, one destination database and one bridge. In the future, we
-will provide more options.
+run `docker compose -f ./docker-compose-dev.yml` to start the local databases. At the moment, `docker-compose` includes 2
+PostgreSQL database instances, 2 MySQL instances, 2 MongoDB instances and a [MinIO](https://min.io/) bridge. One source, one destination by database and one bridge. In the future, we will provide more options.
 
 The Minio console is accessible at http://localhost:9001.
 

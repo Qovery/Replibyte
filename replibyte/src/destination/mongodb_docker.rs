@@ -46,6 +46,7 @@ impl Connector for MongoDBDocker {
             &self.image,
             &self.options,
             vec!["-e", password_env.as_str(), "-e", user_env.as_str()],
+            None,
         )?;
 
         self.container = Some(container);
