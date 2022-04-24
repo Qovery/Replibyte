@@ -121,20 +121,11 @@ impl SourceConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DestinationConfig {
     pub connection_uri: String,
-    pub compression: Option<bool>,
-    pub encryption_key: Option<String>,
 }
 
 impl DestinationConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
-    }
-
-    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
-        match &self.encryption_key {
-            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
-            None => Ok(None),
-        }
     }
 }
 

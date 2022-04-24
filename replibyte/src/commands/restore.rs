@@ -21,11 +21,23 @@ use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::Task;
 
 /// Restore a backup in a local container
-pub fn local<F: Fn(usize, usize) -> (), B: Bridge + 'static>(
+pub fn local<F, B>(
     args: &RestoreLocalArgs,
-    bridge: B,
+    mut bridge: B,
+    config: Config,
     progress_callback: F,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    F: Fn(usize, usize) -> (),
+    B: Bridge + 'static,
+{
+    // The encryption key is necessarily the same as the source configuration so we read it in the source configuration
+    if let Some(source_config) = config.source {
+        if let Some(encryption_key) = source_config.encryption_key()? {
+            bridge.set_encryption_key(encryption_key);
+        }
+    }
+
     let options = match args.value.as_str() {
         "latest" => ReadOptions::Latest,
         v => ReadOptions::Backup {
@@ -175,12 +187,23 @@ pub fn local<F: Fn(usize, usize) -> (), B: Bridge + 'static>(
 }
 
 /// Restore a backup in the configured destination
-pub fn remote<F: Fn(usize, usize) -> (), B: Bridge + 'static>(
+pub fn remote<F, B>(
     args: &RestoreArgs,
-    bridge: B,
+    mut bridge: B,
     config: Config,
     progress_callback: F,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    F: Fn(usize, usize) -> (),
+    B: Bridge + 'static,
+{
+    // The encryption key is necessarily the same as the source configuration so we read it in the source configuration
+    if let Some(source_config) = config.source {
+        if let Some(encryption_key) = source_config.encryption_key()? {
+            bridge.set_encryption_key(encryption_key);
+        }
+    }
+
     match config.destination {
         Some(destination) => {
             let options = match args.value.as_str() {

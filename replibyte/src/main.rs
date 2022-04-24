@@ -94,22 +94,6 @@ fn main() -> anyhow::Result<()> {
         config.bridge.endpoint()?,
     );
 
-    match &config.source {
-        Some(source) => {
-            bridge.set_compression(source.compression.unwrap_or(true));
-            bridge.set_encryption_key(source.encryption_key()?)
-        }
-        None => {}
-    }
-
-    match &config.destination {
-        Some(dest) => {
-            bridge.set_compression(dest.compression.unwrap_or(true));
-            bridge.set_encryption_key(dest.encryption_key()?);
-        }
-        None => {}
-    }
-
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
     let sub_commands: &SubCommand = &args.sub_commands;
 
@@ -152,7 +136,7 @@ fn main() -> anyhow::Result<()> {
         },
         SubCommand::Restore(cmd) => match cmd {
             RestoreCommand::Local(args) => {
-                commands::restore::local(args, bridge, progress_callback)
+                commands::restore::local(args, bridge, config, progress_callback)
             }
             RestoreCommand::Remote(args) => {
                 commands::restore::remote(args, bridge, config, progress_callback)
