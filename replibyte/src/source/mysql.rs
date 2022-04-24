@@ -8,7 +8,7 @@ use dump_parser::mysql::{
     get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
     Token,
 };
-use dump_parser::utils::{list_queries_from_dump_reader, ListQueryResult};
+use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
 
 use crate::connector::Connector;
 use crate::source::Source;
@@ -17,8 +17,6 @@ use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
 use crate::utils::binary_exists;
 
 use super::SourceOptions;
-
-pub const COMMENT_CHARS: &str = "--";
 
 enum RowType {
     InsertInto {
@@ -145,7 +143,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
         let _ = skip_tables_map.insert(format!("{}.{}", skip.database, skip.table), true);
     }
 
-    match list_queries_from_dump_reader(reader, COMMENT_CHARS, |query| {
+    match list_sql_queries_from_dump_reader(reader, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         match get_row_type(&tokens) {
