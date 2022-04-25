@@ -75,6 +75,11 @@ impl TelemetryClient {
         let mut props = HashMap::new();
         let _ = props.insert("args".to_string(), args.join(" ").to_string());
 
+        props.insert(
+            "encryption_used".to_string(),
+            config.encryption_key.is_some().to_string(),
+        );
+
         match &config.source {
             Some(x) => {
                 props.insert(
@@ -90,11 +95,6 @@ impl TelemetryClient {
                 props.insert(
                     "compression_used".to_string(),
                     x.compression.unwrap_or(true).to_string(),
-                );
-
-                props.insert(
-                    "encryption_used".to_string(),
-                    x.encryption_key.is_some().to_string(),
                 );
 
                 props.insert("skip_tables_used".to_string(), x.skip.is_some().to_string());

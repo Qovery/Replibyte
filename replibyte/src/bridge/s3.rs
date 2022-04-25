@@ -179,13 +179,17 @@ impl Bridge for S3 {
             let data = get_object(&self.client, self.bucket.as_str(), object.key().unwrap())?;
 
             // decrypt data?
-            let data = match &self.encryption_key {
-                Some(key) => decrypt(data, key.as_str())?,
-                None => data,
+            let data = if backup.encrypted {
+                // It should be safe to unwrap here because the backup is marked as encrypted in the backup manifest
+                // so if there is no encryption key set at the bridge level we want to panic.
+                let encryption_key = self.encryption_key.as_ref().unwrap();
+                decrypt(data, encryption_key.as_str())?
+            } else {
+                data
             };
 
             // decompress data?
-            let data = if self.enable_compression {
+            let data = if backup.compressed {
                 decompress(data)?
             } else {
                 data
@@ -197,8 +201,8 @@ impl Bridge for S3 {
         Ok(())
     }
 
-    fn set_encryption_key(&mut self, key: Option<String>) {
-        self.encryption_key = key;
+    fn set_encryption_key(&mut self, key: String) {
+        self.encryption_key = Some(key);
     }
 
     fn set_compression(&mut self, enable: bool) {

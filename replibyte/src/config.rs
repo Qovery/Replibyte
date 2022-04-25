@@ -23,6 +23,7 @@ pub struct Config {
     pub source: Option<SourceConfig>,
     pub bridge: BridgeConfig,
     pub destination: Option<DestinationConfig>,
+    pub encryption_key: Option<String>,
 }
 
 pub enum ConnectorConfig<'a> {
@@ -44,6 +45,13 @@ impl Config {
             ErrorKind::Other,
             "<source> or <destination> is mandatory",
         ))
+    }
+
+    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
+        match &self.encryption_key {
+            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
+            None => Ok(None),
+        }
     }
 }
 
@@ -99,7 +107,6 @@ impl BridgeConfig {
 pub struct SourceConfig {
     pub connection_uri: String,
     pub compression: Option<bool>,
-    pub encryption_key: Option<String>,
     pub transformers: Vec<TransformerConfig>,
     pub skip: Option<Vec<SkipConfig>>,
     pub database_subset: Option<DatabaseSubsetConfig>,
@@ -109,32 +116,16 @@ impl SourceConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
     }
-
-    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
-        match &self.encryption_key {
-            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
-            None => Ok(None),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DestinationConfig {
     pub connection_uri: String,
-    pub compression: Option<bool>,
-    pub encryption_key: Option<String>,
 }
 
 impl DestinationConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
         parse_connection_uri(self.connection_uri.as_str())
-    }
-
-    pub fn encryption_key(&self) -> Result<Option<String>, Error> {
-        match &self.encryption_key {
-            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
-            None => Ok(None),
-        }
     }
 }
 

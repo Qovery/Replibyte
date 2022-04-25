@@ -21,7 +21,7 @@ pub trait Bridge: Connector + Send + Sync {
     where
         F: FnMut(Bytes);
     fn set_compression(&mut self, enable: bool);
-    fn set_encryption_key(&mut self, key: Option<String>);
+    fn set_encryption_key(&mut self, key: String);
 }
 
 #[derive(Serialize, Deserialize)]

@@ -1,6 +1,6 @@
+encryption_key: $ENCRYPTION_SECRET
 source:
   connection_uri: $SOURCE_CONNECTION_URI
-  encryption_key: $ENCRYPTION_SECRET
   transformers:
     - database: public # TO CHANGE
       table: employees # TO CHANGE
@@ -11,7 +11,6 @@ source:
           transformer_name: random # TO CHANGE
 destination:
   connection_uri: $DESTINATION_CONNECTION_URI
-  encryption_key: $ENCRYPTION_SECRET
 bridge:
   bucket: $S3_BUCKET
   region: $S3_REGION

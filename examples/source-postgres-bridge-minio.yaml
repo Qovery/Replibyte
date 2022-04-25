@@ -1,3 +1,4 @@
+encryption_key: 'this is a test'
 source:
   connection_uri: postgres://root:password@localhost:5432/root
   transformers:
@@ -15,3 +16,5 @@ bridge:
   secret_access_key: minioadmin
   endpoint:
     custom: 'http://localhost:9000'
+destination:
+  connection_uri: postgres://root:password@localhost:5453/root
