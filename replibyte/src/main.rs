@@ -71,21 +71,45 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     let start_exec_time = utils::epoch_millis();
-    let env_args = env::args().collect::<Vec<String>>();
 
     env_logger::init();
+
+    let env_args = env::args().collect::<Vec<String>>();
     let args = CLI::parse();
+
+    let file = File::open(args.config).expect("missing config file");
+    let config: Config = serde_yaml::from_reader(file).expect("bad config file format");
+
+    let sub_commands: &SubCommand = &args.sub_commands;
 
     let telemetry_client = match args.no_telemetry {
         true => None,
         false => Some(TelemetryClient::new(ClientOptions::from(TELEMETRY_TOKEN))),
     };
 
-    let file = File::open(args.config)?;
-    let config: Config = serde_yaml::from_reader(file)?;
+    let telemetry_config = config.clone();
 
+    if let Some(telemetry_client) = &telemetry_client {
+        let _ = telemetry_client.capture_command(&telemetry_config, sub_commands, &env_args, None);
+    }
+
+    if let Err(err) = run(config, &sub_commands) {
+        eprintln!("{}", err);
+    }
+
+    if let Some(telemetry_client) = &telemetry_client {
+        let _ = telemetry_client.capture_command(
+            &telemetry_config,
+            sub_commands,
+            &env_args,
+            Some(epoch_millis() - start_exec_time),
+        );
+    }
+}
+
+fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
     let mut bridge = S3::new(
         config.bridge.bucket()?,
         config.bridge.region()?,
@@ -95,13 +119,6 @@ fn main() -> anyhow::Result<()> {
     );
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
-    let sub_commands: &SubCommand = &args.sub_commands;
-
-    let telemetry_config = config.clone();
-
-    if let Some(telemetry_client) = &telemetry_client {
-        let _ = telemetry_client.capture_command(&telemetry_config, sub_commands, &env_args, None);
-    }
 
     match sub_commands {
         // skip progress when output = true
@@ -118,7 +135,7 @@ fn main() -> anyhow::Result<()> {
         let _ = tx_pb.send((bytes, max_bytes));
     };
 
-    let _ = match sub_commands {
+    match sub_commands {
         SubCommand::Backup(cmd) => match cmd {
             BackupCommand::List => {
                 let _ = commands::backup::list(&mut bridge)?;
@@ -142,16 +159,5 @@ fn main() -> anyhow::Result<()> {
                 commands::restore::remote(args, bridge, config, progress_callback)
             }
         },
-    };
-
-    if let Some(telemetry_client) = &telemetry_client {
-        let _ = telemetry_client.capture_command(
-            &telemetry_config,
-            sub_commands,
-            &env_args,
-            Some(epoch_millis() - start_exec_time),
-        );
     }
-
-    Ok(())
 }
