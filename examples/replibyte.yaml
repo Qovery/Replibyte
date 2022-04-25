@@ -1,6 +1,6 @@
+encryption_key: $ENCRYPTION_SECRET
 source:
   connection_uri: $SOURCE_CONNECTION_URI
-  encryption_key: $ENCRYPTION_SECRET
   transformers:
     - database: public # TO CHANGE
       table: employees # TO CHANGE

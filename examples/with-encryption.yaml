@@ -1,6 +1,6 @@
+encryption_key: this is a secret key
 source:
   connection_uri: postgres://root:password@localhost:5432/root
-  encryption_key: this is a secret key
   transformers:
     - database: public
       table: employees

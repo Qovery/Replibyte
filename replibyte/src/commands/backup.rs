@@ -63,14 +63,14 @@ where
     F: Fn(usize, usize) -> (),
     B: Bridge + 'static,
 {
+    if let Some(encryption_key) = config.encryption_key()? {
+        bridge.set_encryption_key(encryption_key)
+    }
+
     match config.source {
         Some(source) => {
             // Configure bridge options (compression is enabled by default)
             bridge.set_compression(source.compression.unwrap_or(true));
-
-            if let Some(encryption_key) = source.encryption_key()? {
-                bridge.set_encryption_key(encryption_key)
-            }
 
             // Match the transformers from the config
             let transformers = source

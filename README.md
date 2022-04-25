@@ -216,9 +216,9 @@ replibyte -c prod-conf.yaml restore remote -v backup-1647706359405
 Create your `prod-conf.yaml` configuration file to source your production database.
 
 ```yaml
+encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on bridge
 source:
   connection_uri: $DATABASE_URL
-  encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on bridge
   database_subset: # optional - downscale database while keeping it consistent
     database: public
     table: orders
@@ -271,7 +271,7 @@ bridge:
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
   connection_uri: $DATABASE_URL
-  decryption_key: $MY_PUBLIC_DEC_KEY # optional
+encryption_key: $MY_PRIVATE_ENC_KEY # optional - needed to decrypt data on bridge if there was an encryption_key defined when running the source backup
 ```
 
 Run the app for the destination

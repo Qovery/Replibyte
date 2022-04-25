@@ -31,11 +31,8 @@ where
     F: Fn(usize, usize) -> (),
     B: Bridge + 'static,
 {
-    // The encryption key is necessarily the same as the source configuration so we read it in the source configuration
-    if let Some(source_config) = config.source {
-        if let Some(encryption_key) = source_config.encryption_key()? {
-            bridge.set_encryption_key(encryption_key);
-        }
+    if let Some(encryption_key) = config.encryption_key()? {
+        bridge.set_encryption_key(encryption_key);
     }
 
     let options = match args.value.as_str() {
@@ -197,11 +194,8 @@ where
     F: Fn(usize, usize) -> (),
     B: Bridge + 'static,
 {
-    // The encryption key is necessarily the same as the source configuration so we read it in the source configuration
-    if let Some(source_config) = config.source {
-        if let Some(encryption_key) = source_config.encryption_key()? {
-            bridge.set_encryption_key(encryption_key);
-        }
+    if let Some(encryption_key) = config.encryption_key()? {
+        bridge.set_encryption_key(encryption_key);
     }
 
     match config.destination {
