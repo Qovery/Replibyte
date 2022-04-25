@@ -1,7 +1,7 @@
 <p align="center"> <img src="assets/RepliByte%20Logo.png" alt="replibyte logo"/> </p>
 
-<h3 align="center">The Simplest Way To Synchronize Your Cloud Databases</h3>
-<p align="center">Replibyte is a tool to replicate your cloud databases </br>from one place to the other while keeping sensitive data safe 🕵️‍♂️</p>
+<h3 align="center">Seed Your Development Database With Real Data ⚡️</h3>
+<p align="center">Replibyte is a powerful tool to seed your databases </br>with real data and other cool features 🔥</p>
 
 <p align="center">
 <img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
@@ -11,24 +11,21 @@
 
 ## Features
 
-- [x] Support PostgreSQL, MySQL and MongoDB
-- [x] Complete data synchronization (Full-backup)
-- [x] Generate random/fake information
-- [x] Backup TB of data (read [Design](#design))
-- [x] Skip data sync for specific tables
+- [x] Support data backup and restore for PostgreSQL, MySQL and MongoDB
+- [x] Replace sensitive data with fake data
+- [x] Works on large database (> 10GB) (read [Design](#design))
+- [x] Database Subsetting: Scale down a production database to a more reasonable size 🔥
+- [x] Start a local database with the prod data in a single command 🔥
 - [x] On-the-fly data (de)compression (Zlib)
 - [x] On-the-fly data de/encryption (AES-256)
-- [x] Work on different VPC/network
+- [x] Fully stateless (no server, no daemon) and lightweight binary 🍃
 - [x] Use [custom transformers](examples/wasm)
-- [x] Database Subsetting: Scale down a production database to a more reasonable size
-- [x] Start a local database with the prod data in a single command
 
 Here are the features we plan to support
 
 - [ ] Auto-detect and version database schema change
-- [ ] Auto-detect sensitive fields and generate fake data
-- [ ] Auto-clean up bridge data
-- [ ] Incremental data synchronization (Incremental backup)
+- [ ] Auto-detect sensitive fields
+- [ ] Auto-clean backed up data
 
 ## Install
 
@@ -120,19 +117,72 @@ Feel free to edit `./examples/replibyte.yaml` with your configuration.
 
 Example with PostgreSQL as a _Source_ and _Destination_ database **AND** S3 as a _Bridge_ (cf [configuration file](#Configuration))
 
-### Backup your PostgreSQL databases into S3
+### Create a dev database dataset from your production database
+
+<details>
+
+<summary>Show me</summary>
 
 ```shell
 replibyte -c prod-conf.yaml backup run
 ```
 
-### Backup from local PostgreSQL dump file into S3
+*The backup is compressed and stored on your S3 bucket (cf [configuration](#configuration)).*
+
+</details>
+
+### Create a dev database dataset from a dump file
+
+<details>
+
+<summary>Show me</summary>
 
 ```shell
 cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
 ```
 
-### Restore your PostgreSQL databases from S3 into the configured destination
+*The backup is compressed and stored on your S3 bucket (cf [configuration](#configuration)).*
+
+</details>
+
+### Seed my local database (Docker required)
+
+<details>
+
+<summary>Show me</summary>
+
+List all your backups to choose one:
+
+```shell
+replibyte -c prod-conf.yaml backup list
+
+type          name                    size    when                    compressed  encrypted
+PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am   true        true
+PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am  true        true
+PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am  true        true
+```
+
+Restore the latest one into a Postgres container bound on 5433 (default: 5432) port:
+
+```shell
+replibyte -c prod-conf.yaml restore local -v latest --image postgres --port 5433
+```
+
+OR restore a specific one:
+
+```
+replibyte -c prod-conf.yaml restore local -v backup-1647706359405 --image postgres --port 5433
+```
+
+</details>
+
+*The seed comes from your S3 bucket (cf [configuration](#configuration))*
+
+### Seed a remote database
+
+<details>
+
+<summary>Show me</summary>
 
 Show your backups:
 
@@ -157,30 +207,9 @@ OR restore a specific one:
 replibyte -c prod-conf.yaml restore remote -v backup-1647706359405
 ```
 
-### Restore your PostgreSQL databases from S3 into a local Docker container
+*The seed comes from your S3 bucket (cf [configuration](#configuration))*
 
-List all your backups to choose one:
-
-```shell
-replibyte -c prod-conf.yaml backup list
-
-type          name                    size    when                    compressed  encrypted
-PostgreSQL    backup-1647706359405    154MB   Yesterday at 03:00 am   true        true
-PostgreSQL    backup-1647731334517    152MB   2 days ago at 03:00 am  true        true
-PostgreSQL    backup-1647734369306    149MB   3 days ago at 03:00 am  true        true
-```
-
-Restore the latest one into a Postgres container bound on 5433 (default: 5432) port:
-
-```shell
-replibyte -c prod-conf.yaml restore local -v latest --image postgres --port 5433
-```
-
-OR restore a specific one:
-
-```
-replibyte -c prod-conf.yaml restore local -v backup-1647706359405 --image postgres --port 5433
-```
+</details>
 
 ### Configuration
 
@@ -253,52 +282,13 @@ replibyte -c staging-conf.yaml
 
 ## How RepliByte works
 
-RepliByte is built to replicate small and very large databases from one place (source) to the other (destination) with a bridge as
-intermediary (bridge). Here is an example of what happens while replicating a PostgreSQL database.
+<details>
 
-```mermaid
-sequenceDiagram
-    participant RepliByte
-    participant PostgreSQL (Source)
-    participant AWS S3 (Bridge)
-    PostgreSQL (Source)->>RepliByte: 1. Dump data
-    loop
-        RepliByte->>RepliByte: 2. Subsetting (optional)
-        RepliByte->>RepliByte: 3. Hide or fake sensitive data (optional)
-        RepliByte->>RepliByte: 4. Compress data (optional)
-        RepliByte->>RepliByte: 5. Encrypt data (optional)
-    end
-    RepliByte->>AWS S3 (Bridge): 6. Upload obfuscated dump data
-    RepliByte->>AWS S3 (Bridge): 7. Write index file
-```
+<summary>Show me how RepliByte works</summary>
 
-1. RepliByte connects to the _PostgreSQL Source_ database and makes a full SQL dump of it.
-2. RepliByte receives the SQL dump, parse it, and generates random/fake information in real-time.
-3. RepliByte streams and uploads the modified SQL dump in real-time on AWS S3.
-4. RepliByte keeps track of the uploaded SQL dump by writing it into an index file.
+Check out our [Design page](docs/DESIGN.md)
 
----
-
-Once at least a replica from the source PostgreSQL database is available in the S3 bucket, RepliByte can use and inject it into the
-destination PostgreSQL database.
-
-```mermaid
-sequenceDiagram
-    participant RepliByte
-    participant PostgreSQL (Destination)
-    participant AWS S3 (Bridge)
-    AWS S3 (Bridge)->>RepliByte: 1. Read index file
-    AWS S3 (Bridge)->>RepliByte: 2. Download dump SQL file
-    loop
-        RepliByte->>RepliByte: 3. Decrypt data (if required)
-        RepliByte->>RepliByte: 4. Uncompress data (if required)
-    end
-    RepliByte->>PostgreSQL (Destination): 5. Restore dump SQL
-```
-
-1. RepliByte connects to the S3 bucket and reads the index file to retrieve the latest SQL to download.
-2. RepliByte downloads the SQL dump in a stream bytes.
-3. RepliByte restores the SQL dump in the destination PostgreSQL database in real-time.
+</details>
 
 ## Connectors
 
@@ -313,7 +303,7 @@ sequenceDiagram
 
 A transformer is useful to change / hide the value of a column. RepliByte provides pre-made transformers.
 
-Check out the [list of our available Transformers](TRANSFORMERS.md)
+Check out the [list of our available Transformers](docs/TRANSFORMERS.md)
 
 ### RepliByte Bridge
 
@@ -338,41 +328,6 @@ services.
 - [x] Local dump file
 - [x] MySQL
 
-## Design
-
-### Low Memory and CPU footprint
-
-Written in Rust, RepliByte can run with 512 MB of RAM and 1 CPU to replicate 1 TB of data (we are working on a benchmark). RepliByte
-replicate the data in a stream of bytes and does not store anything on a local disk.
-
-### Limitations
-
-- Tested with PostgreSQL 13 and 14. It should work with prior versions.
-- RepliByte as not been designed to run multiple backups targeting the same Bridge. The Index File does not manage concurrent write (ATM).
-
-### Index file structure
-
-An index file describe the structure of your backups and all of them.
-
-Here is the manifest file that you can find at the root of your target `Bridge` (E.g: S3).
-
-```json
-{
-  "backups": [
-    {
-      "size": 1024000,
-      "directory_name": "backup-{epoch timestamp}",
-      "created_at": "epoch timestamp",
-      "compressed": true,
-      "encrypted": true
-    }
-  ]
-}
-```
-
-- _size_ is in bytes
-- _created_at_ is an epoch timestamp in millis
-
 ## Motivation
 
 At [Qovery](https://www.qovery.com) (the company behind RepliByte), developers can clone their applications and databases just with one
@@ -382,18 +337,13 @@ the Qovery team wants to provide a comprehensive way to seed cloud databases fro
 The long-term motivation behind RepliByte is to provide a way to clone any database in real-time. This project starts small, but has big
 ambition!
 
-## Use cases
+## FAQ
 
-- Synchronize **the whole** PostgreSQL/MongoDB **instance**.
-- Synchronize **the whole** PostgreSQL/MongoDB **instance** and **replace sensitive data** with fake data.
-- Synchronize **specific** PostgreSQL/MongoDB **tables** and **replace sensitive data** with fake data.
-- Synchronize **specific** PostgreSQL/MongoDB **databases** and **replace sensitive data** with fake data.
-- Synchronize **a subset** of your production database.
-- **Migrate** from one **database** hosting platform to the other.
+### Q: Does RepliByte is an ETL?
 
-## What is not RepliByte
+<details>
 
-### RepliByte is not an ETL
+<summary>Answer</summary>
 
 RepliByte is not an ETL like [AirByte](https://github.com/airbytehq/airbyte), [AirFlow](https://airflow.apache.org/), Talend, and it will
 never be. If you need to synchronize versatile data sources, you are better choosing a classic ETL. RepliByte is a tool for software
@@ -401,11 +351,15 @@ engineers to help them to synchronize data from the same databases. With RepliBy
 databases. As mentioned above, the primary purpose of RepliByte is to duplicate into different environments. You can see RepliByte as a
 specific use case of an ETL, where an ETL is more generic.
 
-## FAQ
+</details>
 
 ### Q: Do you support backup from a dump file?
 
-Answer: absolutely,
+<details>
+
+<summary>Answer</summary>
+
+absolutely,
 
 ```shell
 cat dump.sql | replibyte -c prod-conf.yaml backup run -s postgres -i
@@ -417,7 +371,13 @@ and
 replibyte -c prod-conf.yaml backup run -s postgres -f dump.sql
 ```
 
+</details>
+
 ### How RepliByte can list the backups? Is there an API?
+
+<details>
+
+<summary>Answer</summary>
 
 There is no API, RepliByte is fully stateless and store the backup list into the bridge (E.g. S3) via an [index_file](#index-file-structure)
 .
@@ -426,7 +386,13 @@ There is no API, RepliByte is fully stateless and store the backup list into the
 
 ⬆️ _Open an issue if you have any question - I'll pick the most common questions and put them here with the answer_
 
+</details>
+
 # Contributing
+
+<details>
+
+<summary>Show me how to contribute</summary>
 
 ## Local development
 
@@ -460,7 +426,13 @@ Check the open [issues](https://github.com/Qovery/replibyte/issues) and their pr
 2. Join our #replibyte channel on [our discord](https://discord.qovery.com).
 3. Drop us an email to `github+replibyte {at} qovery {dot} com`.
 
+</details>
+
 ## Telemetry
+
+<details>
+
+<summary>Show me</summary>
 
 RepliByte collects anonymized data from users in order to improve our product. Feel free to inspect the
 code [here](replibyte/src/telemetry.rs). This can be deactivated at any time, and any data that has already been collected can be deleted on
@@ -471,12 +443,14 @@ request (hello+replibyte {at} qovery {dot} com).
 - Command line parameters
 - Options used (subset, transformer, compression) in the configuration file.
 
-## Live Coding Session
-
-Romaric, main contributor to RepliByte does some [live coding session on Twitch](https://www.twitch.tv/codewithromaric) to learn more about
-RepliByte and explain how to develop in Rust. Feel free to [join the sessions](https://www.twitch.tv/codewithromaric).
+</details>
 
 ## Thanks
 
 Thanks to all people sharing their ideas to make RepliByte better. We do appreciate it. I would also thank [AirByte](https://airbyte.com/),
 a great product and a trustworthy source of inspiration for this project.
+
+## Additional resources
+
+- [RepliByte Design](docs/DESIGN.md)
+- [Transformers](docs/TRANSFORMERS.md)
