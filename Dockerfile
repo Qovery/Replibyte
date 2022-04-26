@@ -1,17 +1,11 @@
 FROM rust:1.59-buster as build
 
-# MongoDB binaries
-RUN apt-get update && \
-    apt-get install -y mongo-tools
-
-# Postgres binaries
-RUN apt-get install -y wget postgresql-client
-
 # create a new empty shell project
 RUN USER=root cargo new --bin replibyte
 WORKDIR /replibyte
 RUN USER=root cargo new --lib replibyte
 RUN USER=root cargo new --lib dump-parser
+RUN USER=root cargo new --lib subset
 
 # copy over your manifests
 # root
@@ -20,6 +14,9 @@ COPY ./Cargo.toml ./Cargo.toml
 
 # dump-parser
 COPY ./dump-parser ./dump-parser
+
+# subset
+COPY ./subset ./subset
 
 # replibyte
 COPY ./replibyte/Cargo.toml ./replibyte/Cargo.toml
@@ -32,6 +29,7 @@ RUN rm src/*.rs
 # copy your source tree
 COPY ./replibyte/src ./replibyte/src
 COPY ./dump-parser/src ./dump-parser/src
+COPY ./subset/src ./subset/src
 
 # build for release
 RUN rm ./target/release/deps/replibyte*
@@ -39,6 +37,18 @@ RUN cargo build --release
 
 # our final base
 FROM rust:1.59-slim-buster
+
+# Install Postgres and MySQL binaries
+RUN apt-get clean && apt-get update && apt-get install -y \
+    wget \
+    postgresql-client \
+    default-mysql-client
+
+# Install MongoDB tools
+RUN wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-debian92-x86_64-100.5.2.deb && \
+    apt install ./mongodb-database-tools-*.deb && \
+    rm -f mongodb-database-tools-*.deb && \
+    rm -rf /var/lib/apt/lists/*
 
 # copy the build artifact from the build stage
 COPY --from=build /replibyte/target/release/replibyte .
