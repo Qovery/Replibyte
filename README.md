@@ -166,6 +166,10 @@ Restore the latest one into a Postgres container bound on 5433 (default: 5432) p
 
 ```shell
 replibyte -c prod-conf.yaml restore local -v latest --image postgres --port 5433
+
+To connect to your Postgres database, use the following connection string:
+> postgres://postgres:password@localhost:5433/postgres
+Waiting for Ctrl-C to stop the container
 ```
 
 OR restore a specific one:
