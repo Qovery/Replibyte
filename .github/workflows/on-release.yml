@@ -36,7 +36,7 @@ jobs:
           sudo mv replibyte $FILE
           sudo tar -czvf ${FILE}.tar.gz $FILE && sudo rm $FILE
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
-          sudo sha256sum "${FILE}.tar.gz" | cut -d ' ' -f 1 > ${FILE}.sha256sum
+          sudo sha256sum "${FILE}.tar.gz" | cut -d ' ' -f 1 > ${FILE}.tar.gz.sha256sum
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -76,7 +76,7 @@ jobs:
           sudo mv replibyte.exe $FILE
           sudo zip -9r ${FILE}.zip $FILE && sudo rm $FILE
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
-          sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.sha256sum
+          sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -117,7 +117,7 @@ jobs:
           sudo mv replibyte $FILE
           sudo zip -9r ${FILE}.zip $FILE && sudo rm $FILE
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
-          sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.sha256sum
+          sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
 
       - name: Release
         uses: softprops/action-gh-release@v1
