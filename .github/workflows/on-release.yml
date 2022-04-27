@@ -117,7 +117,8 @@ jobs:
           sudo mv replibyte $FILE
           sudo zip -9r ${FILE}.zip $FILE && sudo rm $FILE
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
-          sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
+          CHECKSUM=$(sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1)
+          echo "${CHECKSUM} ${FILE}.zip" > ${FILE}.zip.sha256sum
 
       - name: Release
         uses: softprops/action-gh-release@v1
