@@ -315,7 +315,7 @@ The S3 wire protocol, used by RepliByte bridge, is supported by most cloud provi
 services.
 
 | Cloud Service Provider | S3 service name                                                           | S3 compatible  |
-| ---------------------- | ------------------------------------------------------------------------- | -------------- |
+|------------------------|---------------------------------------------------------------------------|----------------|
 | Amazon Web Services    | [S3](https://aws.amazon.com/s3/)                                          | Yes (Original) |
 | Google Cloud Platform  | [Cloud Storage](https://cloud.google.com/storage)                         | Yes            |
 | Microsoft Azure        | [Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) | Yes            |
