@@ -13,7 +13,7 @@
 
 - [x] Support data backup and restore for PostgreSQL, MySQL and MongoDB
 - [x] Replace sensitive data with fake data
-- [x] Works on large database (> 10GB) (read [Design](../docs/DESIGN.md))
+- [x] Works on large database (> 10GB) (read [Design](./docs/DESIGN.md))
 - [x] Database Subsetting: Scale down a production database to a more reasonable size 🔥
 - [x] Start a local database with the prod data in a single command 🔥
 - [x] On-the-fly data (de)compression (Zlib)
