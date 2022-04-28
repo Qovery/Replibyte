@@ -23,6 +23,7 @@ pub trait Bridge: Connector + Send + Sync {
     fn set_compression(&mut self, enable: bool);
     fn set_encryption_key(&mut self, key: String);
     fn set_backup_name(&mut self, key: String);
+    fn delete(&self, backup_name: &str) -> Result<(), Error>;
 }
 
 #[derive(Serialize, Deserialize)]

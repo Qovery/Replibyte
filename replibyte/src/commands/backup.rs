@@ -190,3 +190,12 @@ where
         }
     }
 }
+
+pub fn delete<B>(backup: &str, bridge: B) -> anyhow::Result<()>
+where
+    B: Bridge + 'static,
+{
+    let _ = bridge.delete(backup)?;
+    println!("Backup deleted!");
+    Ok(())
+}

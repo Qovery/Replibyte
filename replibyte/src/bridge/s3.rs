@@ -2,7 +2,9 @@ use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
 use aws_config::provider_config::ProviderConfig;
-use aws_sdk_s3::model::{BucketLocationConstraint, CreateBucketConfiguration, Object};
+use aws_sdk_s3::model::{
+    BucketLocationConstraint, CreateBucketConfiguration, Delete, Object, ObjectIdentifier,
+};
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
@@ -212,6 +214,21 @@ impl Bridge for S3 {
     fn set_backup_name(&mut self, name: String) {
         self.root_key = name;
     }
+
+    fn delete(&self, backup_name: &str) -> Result<(), Error> {
+        let mut index_file = self.index_file()?;
+
+        let bucket = &self.bucket;
+
+        let _ =
+            delete_directory(&self.client, bucket, backup_name).map_err(|err| Error::from(err))?;
+
+        index_file
+            .backups
+            .retain(|b| b.directory_name != backup_name);
+
+        self.write_index_file(&index_file)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -223,6 +240,7 @@ enum S3Error<'a> {
     FailedObjectDownload { bucket: &'a str, key: &'a str },
     FailedObjectUpload { bucket: &'a str, key: &'a str },
     FailedToDeleteObject { bucket: &'a str, key: &'a str },
+    FailedToDeleteDirectory { bucket: &'a str, directory: &'a str },
 }
 
 impl<'a> From<S3Error<'a>> for Error {
@@ -267,6 +285,10 @@ impl<'a> From<S3Error<'a>> for Error {
             } => Error::new(
                 ErrorKind::Other,
                 format!("failed to delete object '{}/{}'", bucket, object),
+            ),
+            S3Error::FailedToDeleteDirectory { bucket, directory } => Error::new(
+                ErrorKind::Other,
+                format!("failed to delete directory '{}/{}'", bucket, directory),
             ),
         }
     }
@@ -409,6 +431,44 @@ fn delete_object<'a>(client: &Client, bucket: &'a str, key: &'a str) -> Result<(
     match result {
         Ok(_) => Ok(()),
         Err(_) => Err(S3Error::FailedToDeleteObject { bucket, key }),
+    }
+}
+
+fn delete_directory<'a>(
+    client: &Client,
+    bucket: &'a str,
+    directory: &'a str,
+) -> Result<(), S3Error<'a>> {
+    if let Ok(objects) = block_on(
+        client
+            .list_objects_v2()
+            .bucket(bucket)
+            .prefix(directory)
+            .send(),
+    ) {
+        let mut delete_objects: Vec<ObjectIdentifier> = vec![];
+        for obj in objects.contents().unwrap_or_default() {
+            let obj_id = ObjectIdentifier::builder()
+                .set_key(Some(obj.key().unwrap().to_string()))
+                .build();
+            delete_objects.push(obj_id);
+        }
+
+        match block_on(
+            client
+                .delete_objects()
+                .bucket(bucket)
+                .delete(Delete::builder().set_objects(Some(delete_objects)).build())
+                .send(),
+        ) {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                eprintln!("{}", err);
+                Err(S3Error::FailedToDeleteDirectory { bucket, directory })
+            }
+        }
+    } else {
+        Err(S3Error::FailedToListObjects { bucket })
     }
 }
 
@@ -569,5 +629,65 @@ mod tests {
         s3.set_backup_name("custom-backup-name".to_string());
 
         assert_eq!(s3.root_key, "custom-backup-name".to_string())
+    }
+
+    #[test]
+    fn test_s3_backup_delete() {
+        let bucket = bucket();
+        let mut s3 = s3(bucket.as_str());
+
+        let _ = s3.init().expect("s3 init failed");
+
+        assert!(s3.index_file().is_ok());
+
+        let mut index_file = s3.index_file().unwrap();
+
+        assert!(index_file.backups.is_empty());
+
+        // Add 2 backups in the manifest
+        index_file.backups.push(Backup {
+            directory_name: "backup-1".to_string(),
+            size: 0,
+            created_at: epoch_millis(),
+            compressed: true,
+            encrypted: false,
+        });
+
+        index_file.backups.push(Backup {
+            directory_name: "backup-2".to_string(),
+            size: 0,
+            created_at: epoch_millis(),
+            compressed: true,
+            encrypted: false,
+        });
+
+        assert!(s3.write_index_file(&index_file).is_ok());
+        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-1/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-2/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(s3.delete("backup-1").is_ok());
+
+        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
+
+        assert!(s3.delete("backup-2").is_ok());
+        assert!(s3.index_file().unwrap().backups.is_empty());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
     }
 }

@@ -38,6 +38,12 @@ pub enum BackupCommand {
     List,
     /// launch backup -- use `-h` to show all the options
     Run(BackupRunArgs),
+    /// delete a backup from the bridge
+    Delete {
+        /// backup name
+        #[clap(required = true)]
+        backup: String,
+    },
 }
 
 /// all transformer commands
