@@ -8,12 +8,14 @@ use aws_sdk_s3::model::{
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
+use chrono::{Duration, Utc};
 use log::{error, info};
 
 use crate::bridge::s3::S3Error::FailedObjectUpload;
 use crate::bridge::{
     compress, decompress, decrypt, encrypt, Backup, Bridge, IndexFile, ReadOptions,
 };
+use crate::cli::BackupDeleteArgs;
 use crate::config::Endpoint;
 use crate::connector::Connector;
 use crate::runtime::block_on;
@@ -215,20 +217,96 @@ impl Bridge for S3 {
         self.root_key = name;
     }
 
-    fn delete(&self, backup_name: &str) -> Result<(), Error> {
-        let mut index_file = self.index_file()?;
+    fn delete(&self, args: &BackupDeleteArgs) -> Result<(), Error> {
+        if let Some(backup_name) = &args.backup {
+            return delete_by_name(&self, backup_name.as_str());
+        }
 
-        let bucket = &self.bucket;
+        if let Some(older_than) = &args.older_than {
+            let days = match older_than.chars().nth_back(0) {
+                Some('d') => {
+                    // remove the last character which corresponds to the unit
+                    let mut older_than = older_than.to_string();
+                    older_than.pop();
 
-        let _ =
-            delete_directory(&self.client, bucket, backup_name).map_err(|err| Error::from(err))?;
+                    match older_than.parse::<i64>() {
+                        Ok(days) => days,
+                        Err(err) => return Err(Error::new(
+                            ErrorKind::Other,
+                            format!("command error: {} - invalid `--older-than` format. Use `--older-than=14d`", err),
+                        )),
+                    }
+                }
+                _ => {
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        "command error: invalid `--older-than` format. Use `--older-than=14d`",
+                    ))
+                }
+            };
 
-        index_file
-            .backups
-            .retain(|b| b.directory_name != backup_name);
+            return delete_older_than(&self, days);
+        }
 
-        self.write_index_file(&index_file)
+        if let Some(keep_last) = args.keep_last {
+            return delete_keep_last(&self, keep_last);
+        }
+
+        Err(Error::new(
+            ErrorKind::Other,
+            "command error: parameters or options required",
+        ))
     }
+}
+
+fn delete_older_than(bridge: &S3, days: i64) -> Result<(), Error> {
+    let index_file = bridge.index_file()?;
+
+    let threshold_date = Utc::now() - Duration::days(days);
+    let threshold_date = threshold_date.timestamp_millis() as u128;
+
+    let backups_to_delete: Vec<Backup> = index_file
+        .backups
+        .into_iter()
+        .filter(|b| b.created_at.lt(&threshold_date))
+        .collect();
+
+    for backup in backups_to_delete {
+        delete_by_name(&bridge, backup.directory_name.as_str())?
+    }
+
+    Ok(())
+}
+
+fn delete_keep_last(bridge: &S3, keep_last: usize) -> Result<(), Error> {
+    let mut index_file = bridge.index_file()?;
+
+    index_file
+        .backups
+        .sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    if let Some(backups) = index_file.backups.get(keep_last..) {
+        for backup in backups {
+            delete_by_name(&bridge, backup.directory_name.as_str())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn delete_by_name(bridge: &S3, backup_name: &str) -> Result<(), Error> {
+    let mut index_file = bridge.index_file()?;
+
+    let bucket = &bridge.bucket;
+
+    let _ =
+        delete_directory(&bridge.client, bucket, backup_name).map_err(|err| Error::from(err))?;
+
+    index_file
+        .backups
+        .retain(|b| b.directory_name != backup_name);
+
+    bridge.write_index_file(&index_file)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -474,10 +552,12 @@ fn delete_directory<'a>(
 
 #[cfg(test)]
 mod tests {
+    use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
 
     use crate::bridge::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
     use crate::bridge::{Backup, Bridge};
+    use crate::cli::BackupDeleteArgs;
     use crate::config::Endpoint;
     use crate::connector::Connector;
     use crate::utils::epoch_millis;
@@ -632,7 +712,7 @@ mod tests {
     }
 
     #[test]
-    fn test_s3_backup_delete() {
+    fn test_s3_backup_delete_by_name() {
         let bucket = bucket();
         let mut s3 = s3(bucket.as_str());
 
@@ -680,14 +760,192 @@ mod tests {
         )
         .is_ok());
 
-        assert!(s3.delete("backup-1").is_ok());
+        assert!(s3
+            .delete(&BackupDeleteArgs {
+                backup: Some("backup-1".to_string()),
+                older_than: None,
+                keep_last: None
+            })
+            .is_ok());
 
         assert_eq!(s3.index_file().unwrap().backups.len(), 1);
         assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
         assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
 
-        assert!(s3.delete("backup-2").is_ok());
+        assert!(s3
+            .delete(&BackupDeleteArgs {
+                backup: Some("backup-2".to_string()),
+                older_than: None,
+                keep_last: None
+            })
+            .is_ok());
         assert!(s3.index_file().unwrap().backups.is_empty());
         assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
+    }
+
+    #[test]
+    fn test_s3_backup_delete_older_than() {
+        let bucket = bucket();
+        let mut s3 = s3(bucket.as_str());
+
+        let _ = s3.init().expect("s3 init failed");
+
+        assert!(s3.index_file().is_ok());
+
+        let mut index_file = s3.index_file().unwrap();
+
+        assert!(index_file.backups.is_empty());
+
+        // Add a backup from 5 days ago
+        index_file.backups.push(Backup {
+            directory_name: "backup-1".to_string(),
+            size: 0,
+            created_at: (Utc::now() - Duration::days(5)).timestamp_millis() as u128,
+            compressed: true,
+            encrypted: false,
+        });
+
+        // Add a backup from now
+        index_file.backups.push(Backup {
+            directory_name: "backup-2".to_string(),
+            size: 0,
+            created_at: epoch_millis(),
+            compressed: true,
+            encrypted: false,
+        });
+
+        assert!(s3.write_index_file(&index_file).is_ok());
+        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-1/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-2/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(s3
+            .delete(&BackupDeleteArgs {
+                backup: None,
+                older_than: Some("6d".to_string()),
+                keep_last: None
+            })
+            .is_ok());
+
+        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_ok());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
+
+        assert!(s3
+            .delete(&BackupDeleteArgs {
+                backup: None,
+                older_than: Some("5d".to_string()),
+                keep_last: None
+            })
+            .is_ok());
+
+        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
+    }
+
+    #[test]
+    fn test_s3_backup_keep_last() {
+        let bucket = bucket();
+        let mut s3 = s3(bucket.as_str());
+
+        let _ = s3.init().expect("s3 init failed");
+
+        assert!(s3.index_file().is_ok());
+
+        let mut index_file = s3.index_file().unwrap();
+
+        assert!(index_file.backups.is_empty());
+
+        index_file.backups.push(Backup {
+            directory_name: "backup-1".to_string(),
+            size: 0,
+            created_at: (Utc::now() - Duration::days(3)).timestamp_millis() as u128,
+            compressed: true,
+            encrypted: false,
+        });
+
+        index_file.backups.push(Backup {
+            directory_name: "backup-2".to_string(),
+            size: 0,
+            created_at: (Utc::now() - Duration::days(5)).timestamp_millis() as u128,
+            compressed: true,
+            encrypted: false,
+        });
+
+        index_file.backups.push(Backup {
+            directory_name: "backup-3".to_string(),
+            size: 0,
+            created_at: epoch_millis(),
+            compressed: true,
+            encrypted: false,
+        });
+
+        assert!(s3.write_index_file(&index_file).is_ok());
+        assert_eq!(s3.index_file().unwrap().backups.len(), 3);
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-1/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-2/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            "backup-3/testing-key.dump",
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert!(s3
+            .delete(&BackupDeleteArgs {
+                backup: None,
+                older_than: None,
+                keep_last: Some(2)
+            })
+            .is_ok());
+
+        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_ok());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-3/testing-key.dump").is_ok());
+
+        assert!(s3
+            .delete(&BackupDeleteArgs {
+                backup: None,
+                older_than: None,
+                keep_last: Some(1)
+            })
+            .is_ok());
+
+        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "backup-3/testing-key.dump").is_ok());
     }
 }

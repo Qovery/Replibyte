@@ -6,7 +6,7 @@ use timeago::Formatter;
 
 use crate::bridge::s3::S3;
 use crate::bridge::Bridge;
-use crate::cli::BackupRunArgs;
+use crate::cli::{BackupDeleteArgs, BackupRunArgs};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
 
@@ -191,11 +191,11 @@ where
     }
 }
 
-pub fn delete<B>(backup: &str, bridge: B) -> anyhow::Result<()>
+pub fn delete<B>(bridge: B, args: &BackupDeleteArgs) -> anyhow::Result<()>
 where
     B: Bridge + 'static,
 {
-    let _ = bridge.delete(backup)?;
+    let _ = bridge.delete(args)?;
     println!("Backup deleted!");
     Ok(())
 }

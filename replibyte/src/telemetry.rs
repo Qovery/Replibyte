@@ -134,7 +134,7 @@ impl TelemetryClient {
             SubCommand::Backup(cmd) => match cmd {
                 BackupCommand::List => "backup-list",
                 BackupCommand::Run(_) => "backup-run",
-                BackupCommand::Delete { backup } => "backup-delete",
+                BackupCommand::Delete(_) => "backup-delete",
             },
             SubCommand::Transformer(cmd) => match cmd {
                 TransformerCommand::List => "transformer-list",

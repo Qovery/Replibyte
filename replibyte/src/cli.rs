@@ -39,11 +39,7 @@ pub enum BackupCommand {
     /// launch backup -- use `-h` to show all the options
     Run(BackupRunArgs),
     /// delete a backup from the bridge
-    Delete {
-        /// backup name
-        #[clap(required = true)]
-        backup: String,
-    },
+    Delete(BackupDeleteArgs),
 }
 
 /// all transformer commands
@@ -111,4 +107,16 @@ pub struct BackupRunArgs {
     /// backup name
     #[clap(short, long)]
     pub name: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct BackupDeleteArgs {
+    /// Name of the backup to delete
+    pub backup: Option<String>,
+    /// Remove all backups older than the specified number of days. Example: `14d` for deleting backups older than 14 days
+    #[clap(long)]
+    pub older_than: Option<String>,
+    /// Keep only the last N backups
+    #[clap(long)]
+    pub keep_last: Option<usize>,
 }
