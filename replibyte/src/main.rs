@@ -142,6 +142,10 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
                 Ok(())
             }
             BackupCommand::Run(args) => {
+                if let Some(name) = &args.name {
+                    bridge.set_backup_name(name.to_string());
+                }
+
                 commands::backup::run(args, bridge, config, progress_callback)
             }
         },

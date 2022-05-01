@@ -208,6 +208,10 @@ impl Bridge for S3 {
     fn set_compression(&mut self, enable: bool) {
         self.enable_compression = enable;
     }
+
+    fn set_backup_name(&mut self, name: String) {
+        self.root_key = name;
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -555,5 +559,15 @@ mod tests {
         assert_eq!(s3.index_file().unwrap().backups.len(), 1);
 
         assert!(delete_bucket(&s3.client, bucket.as_str(), true).is_ok());
+    }
+
+    #[test]
+    fn test_backup_name() {
+        let bucket = bucket();
+        let mut s3 = s3(bucket.as_str());
+
+        s3.set_backup_name("custom-backup-name".to_string());
+
+        assert_eq!(s3.root_key, "custom-backup-name".to_string())
     }
 }
