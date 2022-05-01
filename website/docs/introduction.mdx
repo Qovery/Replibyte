@@ -1,0 +1,40 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+![replibyte logo](/img/full_logo.svg)
+
+Replibyte is a tool to seed your development database with real data
+
+![stability badge](https://img.shields.io/badge/stability-stable-green.svg?style=flat-square)
+![build and tests badge](https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square)
+[![discord server](https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square)](https://discord.qovery.com)
+
+## Features
+
+- [x] Support data backup and restore for PostgreSQL, MySQL and MongoDB
+- [x] Replace sensitive data with fake data
+- [x] Works on large database (> 10GB) (read [Design](./docs/DESIGN.md))
+- [x] Database Subsetting: Scale down a production database to a more reasonable size 🔥
+- [x] Start a local database with the prod data in a single command 🔥
+- [x] On-the-fly data (de)compression (Zlib)
+- [x] On-the-fly data de/encryption (AES-256)
+- [x] Fully stateless (no server, no daemon) and lightweight binary 🍃
+- [x] Use [custom transformers](examples/wasm)
+
+Here are the features we plan to support
+
+- [ ] Auto-detect and version database schema change
+- [ ] Auto-detect sensitive fields
+- [ ] Auto-clean backed up data
+
+## Motivation
+
+At [Qovery](https://www.qovery.com) (the company behind Replibyte), developers can clone their applications and databases just with one
+click. However, the cloning process can be tedious and time-consuming, and we end up copying the information multiple times. With RepliByte,
+the Qovery team wants to provide a comprehensive way to seed cloud databases from one place to another.
+
+The long-term motivation behind RepliByte is to provide a way to clone any database in real-time. This project starts small, but has big
+ambition!
