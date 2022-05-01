@@ -41,9 +41,9 @@
 }
 
 [data-theme='dark'] .navbar {
-  background-color: inherit;
+  background-color: #151B2B;
 }
 
-[data-theme='dark'] body {
+[data-theme='dark'] {
   background-color: #151B2B;
 }

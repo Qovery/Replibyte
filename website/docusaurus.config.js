@@ -24,6 +24,7 @@ const config = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: 'https://github.com/Qovery/replibyte/webiste/',
+          remarkPlugins: [require('mdx-mermaid')],
         },
         blog: {
           showReadingTime: true,
@@ -54,9 +55,9 @@ const config = {
             label: 'Documentation',
           },
           {
-            href: 'https://github.com/Qovery/replibyte',
-            label: 'Download',
-            position: 'right',
+            href: 'https://discord.qovery.com',
+            label: 'Discord',
+            position: 'left',
           },
           {
             href: 'https://github.com/Qovery/replibyte',
