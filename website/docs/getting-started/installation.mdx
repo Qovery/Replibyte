@@ -1,0 +1,98 @@
+---
+sidebar_position: 2
+---
+
+# Installation
+
+<details>
+
+  <summary>Install on MacOSX</summary>
+
+  > RepliByte homebrew auto release is in maintenance. Consider using Docker or building from source in the meantime ⚠️
+
+  ```shell
+  brew tap Qovery/replibyte
+  brew install replibyte
+  ```
+
+  Or [manually](https://github.com/Qovery/replibyte/releases).
+
+</details>
+
+<details>
+
+  <summary>Install on Linux</summary>
+
+  ```shell
+  # download latest replibyte archive for Linux
+  curl -s https://api.github.com/repos/Qovery/replibyte/releases/latest | \
+  jq -r '.assets[].browser_download_url' | \
+  grep -i 'linux-musl.tar.gz$' | wget -qi - && \
+
+  # unarchive
+  tar zxf *.tar.gz
+
+  # make replibyte executable
+  chmod +x replibyte
+
+  # make it accessible from everywhere
+  mv replibyte /usr/local/bin/
+  ```
+
+</details>
+
+<details>
+
+  <summary>Install on Windows</summary>
+
+  Download [the latest Windows release](https://github.com/Qovery/replibyte/releases) and install it.
+
+</details>
+
+<details>
+
+  <summary>Install from source</summary>
+
+  ```shell
+  git clone https://github.com/Qovery/replibyte.git && cd replibyte
+
+  # Install cargo
+  # visit: https://doc.rust-lang.org/cargo/getting-started/installation.html
+
+  # Build with cargo
+  cargo build --release
+
+  # Run RepliByte
+  ./target/release/replibyte -h
+  ```
+
+</details>
+
+<details>
+
+  <summary>Run replibyte with Docker</summary>
+
+  ```shell
+  git clone https://github.com/Qovery/replibyte.git
+
+  # Build image with Docker
+  docker build -t replibyte -f Dockerfile .
+
+  # Run RepliByte
+  docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml transformer list
+  ```
+
+  Feel free to edit `./examples/replibyte.yaml` with your configuration.
+
+</details>
+
+## Telemetry
+
+RepliByte collects anonymized data from users in order to improve our product. Feel free to inspect the
+code [here](https://github.com/Qovery/replibyte/src/telemetry.rs). This can be deactivated at any time, and any data that has already been collected can be deleted on
+request (hello+replibyte {at} qovery {dot} com).
+
+### Collected data
+
+- Command line parameters
+- Options used (subset, transformer, compression) in the configuration file.
