@@ -391,7 +391,10 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
             get_host(&url)?,
             get_port(&url, 3306)?,
             get_username(&url)?,
-            get_password(&url)?,
+            get_password(&url)
+                .ok() //mysql can have an empty password
+                .get_or_insert(String::new())
+                .to_owned(),
             get_database(&url, None)?,
         ),
         scheme if scheme.to_lowercase() == "mongodb" || scheme.to_lowercase() == "mongodb+srv" => {
