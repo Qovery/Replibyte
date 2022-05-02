@@ -6,7 +6,7 @@ sidebar_position: 3
 
 To better use Replibyte, here are a list of the different concept to have in mind.
 
-:::success
+:::tip
 
 I assume you read "[How Replibyte works](/docs/how-replibyte-works)"
 

@@ -98,10 +98,14 @@ const config = {
                 label: 'GitHub',
                 href: 'https://github.com/Qovery/replibyte',
               },
+              {
+                label: 'Qovery',
+                href: 'https://www.qovery.com',
+              },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} RepliByte from <a href="https://www.qovery.com">Qovery</a>`,
+        copyright: `Copyright © ${new Date().getFullYear()} Replibyte by <a href="https://www.qovery.com">Qovery</a>`,
       },
       prism: {
         theme: lightCodeTheme,
