@@ -38,6 +38,6 @@ TODO
 
 TODO
 
-## WASM
+## Custom with Web Assembly (wasm)
 
-TODO
+Are you ready to get into the matrix? Take a look [here](/docs/advanced-guides/web-assembly-transformer) 👀
