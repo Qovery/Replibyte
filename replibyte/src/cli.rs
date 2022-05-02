@@ -110,13 +110,15 @@ pub struct BackupRunArgs {
 }
 
 #[derive(Args, Debug)]
+#[clap(group = clap::ArgGroup::new("delete-mode").multiple(false))]
 pub struct BackupDeleteArgs {
     /// Name of the backup to delete
+    #[clap(group = "delete-mode")]
     pub backup: Option<String>,
     /// Remove all backups older than the specified number of days. Example: `14d` for deleting backups older than 14 days
-    #[clap(long)]
+    #[clap(long, group = "delete-mode")]
     pub older_than: Option<String>,
     /// Keep only the last N backups
-    #[clap(long)]
+    #[clap(long, group = "delete-mode")]
     pub keep_last: Option<usize>,
 }
