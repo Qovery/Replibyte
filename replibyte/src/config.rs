@@ -323,10 +323,7 @@ fn get_username(url: &Url) -> Result<String, Error> {
 fn get_password(url: &Url) -> Result<String, Error> {
     match url.password() {
         Some(password) => Ok(password.to_string()),
-        None => Err(Error::new(
-            ErrorKind::Other,
-            "missing <password> property from connection uri",
-        )),
+        None => Ok(String::new()), // no password
     }
 }
 
@@ -391,10 +388,7 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
             get_host(&url)?,
             get_port(&url, 3306)?,
             get_username(&url)?,
-            get_password(&url)
-                .ok() //mysql can have an empty password
-                .get_or_insert(String::new())
-                .to_owned(),
+            get_password(&url)?,
             get_database(&url, None)?,
         ),
         scheme if scheme.to_lowercase() == "mongodb" || scheme.to_lowercase() == "mongodb+srv" => {
@@ -465,6 +459,7 @@ mod tests {
     #[test]
     fn parse_postgres_connection_uri() {
         assert!(parse_connection_uri("postgres://root:password@localhost:5432/db").is_ok());
+        assert!(parse_connection_uri("postgres://root:@localhost:5432/db").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost:5432").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost").is_ok());
         assert!(parse_connection_uri("postgres://root:password").is_err());
@@ -473,6 +468,7 @@ mod tests {
     #[test]
     fn parse_mysql_connection_uri() {
         assert!(parse_connection_uri("mysql://root:password@localhost:3306/db").is_ok());
+        assert!(parse_connection_uri("mysql://root:@localhost:3306/db").is_ok());
         assert!(parse_connection_uri("mysql://root:password@localhost/db").is_ok());
         assert!(parse_connection_uri("mysql://root:password@localhost").is_err());
         assert!(parse_connection_uri("mysql://root:password").is_err());
@@ -522,6 +518,7 @@ mod tests {
         assert!(parse_connection_uri("mongodb://root:password").is_err());
         assert!(parse_connection_uri("mongodb://root:password@localhost:27017").is_ok());
         assert!(parse_connection_uri("mongodb://root:password@localhost:27017/db").is_ok());
+        assert!(parse_connection_uri("mongodb://root:@localhost:27017/db").is_ok());
         assert!(parse_connection_uri("mongodb://root:password@localhost").is_ok());
         assert!(parse_connection_uri("mongodb+srv://root:password@server.example.com/").is_ok());
     }
