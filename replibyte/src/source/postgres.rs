@@ -71,7 +71,7 @@ impl<'a> Postgres<'a> {
 
 impl<'a> Connector for Postgres<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        binary_exists("pg_dumpall")
+        binary_exists("pg_dump")
     }
 }
 
@@ -83,8 +83,7 @@ impl<'a> Source for Postgres<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
-        // use pg_dumpall instead of pg_dump to get all the users, roles and permissions
-        let mut process = Command::new("pg_dumpall")
+        let mut process = Command::new("pg_dump")
             .env("PGPASSWORD", self.password)
             .args([
                 "--column-inserts", // dump data as INSERT commands with column names
@@ -95,6 +94,7 @@ impl<'a> Source for Postgres<'a> {
                 s_port.as_str(),
                 "-U",
                 self.username,
+                self.database,
             ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
