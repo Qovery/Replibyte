@@ -120,16 +120,32 @@ impl<'a> Source for Postgres<'a> {
         match process.wait() {
             Ok(exit_status) => {
                 if !exit_status.success() {
+                    if let Some(stderr) = process.stderr.take().as_mut() {
+                        let mut buffer = String::new();
+                        let error = match stderr.read_to_string(&mut buffer) {
+                            Ok(_) => Error::new(ErrorKind::Other, format!("{}", buffer)),
+                            Err(err) => Error::new(ErrorKind::Other, format!("{}", err)),
+                        };
+
+                        return Err(Error::new(
+                            ErrorKind::Other,
+                            format!("command error: {}", error),
+                        ));
+                    }
+
                     return Err(Error::new(
                         ErrorKind::Other,
-                        format!("command error: {:?}", exit_status.to_string()),
+                        format!("command error: {}", exit_status.to_string()),
                     ));
                 }
-            }
-            Err(err) => return Err(err),
-        }
 
-        Ok(())
+                Ok(())
+            }
+            Err(err) => Err(Error::new(
+                ErrorKind::Other,
+                format!("command error: {}", err),
+            )),
+        }
     }
 }
 
