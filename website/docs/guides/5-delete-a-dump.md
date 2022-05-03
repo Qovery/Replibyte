@@ -1,13 +1,13 @@
 ---
-title: V. Delete a dataset
+title: V. Delete a dump
 sidebar_position: 6
 ---
 
-# Delete a dataset
+# Delete a dump
 
-The `backup delete` command comes with 3 differents deleting strategies.
+The `backup delete` command comes with 3 different deleting strategies.
 
-1. Delete a backup by it's name
+1. Delete a backup by its name
 2. Delete backups older than a specified number of days
 3. Keep only a maximum number of backups
 

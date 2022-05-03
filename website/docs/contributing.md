@@ -14,7 +14,7 @@ If you are non-experienced in Rust, consider picking issues with label [good fir
 
 For local development, you will need to install [Docker](https://www.docker.com) and run `docker compose -f ./docker-compose-dev.yml` to
 start the local databases. At the moment, `docker-compose` includes 2 PostgreSQL database instances, 2 MySQL instances, 2 MongoDB instances
-and a [MinIO](https://min.io) bridge. One source, one destination by database and one bridge. In the future, we will provide more options.
+and a [MinIO](https://min.io) datastore. One source, one destination by database and one datastore. In the future, we will provide more options.
 
 The Minio console is accessible at http://localhost:9001.
 

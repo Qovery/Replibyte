@@ -1,9 +1,9 @@
 ---
-title: III. Restore data
+title: III. Restore a dump
 sidebar_position: 4
 ---
 
-# Restore data
+# Restore a dump
 
 TODO
 

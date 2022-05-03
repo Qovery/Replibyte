@@ -7,10 +7,10 @@ sidebar_position: 4
 Create your `conf.yaml` configuration file to source your production database.
 
 ```yaml
-encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on bridge
+encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on datastore
 source:
   connection_uri: postgres://user:password@host:port/db # you can use $DATABASE_URL
-bridge:
+datastore:
   bucket: $BUCKET_NAME
   region: $S3_REGION
   access_key_id: $ACCESS_KEY_ID
@@ -35,9 +35,9 @@ replibyte -c conf.yaml
 
 Replibyte supports multiple databases.
 
-- [PostgreSQL](/docs/databases/postgresql)
-- [MySQL](/docs/databases/mysql)
-- [MongoDB](/docs/databases/mongodb)
+- [PostgreSQL](/docs/databases#postgresql)
+- [MySQL](/docs/databases#mysql)
+- [MongoDB](/docs/databases#mongodb)
 
 ## Transformer
 
@@ -57,9 +57,9 @@ Here is a list of all the [transformers available](/docs/transformers).
 | credit-card     | Replace the string value by a credit card number                                                   | [link](/docs/transformers#credit-card)          |
 | redacted        | Obfuscate your sensitive data (>3 characters strings only). [4242 4242 4242 4242]->[424**********] | [link](/docs/transformers#redacted)             |
 
-## Bridge
+## Datastore
 
-A Bridge is where Replibyte store the created dataset to make them accessible from the destination databases.
+A Datastore is where Replibyte store the created dump to make them accessible from the destination databases.
 
 | Cloud Service Provider | S3 service name                                                           | S3 compatible  |
 |------------------------|---------------------------------------------------------------------------|----------------|
@@ -72,7 +72,7 @@ A Bridge is where Replibyte store the created dataset to make them accessible fr
 
 :::info
 
-Any bridge compatible with the S3 protocol is a valid bridge.
+Any datastore compatible with the S3 protocol is a valid datastore.
 
 :::
 
@@ -81,7 +81,7 @@ Any bridge compatible with the S3 protocol is a valid bridge.
 Here is a configuration file including some transformations and different options like the database subset.
 
 ```yaml
-encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on bridge
+encryption_key: $MY_PRIVATE_ENC_KEY # optional - encrypt data on datastore
 source:
   connection_uri: postgres://user:password@host:port/db # you can use $DATABASE_URL
   database_subset: # optional - downscale database while keeping it consistent
@@ -111,7 +111,7 @@ source:
       columns:
         - name: phone
           transformer_name: phone-number
-bridge:
+datastore:
   bucket: $BUCKET_NAME
   region: $S3_REGION
   access_key_id: $ACCESS_KEY_ID

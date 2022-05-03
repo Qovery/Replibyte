@@ -29,14 +29,16 @@ Here are the features we plan to support
 
 ## Getting Started
 
-1. Initial setup: 
+1. [How Replibyte works](https://www.replibyte.com/docs/how-replibyte-works)
+2. Initial setup: 
    1. [Install](https://www.replibyte.com/docs/getting-started/installation)
    2. [Configure](https://www.replibyte.com/docs/getting-started/configuration)
-2. Step-by-step guides:
-   1. [Create a dataset](https://www.replibyte.com/docs/guides/create-a-dataset)
-   2. [Transform data](https://www.replibyte.com/docs/guides/transform-data)
-   3. [Restore data](https://www.replibyte.com/docs/guides/restore-data)
-   4. [Database subset](https://www.replibyte.com/docs/guides/database-subset)
+3. Step-by-step guides:
+   1. [Create a dump](https://www.replibyte.com/docs/guides/create-a-dump)
+   2. [Transform a dump](https://www.replibyte.com/docs/guides/transform-a-dump)
+   3. [Restore a dump](https://www.replibyte.com/docs/guides/restore-a-dump)
+   4. [Subset a dump](https://www.replibyte.com/docs/guides/subset-a-dump)
+   5. [Delete a dump](https://www.replibyte.com/docs/guides/delete-a-dump)
 
 ## Demo
 
