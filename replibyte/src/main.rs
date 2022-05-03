@@ -148,6 +148,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
 
                 commands::backup::run(args, bridge, config, progress_callback)
             }
+            BackupCommand::Delete(args) => commands::backup::delete(bridge, args),
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {

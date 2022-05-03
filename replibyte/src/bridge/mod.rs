@@ -7,6 +7,7 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use serde::{Deserialize, Serialize};
 
+use crate::cli::BackupDeleteArgs;
 use crate::connector::Connector;
 use crate::types::Bytes;
 
@@ -23,6 +24,7 @@ pub trait Bridge: Connector + Send + Sync {
     fn set_compression(&mut self, enable: bool);
     fn set_encryption_key(&mut self, key: String);
     fn set_backup_name(&mut self, key: String);
+    fn delete(&self, args: &BackupDeleteArgs) -> Result<(), Error>;
 }
 
 #[derive(Serialize, Deserialize)]
