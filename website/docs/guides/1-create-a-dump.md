@@ -150,6 +150,8 @@ source:
           transformer_name: email
 ```
 
+By using Transformers, you keep your sensitive data safe of being leaked. 
+
 ## Run
 
 It's the big day! Let's **run and upload** our transformed dump. But wait, something is missing. If you read about the [concepts](/docs/getting-started/concepts), and [how Replibyte works](/docs/how-replibyte-works), you know that a [Datastore](/docs/getting-started/concepts#datastore) is required to upload the transformed dump. Here is the lines you need to add in your `conf.yaml`
@@ -162,11 +164,13 @@ datastore:
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
 
+Here the datastore is a S3 bucket where the dump will be stored and accessible for future restore (next guide).
+
 The final `conf.yaml` to create a final transformed dump looks like this:
 
 ```yaml title="conf.yaml"
 source:
-  connection_uri: postgres://user:password@host:port/db
+  connection_uri: postgres://user:password@host:port/db # optional - use only for option #1
   transformers:
     - database: public
       table: customers
@@ -185,6 +189,28 @@ datastore:
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
+
+Finally, you can run the following command according to you chosen option above:
+
+<details>
+
+<summary>Option 1: Make a dump with Replibyte</summary>
+
+```shell
+replibyte -c conf.yaml dump --create
+```
+
+</details>
+
+<details>
+
+<summary>Option 2 and 3: Create a transformed dump with an existing dump</summary>
+
+```shell
+cat your_dump.sql | replibyte -c conf.yaml dump --create -i
+```
+
+</details>
 
 ---
 Now, it's time to look at how to restore your transformed dump ➡️
