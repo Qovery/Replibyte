@@ -377,13 +377,15 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
     };
 
     let connection_uri = match url.scheme() {
-        scheme if scheme.to_lowercase() == "postgres" => ConnectionUri::Postgres(
-            get_host(&url)?,
-            get_port(&url, 5432)?,
-            get_username(&url)?,
-            get_password(&url)?,
-            get_database(&url, Some("public"))?,
-        ),
+        scheme if scheme.to_lowercase() == "postgres" || scheme.to_lowercase() == "postgresql" => {
+            ConnectionUri::Postgres(
+                get_host(&url)?,
+                get_port(&url, 5432)?,
+                get_username(&url)?,
+                get_password(&url)?,
+                get_database(&url, Some("public"))?,
+            )
+        }
         scheme if scheme.to_lowercase() == "mysql" => ConnectionUri::Mysql(
             get_host(&url)?,
             get_port(&url, 3306)?,
@@ -463,6 +465,12 @@ mod tests {
         assert!(parse_connection_uri("postgres://root:password@localhost:5432").is_ok());
         assert!(parse_connection_uri("postgres://root:password@localhost").is_ok());
         assert!(parse_connection_uri("postgres://root:password").is_err());
+
+        assert!(parse_connection_uri("postgresql://root:password@localhost:5432/db").is_ok());
+        assert!(parse_connection_uri("postgresql://root:@localhost:5432/db").is_ok());
+        assert!(parse_connection_uri("postgresql://root:password@localhost:5432").is_ok());
+        assert!(parse_connection_uri("postgresql://root:password@localhost").is_ok());
+        assert!(parse_connection_uri("postgresql://root:password").is_err());
     }
 
     #[test]
