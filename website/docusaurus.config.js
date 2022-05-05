@@ -23,13 +23,13 @@ const config = {
       ({
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
-          editUrl: 'https://github.com/Qovery/replibyte/webiste/',
+          editUrl: 'https://github.com/Qovery/replibyte/tree/main/website/',
           remarkPlugins: [require('mdx-mermaid')],
         },
         blog: {
           showReadingTime: true,
           editUrl:
-            'https://github.com/Qovery/replibyte/website/',
+            'https://github.com/Qovery/replibyte/tree/main/website/',
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -58,6 +58,11 @@ const config = {
             href: 'https://discord.qovery.com',
             label: 'Discord',
             position: 'left',
+          },
+          {
+            href: 'https://www.qovery.com/preview-environments',
+            label: 'Preview Environments',
+            position: 'right',
           },
           {
             href: 'https://github.com/Qovery/replibyte',
@@ -110,6 +115,7 @@ const config = {
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
+        additionalLanguages: ['rust', 'yaml', 'bash']
       },
       colorMode: {
         defaultMode: 'dark'

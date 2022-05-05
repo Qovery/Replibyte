@@ -1,6 +1,6 @@
 ---
-title: V. Delete a dump
-sidebar_position: 6
+title: IV. Delete a dump
+sidebar_position: 4
 ---
 
 # Delete a dump

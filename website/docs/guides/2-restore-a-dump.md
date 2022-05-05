@@ -1,6 +1,6 @@
 ---
-title: III. Restore a dump
-sidebar_position: 4
+title: II. Restore a dump
+sidebar_position: 2
 ---
 
 # Restore a dump
