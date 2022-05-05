@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # Create a dump
 
-:::note
+:::note hello 👋🏼
 
 I assume you have [Installed Replibyte](/docs/getting-started/installation) and you Read the [concepts](/docs/getting-started/concepts).
 
@@ -168,6 +168,12 @@ Here the datastore is a S3 bucket where the dump will be stored and accessible f
 
 The final `conf.yaml` to create a final transformed dump looks like this:
 
+:::caution
+
+Do not forget to change your bucket name!
+
+:::
+
 ```yaml title="conf.yaml"
 source:
   connection_uri: postgres://user:password@host:port/db # optional - use only for option #1
@@ -197,18 +203,20 @@ Finally, you can run the following command according to you chosen option above:
 <summary>Option 1: Make a dump with Replibyte</summary>
 
 ```shell
-replibyte -c conf.yaml dump --create
+replibyte -c conf.yaml dump create
 ```
 
 </details>
 
 <details>
 
-<summary>Option 2 and 3: Create a transformed dump with an existing dump</summary>
+<summary>Option 2 and 3: Create a transformed dump from a dump file</summary>
 
 ```shell
-cat your_dump.sql | replibyte -c conf.yaml dump --create -i
+cat your_dump.sql | replibyte -c conf.yaml dump create -i
 ```
+
+`-i` parameter is required to read the data from the input.
 
 </details>
 
