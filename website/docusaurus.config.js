@@ -61,7 +61,7 @@ const config = {
           },
           {
             href: 'https://www.qovery.com/preview-environments',
-            label: 'Preview Environments',
+            label: '⚡️ Preview Environments',
             position: 'right',
           },
           {

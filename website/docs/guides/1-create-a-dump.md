@@ -162,6 +162,8 @@ datastore:
   region: us-east-2
   access_key_id: $ACCESS_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
+  # endpoint: # UNCOMMENT to use another S3 compatible service than AWS S3 
+  #   custom: 'https://storage.googleapis.com/storage/v1' # E.g. endpoint for GCP
 ```
 
 Here the datastore is a S3 bucket where the dump will be stored and accessible for future restore (next guide).
