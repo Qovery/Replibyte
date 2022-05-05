@@ -43,7 +43,7 @@ Replibyte provides you two options to restore a dump:
 It's the best option to develop locally with a consistent transformed dump coming from your production data. Execute the following command to restore in a local Docker instance the latest dump:
 
 ```shell
-replibyte -c conf.yaml dump restore local -d postgres -v latest
+replibyte -c conf.yaml dump restore local -d postgresql -v latest
 ```
 
 `-d` parameter accepts `mongodb`, `mysql` and other databases supported by Replibyte.
