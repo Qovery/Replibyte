@@ -1,10 +1,10 @@
-use std::io::{Error, ErrorKind, Write};
+use std::io::{Error, Write};
 use std::process::{Command, Stdio};
 
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
-use crate::utils::binary_exists;
+use crate::utils::{binary_exists, wait_for_command};
 
 pub struct MongoDB<'a> {
     host: &'a str,
@@ -75,15 +75,7 @@ impl<'a> Destination for MongoDB<'a> {
             .unwrap()
             .write_all(&data[..data.len() - 1]); // remove trailing null terminator, or else mongorestore will fail
 
-        let exit_status = process.wait()?;
-        if !exit_status.success() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error: {:?}", exit_status.to_string()),
-            ));
-        }
-
-        Ok(())
+        wait_for_command(&mut process)
     }
 }
 
@@ -113,15 +105,7 @@ fn check_connection_status(db: &MongoDB) -> Result<(), Error> {
         .stdout(Stdio::inherit())
         .spawn()?;
 
-    let exit_status = mongo_process.wait()?;
-    if !exit_status.success() {
-        return Err(Error::new(
-            ErrorKind::Other,
-            format!("command error: {:?}", exit_status.to_string()),
-        ));
-    }
-
-    Ok(())
+    wait_for_command(&mut mongo_process)
 }
 
 #[cfg(test)]

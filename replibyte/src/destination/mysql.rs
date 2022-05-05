@@ -1,10 +1,10 @@
-use std::io::{Error, ErrorKind, Write};
+use std::io::{Error, Write};
 use std::process::{Command, Stdio};
 
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
-use crate::utils::binary_exists;
+use crate::utils::{binary_exists, wait_for_command};
 
 pub struct Mysql<'a> {
     host: &'a str,
@@ -37,7 +37,7 @@ impl<'a> Connector for Mysql<'a> {
         let _ = binary_exists("mysql")?;
 
         // test MySQL connection
-        let exit_status = Command::new("mysql")
+        let mut process = Command::new("mysql")
             .args([
                 "-h",
                 self.host,
@@ -50,17 +50,9 @@ impl<'a> Connector for Mysql<'a> {
                 "SELECT 1;",
             ])
             .stdout(Stdio::piped())
-            .spawn()?
-            .wait()?;
+            .spawn()?;
 
-        if !exit_status.success() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error: {:?}", exit_status.to_string()),
-            ));
-        }
-
-        Ok(())
+        wait_for_command(&mut process)
     }
 }
 
@@ -82,15 +74,7 @@ impl<'a> Destination for Mysql<'a> {
 
         let _ = process.stdin.take().unwrap().write_all(data.as_slice());
 
-        let exit_status = process.wait()?;
-        if !exit_status.success() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error: {:?}", exit_status.to_string()),
-            ));
-        }
-
-        Ok(())
+        wait_for_command(&mut process)
     }
 }
 

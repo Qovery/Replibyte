@@ -1,4 +1,5 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind, Read};
+use std::process::Child;
 
 use crate::config::{DatabaseSubsetConfig, SkipConfig};
 use crate::connector::Connector;
