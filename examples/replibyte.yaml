@@ -11,7 +11,7 @@ source:
           transformer_name: random # TO CHANGE
 destination:
   connection_uri: $DESTINATION_CONNECTION_URI
-bridge:
+datastore:
   bucket: $S3_BUCKET
   region: $S3_REGION
   access_key_id: $S3_ACCESS_KEY_ID

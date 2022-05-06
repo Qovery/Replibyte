@@ -23,11 +23,11 @@ sequenceDiagram
     PostgreSQL (Source)->>RepliByte: 1. Dump data
     loop
         RepliByte->>RepliByte: 2. Subsetting (optional)
-        RepliByte->>RepliByte: 3. Hide or fake sensitive data (optional)
+        RepliByte->>RepliByte: 3. Transform sensitive data (optional)
         RepliByte->>RepliByte: 4. Compress data (optional)
         RepliByte->>RepliByte: 5. Encrypt data (optional)
     end
-    RepliByte->>AWS S3 (Datastore): 6. Upload obfuscated dump data
+    RepliByte->>AWS S3 (Datastore): 6. Upload dump data
     RepliByte->>AWS S3 (Datastore): 7. Write index file
 ```
 

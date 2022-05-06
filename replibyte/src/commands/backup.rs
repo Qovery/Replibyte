@@ -4,11 +4,11 @@ use std::time::Duration;
 
 use timeago::Formatter;
 
-use crate::bridge::s3::S3;
-use crate::bridge::Bridge;
-use crate::cli::{BackupDeleteArgs, BackupRunArgs};
+use crate::cli::{DumpCreateArgs, DumpDeleteArgs};
 use crate::config::{Config, ConnectionUri};
 use crate::connector::Connector;
+use crate::datastore::s3::S3;
+use crate::datastore::Datastore;
 
 use crate::source::mongodb::MongoDB;
 use crate::source::mysql::Mysql;
@@ -54,23 +54,23 @@ pub fn list(s3: &mut S3) -> Result<(), Error> {
 
 // Run a new backup
 pub fn run<F, B>(
-    args: &BackupRunArgs,
-    mut bridge: B,
+    args: &DumpCreateArgs,
+    mut datastore: B,
     config: Config,
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
     F: Fn(usize, usize) -> (),
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     if let Some(encryption_key) = config.encryption_key()? {
-        bridge.set_encryption_key(encryption_key)
+        datastore.set_encryption_key(encryption_key)
     }
 
     match config.source {
         Some(source) => {
-            // Configure bridge options (compression is enabled by default)
-            bridge.set_compression(source.compression.unwrap_or(true));
+            // Configure datastore options (compression is enabled by default)
+            datastore.set_compression(source.compression.unwrap_or(true));
 
             // Match the transformers from the config
             let transformers = source
@@ -110,7 +110,7 @@ where
                             password.as_str(),
                         );
 
-                        let task = FullBackupTask::new(postgres, bridge, options);
+                        let task = FullBackupTask::new(postgres, datastore, options);
                         task.run(progress_callback)?
                     }
                     ConnectionUri::Mysql(host, port, username, password, database) => {
@@ -122,7 +122,7 @@ where
                             password.as_str(),
                         );
 
-                        let task = FullBackupTask::new(mysql, bridge, options);
+                        let task = FullBackupTask::new(mysql, datastore, options);
                         task.run(progress_callback)?
                     }
                     ConnectionUri::MongoDB(
@@ -142,7 +142,7 @@ where
                             authentication_db.as_str(),
                         );
 
-                        let task = FullBackupTask::new(mongodb, bridge, options);
+                        let task = FullBackupTask::new(mongodb, datastore, options);
                         task.run(progress_callback)?
                     }
                 },
@@ -156,7 +156,7 @@ where
                     }
 
                     let postgres = PostgresStdin::default();
-                    let task = FullBackupTask::new(postgres, bridge, options);
+                    let task = FullBackupTask::new(postgres, datastore, options);
                     task.run(progress_callback)?
                 }
                 Some(v) if v == "mysql" => {
@@ -168,7 +168,7 @@ where
                     }
 
                     let mysql = MysqlStdin::default();
-                    let task = FullBackupTask::new(mysql, bridge, options);
+                    let task = FullBackupTask::new(mysql, datastore, options);
                     task.run(progress_callback)?
                 }
                 Some(v) => {
@@ -191,11 +191,11 @@ where
     }
 }
 
-pub fn delete<B>(bridge: B, args: &BackupDeleteArgs) -> anyhow::Result<()>
+pub fn delete<B>(datastore: B, args: &DumpDeleteArgs) -> anyhow::Result<()>
 where
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
-    let _ = bridge.delete(args)?;
+    let _ = datastore.delete(args)?;
     println!("Backup deleted!");
     Ok(())
 }

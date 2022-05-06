@@ -6,7 +6,7 @@ source:
       columns:
         - name: last_name
           transformer_name: random
-bridge:
+datastore:
   bucket: $BUCKET_NAME
   region: us-east-2
   access_key_id: $AWS_ACCESS_KEY_ID

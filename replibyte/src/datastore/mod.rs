@@ -7,13 +7,13 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use serde::{Deserialize, Serialize};
 
-use crate::cli::BackupDeleteArgs;
+use crate::cli::DumpDeleteArgs;
 use crate::connector::Connector;
 use crate::types::Bytes;
 
 pub mod s3;
 
-pub trait Bridge: Connector + Send + Sync {
+pub trait Datastore: Connector + Send + Sync {
     /// Getting Index file with all the backups information
     fn index_file(&self) -> Result<IndexFile, Error>;
     fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error>;
@@ -24,7 +24,7 @@ pub trait Bridge: Connector + Send + Sync {
     fn set_compression(&mut self, enable: bool);
     fn set_encryption_key(&mut self, key: String);
     fn set_backup_name(&mut self, key: String);
-    fn delete(&self, args: &BackupDeleteArgs) -> Result<(), Error>;
+    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -133,7 +133,7 @@ fn decrypt(encrypted_data: Bytes, encryption_key: &str) -> Result<Bytes, Error> 
 
 #[cfg(test)]
 mod tests {
-    use crate::bridge::{compress, decompress, decrypt, encrypt};
+    use crate::datastore::{compress, decompress, decrypt, encrypt};
 
     #[test]
     fn test_compression() {

@@ -1,11 +1,10 @@
 use crate::config::{ConnectionUri, TransformerTypeConfig};
-use crate::{BackupCommand, Config, RestoreCommand, SubCommand, TransformerCommand};
+use crate::{Config, DumpCommand, RestoreCommand, SubCommand, TransformerCommand};
 use chrono::{NaiveDateTime, Utc};
 use reqwest::blocking::Client as HttpClient;
 use reqwest::header::CONTENT_TYPE;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::fmt::format;
 use std::io::{Error, ErrorKind};
 use std::time::Duration;
 
@@ -131,17 +130,17 @@ impl TelemetryClient {
         };
 
         let event = match sub_command {
-            SubCommand::Backup(cmd) => match cmd {
-                BackupCommand::List => "backup-list",
-                BackupCommand::Run(_) => "backup-run",
-                BackupCommand::Delete(_) => "backup-delete",
+            SubCommand::Dump(cmd) => match cmd {
+                DumpCommand::List => "dump-list",
+                DumpCommand::Create(_) => "dump-create",
+                DumpCommand::Delete(_) => "dump-delete",
+                DumpCommand::Restore(restore_cmd) => match restore_cmd {
+                    RestoreCommand::Local(_) => "dump-restore-local",
+                    RestoreCommand::Remote(_) => "dump-restore-remote",
+                },
             },
             SubCommand::Transformer(cmd) => match cmd {
                 TransformerCommand::List => "transformer-list",
-            },
-            SubCommand::Restore(cmd) => match cmd {
-                RestoreCommand::Local(_) => "restore-local",
-                RestoreCommand::Remote(_) => "restore-remote",
             },
         };
 

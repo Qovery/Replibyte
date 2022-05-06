@@ -2,7 +2,7 @@ use std::io::Error;
 use std::sync::mpsc;
 use std::thread;
 
-use crate::bridge::Bridge;
+use crate::datastore::Datastore;
 use crate::source::SourceOptions;
 use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::types::{to_bytes, Queries};
@@ -10,26 +10,26 @@ use crate::Source;
 
 type DataMessage = (u16, Queries);
 
-/// FullBackupTask is a wrapping struct to execute the synchronization between a *Source* and a *Bridge*
+/// FullBackupTask is a wrapping struct to execute the synchronization between a *Source* and a *Datastore*
 pub struct FullBackupTask<'a, S, B>
 where
     S: Source,
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     source: S,
-    bridge: B,
+    datastore: B,
     options: SourceOptions<'a>,
 }
 
 impl<'a, S, B> FullBackupTask<'a, S, B>
 where
     S: Source,
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
-    pub fn new(source: S, bridge: B, options: SourceOptions<'a>) -> Self {
+    pub fn new(source: S, datastore: B, options: SourceOptions<'a>) -> Self {
         FullBackupTask {
             source,
-            bridge,
+            datastore,
             options,
         }
     }
@@ -38,7 +38,7 @@ where
 impl<'a, S, B> Task for FullBackupTask<'a, S, B>
 where
     S: Source,
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
         mut self,
@@ -47,15 +47,15 @@ where
         // initialize the source
         let _ = self.source.init()?;
 
-        // initialize the bridge
-        let _ = self.bridge.init()?;
+        // initialize the datastore
+        let _ = self.datastore.init()?;
 
         let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(1);
-        let bridge = self.bridge;
+        let datastore = self.datastore;
 
         let join_handle = thread::spawn(move || {
-            // managing Bridge (S3) upload here
-            let bridge = bridge;
+            // managing Datastore (S3) upload here
+            let datastore = datastore;
 
             loop {
                 let (chunk_part, queries) = match rx.recv() {
@@ -64,7 +64,7 @@ where
                     Err(err) => panic!("{:?}", err), // FIXME what should I do here?
                 };
 
-                let _ = match bridge.write(chunk_part, to_bytes(queries)) {
+                let _ = match datastore.write(chunk_part, to_bytes(queries)) {
                     Ok(_) => {}
                     Err(err) => {
                         panic!("{:?}", err);
@@ -73,7 +73,7 @@ where
             }
         });
 
-        // buffer of 100MB in memory to use and re-use to upload data into bridge
+        // buffer of 100MB in memory to use and re-use to upload data into datastore
         let buffer_size = 100 * 1024 * 1024;
         let mut queries = vec![];
         let mut consumed_buffer_size = 0usize;

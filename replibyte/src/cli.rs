@@ -22,24 +22,24 @@ pub struct CLI {
 pub enum SubCommand {
     /// all backup commands
     #[clap(subcommand)]
-    Backup(BackupCommand),
+    Dump(DumpCommand),
     /// all transformers command
     #[clap(subcommand)]
     Transformer(TransformerCommand),
-    /// all restore commands
-    #[clap(subcommand)]
-    Restore(RestoreCommand),
 }
 
-/// all backup commands
+/// all dump commands
 #[derive(Subcommand, Debug)]
-pub enum BackupCommand {
+pub enum DumpCommand {
     /// list available backups
     List,
     /// launch backup -- use `-h` to show all the options
-    Run(BackupRunArgs),
-    /// delete a backup from the bridge
-    Delete(BackupDeleteArgs),
+    Create(DumpCreateArgs),
+    /// all restore commands
+    #[clap(subcommand)]
+    Restore(RestoreCommand),
+    /// delete a backup from the defined datastore
+    Delete(DumpDeleteArgs),
 }
 
 /// all transformer commands
@@ -94,7 +94,7 @@ pub struct RestoreLocalArgs {
 
 /// all backup run commands
 #[derive(Args, Debug)]
-pub struct BackupRunArgs {
+pub struct DumpCreateArgs {
     #[clap(short, long, value_name = "[postgresql | mysql | mongodb]")]
     /// database source type to import
     pub source_type: Option<String>,
@@ -111,10 +111,10 @@ pub struct BackupRunArgs {
 
 #[derive(Args, Debug)]
 #[clap(group = clap::ArgGroup::new("delete-mode").multiple(false))]
-pub struct BackupDeleteArgs {
+pub struct DumpDeleteArgs {
     /// Name of the backup to delete
     #[clap(group = "delete-mode")]
-    pub backup: Option<String>,
+    pub dump: Option<String>,
     /// Remove all backups older than the specified number of days. Example: `14d` for deleting backups older than 14 days
     #[clap(long, group = "delete-mode")]
     pub older_than: Option<String>,

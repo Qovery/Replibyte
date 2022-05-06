@@ -2,31 +2,31 @@ use std::io::Error;
 use std::sync::mpsc;
 use std::thread;
 
-use crate::bridge::{Bridge, ReadOptions};
+use crate::datastore::{Datastore, ReadOptions};
 use crate::destination::Destination;
 use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::types::Bytes;
 
-/// FullRestoreTask is a wrapping struct to execute the synchronization between a *Bridge* and a *Source*.
+/// FullRestoreTask is a wrapping struct to execute the synchronization between a *Datastore* and a *Source*.
 pub struct FullRestoreTask<'a, D, B>
 where
     D: Destination,
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     destination: &'a mut D,
-    bridge: B,
+    datastore: B,
     read_options: ReadOptions,
 }
 
 impl<'a, D, B> FullRestoreTask<'a, D, B>
 where
     D: Destination,
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
-    pub fn new(destination: &'a mut D, bridge: B, read_options: ReadOptions) -> Self {
+    pub fn new(destination: &'a mut D, datastore: B, read_options: ReadOptions) -> Self {
         FullRestoreTask {
             destination,
-            bridge,
+            datastore,
             read_options,
         }
     }
@@ -35,7 +35,7 @@ where
 impl<'a, D, B> Task for FullRestoreTask<'a, D, B>
 where
     D: Destination,
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
         mut self,
@@ -44,14 +44,14 @@ where
         // initialize the destination
         let _ = self.destination.init()?;
 
-        // initialize the bridge
-        let _ = self.bridge.init()?;
+        // initialize the datastore
+        let _ = self.datastore.init()?;
 
         // bound to 1 to avoid eating too much memory if we download the dump faster than we ingest it
         let (tx, rx) = mpsc::sync_channel::<Message<Bytes>>(1);
-        let bridge = self.bridge;
+        let datastore = self.datastore;
 
-        let mut index_file = bridge.index_file()?;
+        let mut index_file = datastore.index_file()?;
         let backup = index_file.find_backup(&self.read_options)?;
 
         // init progress
@@ -60,11 +60,11 @@ where
         let read_options = self.read_options.clone();
 
         let join_handle = thread::spawn(move || {
-            // managing Bridge (S3) download here
-            let bridge = bridge;
+            // managing Datastore (S3) download here
+            let datastore = datastore;
             let read_options = read_options;
 
-            let _ = match bridge.read(&read_options, |data| {
+            let _ = match datastore.read(&read_options, |data| {
                 let _ = tx.send(Message::Data(data));
             }) {
                 Ok(_) => {}

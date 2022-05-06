@@ -6,7 +6,7 @@ source:
       columns:
         - name: Name
           transformer_name: random
-bridge:
+datastore:
   bucket: replibyte-test
   region: us-east-2
   access_key_id: minioadmin

@@ -10,7 +10,7 @@ source:
           transformer_name: random
 destination:
   connection_uri: mongodb://root:password@localhost:27018/?authSource=admin
-bridge:
+datastore:
   bucket: replibyte-test
   region: us-east-2
   access_key_id: minioadmin
