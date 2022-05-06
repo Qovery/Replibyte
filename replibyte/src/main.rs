@@ -122,9 +122,14 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
 
     match sub_commands {
         // skip progress when output = true
-        SubCommand::Restore(cmd) => match cmd {
-            RestoreCommand::Local(args) => if args.output {},
-            RestoreCommand::Remote(args) => if args.output {},
+        SubCommand::Dump(dump_cmd) => match dump_cmd {
+            DumpCommand::Restore(cmd) => match cmd {
+                RestoreCommand::Local(args) => if args.output {},
+                RestoreCommand::Remote(args) => if args.output {},
+            },
+            _ => {
+                let _ = thread::spawn(move || show_progress_bar(rx_pb));
+            }
         },
         _ => {
             let _ = thread::spawn(move || show_progress_bar(rx_pb));
@@ -149,19 +154,19 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
                 commands::backup::run(args, datastore, config, progress_callback)
             }
             DumpCommand::Delete(args) => commands::backup::delete(datastore, args),
+            DumpCommand::Restore(restore_cmd) => match restore_cmd {
+                RestoreCommand::Local(args) => {
+                    commands::restore::local(args, datastore, config, progress_callback)
+                }
+                RestoreCommand::Remote(args) => {
+                    commands::restore::remote(args, datastore, config, progress_callback)
+                }
+            },
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {
                 let _ = commands::transformer::list();
                 Ok(())
-            }
-        },
-        SubCommand::Restore(cmd) => match cmd {
-            RestoreCommand::Local(args) => {
-                commands::restore::local(args, datastore, config, progress_callback)
-            }
-            RestoreCommand::Remote(args) => {
-                commands::restore::remote(args, datastore, config, progress_callback)
             }
         },
     }
