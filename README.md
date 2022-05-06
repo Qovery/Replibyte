@@ -38,6 +38,7 @@ Here are the features we plan to support
    2. [Restore a dump](https://www.replibyte.com/docs/guides/restore-a-dump)
    3. [Subset a dump](https://www.replibyte.com/docs/guides/subset-a-dump)
    4. [Delete a dump](https://www.replibyte.com/docs/guides/delete-a-dump)
+   4. [Deploy Replibyte](https://www.replibyte.com/docs/guides/deploy-replibyte)
 
 ## Demo
 

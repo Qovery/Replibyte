@@ -150,7 +150,7 @@ source:
           transformer_name: email
 ```
 
-By using Transformers, you keep your sensitive data safe of being leaked. 
+By using [Transformers](/docs/transformers), you keep your sensitive data safe of being leaked. 
 
 ## Run
 

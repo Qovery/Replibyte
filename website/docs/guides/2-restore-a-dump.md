@@ -70,7 +70,7 @@ replibyte -c conf.yaml dump restore local -d postgres -v dump-1647731334517
 You might want to inspect what you have in your dump, and restore it manually, you can execute the same restore command but with the `-o` parameter:
 
 ```shell
-replibyte -c conf.yaml dump restore local -d postgres -v latest -o > dump.sql
+replibyte -c conf.yaml dump restore local -i postgres -v latest -o > dump.sql
 ```
 
 ## Option 2: Remote

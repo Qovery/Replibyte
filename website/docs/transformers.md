@@ -12,6 +12,24 @@ Examples are with SQL input and output to reflect the change made by the transfo
 
 :::
 
+To list the transformers available use
+
+```shell
+replibyte -c conf.yaml transformer list
+ 
+ name            | description
+-----------------+--------------------------------------------------------------------------------------------
+ email           | Generate an email address (string only). [john.doe@company.com]->[tony.stark@avengers.com]
+ first-name      | Generate a first name (string only). [Lucas]->[Georges]
+ phone-number    | Generate a phone number (string only).
+ random          | Randomize value but keep the same length (string only). [AAA]->[BBB]
+ keep-first-char | Keep only the first character of the column.
+ transient       | Does not modify the value.
+ credit-card     | Generate a credit card number (string only).
+ redacted        | Obfuscate your sensitive data (string only). [4242 4242 4242 4242]->[424****************]
+ ...
+```
+
 ## Random
 
 Randomize value but keep the same length.
