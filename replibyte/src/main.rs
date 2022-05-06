@@ -11,20 +11,20 @@ use std::{env, thread};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::bridge::s3::S3;
-use crate::bridge::Bridge;
-use crate::cli::{BackupCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
+use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, DatabaseSubsetConfig};
+use crate::datastore::s3::S3;
+use crate::datastore::Datastore;
 use crate::source::{Source, SourceOptions};
 use crate::tasks::{MaxBytes, TransferredBytes};
 use crate::telemetry::{ClientOptions, TelemetryClient, TELEMETRY_TOKEN};
 use crate::utils::epoch_millis;
 
-mod bridge;
 mod cli;
 mod commands;
 mod config;
 mod connector;
+mod datastore;
 mod destination;
 mod runtime;
 mod source;
@@ -110,21 +110,26 @@ fn main() {
 }
 
 fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
-    let mut bridge = S3::new(
-        config.bridge.bucket()?,
-        config.bridge.region()?,
-        config.bridge.access_key_id()?,
-        config.bridge.secret_access_key()?,
-        config.bridge.endpoint()?,
+    let mut datastore = S3::new(
+        config.datastore.bucket()?,
+        config.datastore.region()?,
+        config.datastore.access_key_id()?,
+        config.datastore.secret_access_key()?,
+        config.datastore.endpoint()?,
     );
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 
     match sub_commands {
         // skip progress when output = true
-        SubCommand::Restore(cmd) => match cmd {
-            RestoreCommand::Local(args) => if args.output {},
-            RestoreCommand::Remote(args) => if args.output {},
+        SubCommand::Dump(dump_cmd) => match dump_cmd {
+            DumpCommand::Restore(cmd) => match cmd {
+                RestoreCommand::Local(args) => if args.output {},
+                RestoreCommand::Remote(args) => if args.output {},
+            },
+            _ => {
+                let _ = thread::spawn(move || show_progress_bar(rx_pb));
+            }
         },
         _ => {
             let _ = thread::spawn(move || show_progress_bar(rx_pb));
@@ -136,32 +141,32 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
     };
 
     match sub_commands {
-        SubCommand::Backup(cmd) => match cmd {
-            BackupCommand::List => {
-                let _ = commands::backup::list(&mut bridge)?;
+        SubCommand::Dump(cmd) => match cmd {
+            DumpCommand::List => {
+                let _ = commands::backup::list(&mut datastore)?;
                 Ok(())
             }
-            BackupCommand::Run(args) => {
+            DumpCommand::Create(args) => {
                 if let Some(name) = &args.name {
-                    bridge.set_backup_name(name.to_string());
+                    datastore.set_backup_name(name.to_string());
                 }
 
-                commands::backup::run(args, bridge, config, progress_callback)
+                commands::backup::run(args, datastore, config, progress_callback)
             }
-            BackupCommand::Delete(args) => commands::backup::delete(bridge, args),
+            DumpCommand::Delete(args) => commands::backup::delete(datastore, args),
+            DumpCommand::Restore(restore_cmd) => match restore_cmd {
+                RestoreCommand::Local(args) => {
+                    commands::restore::local(args, datastore, config, progress_callback)
+                }
+                RestoreCommand::Remote(args) => {
+                    commands::restore::remote(args, datastore, config, progress_callback)
+                }
+            },
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {
                 let _ = commands::transformer::list();
                 Ok(())
-            }
-        },
-        SubCommand::Restore(cmd) => match cmd {
-            RestoreCommand::Local(args) => {
-                commands::restore::local(args, bridge, config, progress_callback)
-            }
-            RestoreCommand::Remote(args) => {
-                commands::restore::remote(args, bridge, config, progress_callback)
             }
         },
     }

@@ -8,7 +8,7 @@ source:
           transformer_name: custom-wasm
           transformer_options:
             path: "examples/wasm/wasm-transformer-reverse-string.wasm"
-bridge:
+datastore:
   bucket: replibyte-test
   region: us-east-2
   access_key_id: minioadmin

@@ -10,7 +10,7 @@ pub trait Task {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(self, progress_callback: F) -> Result<(), Error>;
 }
 
-/// inter-thread message for Source/Destination and Bridge
+/// inter-thread message for Source/Destination and Datastore
 #[derive(Debug, Clone)]
 enum Message<T> {
     Data(T),

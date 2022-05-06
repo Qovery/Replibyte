@@ -1,6 +1,6 @@
 source:
   connection_uri: postgres://root:password@localhost:5432/root
-bridge:
+datastore:
   bucket: replibyte-test
   region: us-east-2
   access_key_id: $AWS_ACCESS_KEY_ID

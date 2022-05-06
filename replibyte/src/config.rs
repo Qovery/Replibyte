@@ -21,7 +21,7 @@ pub struct Config {
     // pub bind: Ipv4Addr,
     // pub port: u16,
     pub source: Option<SourceConfig>,
-    pub bridge: BridgeConfig,
+    pub datastore: DatastoreConfig,
     pub destination: Option<DestinationConfig>,
     pub encryption_key: Option<String>,
 }
@@ -56,7 +56,7 @@ impl Config {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct BridgeConfig {
+pub struct DatastoreConfig {
     // At the moment we do support only S3 as B,
     // in a near future we'll need to make it generic
     pub bucket: String,
@@ -66,7 +66,7 @@ pub struct BridgeConfig {
     pub endpoint: Option<Endpoint>,
 }
 
-impl BridgeConfig {
+impl DatastoreConfig {
     /// decode and return the bucket value
     pub fn bucket(&self) -> Result<String, Error> {
         substitute_env_var(self.bucket.as_str())

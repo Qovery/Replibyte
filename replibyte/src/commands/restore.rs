@@ -1,10 +1,9 @@
 use std::io::{Error, ErrorKind};
 use std::sync::mpsc;
 
-use crate::bridge::s3::S3;
-use crate::bridge::{Bridge, ReadOptions};
 use crate::cli::{RestoreArgs, RestoreLocalArgs};
 use crate::config::{Config, ConnectionUri};
+use crate::datastore::{Datastore, ReadOptions};
 use crate::destination::mongodb::MongoDB;
 use crate::destination::mongodb_docker::{MongoDBDocker, DEFAULT_MONGO_CONTAINER_PORT};
 use crate::destination::mysql::Mysql;
@@ -23,16 +22,16 @@ use crate::tasks::Task;
 /// Restore a backup in a local container
 pub fn local<F, B>(
     args: &RestoreLocalArgs,
-    mut bridge: B,
+    mut datastore: B,
     config: Config,
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
     F: Fn(usize, usize) -> (),
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     if let Some(encryption_key) = config.encryption_key()? {
-        bridge.set_encryption_key(encryption_key);
+        datastore.set_encryption_key(encryption_key);
     }
 
     let options = match args.value.as_str() {
@@ -50,7 +49,7 @@ where
         };
 
         let mut postgres = PostgresDocker::new(tag.to_string(), port);
-        let task = FullRestoreTask::new(&mut postgres, bridge, options);
+        let task = FullRestoreTask::new(&mut postgres, datastore, options);
         let _ = task.run(progress_callback)?;
 
         print_connection_string_and_wait(
@@ -98,7 +97,7 @@ where
         };
 
         let mut mongodb = MongoDBDocker::new(tag.to_string(), port);
-        let task = FullRestoreTask::new(&mut mongodb, bridge, options);
+        let task = FullRestoreTask::new(&mut mongodb, datastore, options);
         let _ = task.run(progress_callback)?;
 
         print_connection_string_and_wait(
@@ -143,7 +142,7 @@ where
         };
 
         let mut mysql = MysqlDocker::new(tag.to_string(), port);
-        let task = FullRestoreTask::new(&mut mysql, bridge, options);
+        let task = FullRestoreTask::new(&mut mysql, datastore, options);
         let _ = task.run(progress_callback)?;
 
         print_connection_string_and_wait(
@@ -186,16 +185,16 @@ where
 /// Restore a backup in the configured destination
 pub fn remote<F, B>(
     args: &RestoreArgs,
-    mut bridge: B,
+    mut datastore: B,
     config: Config,
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
     F: Fn(usize, usize) -> (),
-    B: Bridge + 'static,
+    B: Datastore + 'static,
 {
     if let Some(encryption_key) = config.encryption_key()? {
-        bridge.set_encryption_key(encryption_key);
+        datastore.set_encryption_key(encryption_key);
     }
 
     match config.destination {
@@ -209,7 +208,7 @@ where
 
             if args.output {
                 let mut postgres = PostgresStdout::default();
-                let task = FullRestoreTask::new(&mut postgres, bridge, options);
+                let task = FullRestoreTask::new(&mut postgres, datastore, options);
                 let _ = task.run(|_, _| {})?; // do not display the progress bar
                 return Ok(());
             }
@@ -225,7 +224,7 @@ where
                         true,
                     );
 
-                    let task = FullRestoreTask::new(&mut postgres, bridge, options);
+                    let task = FullRestoreTask::new(&mut postgres, datastore, options);
                     task.run(progress_callback)?
                 }
                 ConnectionUri::Mysql(host, port, username, password, database) => {
@@ -236,7 +235,7 @@ where
                         username.as_str(),
                         password.as_str(),
                     );
-                    let task = FullRestoreTask::new(&mut mysql, bridge, options);
+                    let task = FullRestoreTask::new(&mut mysql, datastore, options);
                     task.run(progress_callback)?;
                 }
                 ConnectionUri::MongoDB(
@@ -256,7 +255,7 @@ where
                         authentication_db.as_str(),
                     );
 
-                    let task = FullRestoreTask::new(&mut mongodb, bridge, options);
+                    let task = FullRestoreTask::new(&mut mongodb, datastore, options);
                     task.run(progress_callback)?
                 }
             }

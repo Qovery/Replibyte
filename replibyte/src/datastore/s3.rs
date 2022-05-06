@@ -11,13 +11,13 @@ use aws_types::os_shim_internal::Env;
 use chrono::{Duration, Utc};
 use log::{error, info};
 
-use crate::bridge::s3::S3Error::FailedObjectUpload;
-use crate::bridge::{
-    compress, decompress, decrypt, encrypt, Backup, Bridge, IndexFile, ReadOptions,
-};
-use crate::cli::BackupDeleteArgs;
+use crate::cli::DumpDeleteArgs;
 use crate::config::Endpoint;
 use crate::connector::Connector;
+use crate::datastore::s3::S3Error::FailedObjectUpload;
+use crate::datastore::{
+    compress, decompress, decrypt, encrypt, Backup, Datastore, IndexFile, ReadOptions,
+};
 use crate::runtime::block_on;
 use crate::types::Bytes;
 use crate::utils::epoch_millis;
@@ -96,7 +96,7 @@ impl Connector for S3 {
     }
 }
 
-impl Bridge for S3 {
+impl Datastore for S3 {
     fn index_file(&self) -> Result<IndexFile, Error> {
         let object = get_object(&self.client, self.bucket.as_str(), INDEX_FILE_NAME)?;
         let index_file: IndexFile = serde_json::from_slice(object.as_slice())?;
@@ -185,7 +185,7 @@ impl Bridge for S3 {
             // decrypt data?
             let data = if backup.encrypted {
                 // It should be safe to unwrap here because the backup is marked as encrypted in the backup manifest
-                // so if there is no encryption key set at the bridge level we want to panic.
+                // so if there is no encryption key set at the datastore level we want to panic.
                 let encryption_key = self.encryption_key.as_ref().unwrap();
                 decrypt(data, encryption_key.as_str())?
             } else {
@@ -217,8 +217,8 @@ impl Bridge for S3 {
         self.root_key = name;
     }
 
-    fn delete(&self, args: &BackupDeleteArgs) -> Result<(), Error> {
-        if let Some(backup_name) = &args.backup {
+    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error> {
+        if let Some(backup_name) = &args.dump {
             return delete_by_name(&self, backup_name.as_str());
         }
 
@@ -259,8 +259,8 @@ impl Bridge for S3 {
     }
 }
 
-fn delete_older_than(bridge: &S3, days: i64) -> Result<(), Error> {
-    let index_file = bridge.index_file()?;
+fn delete_older_than(datastore: &S3, days: i64) -> Result<(), Error> {
+    let index_file = datastore.index_file()?;
 
     let threshold_date = Utc::now() - Duration::days(days);
     let threshold_date = threshold_date.timestamp_millis() as u128;
@@ -272,14 +272,14 @@ fn delete_older_than(bridge: &S3, days: i64) -> Result<(), Error> {
         .collect();
 
     for backup in backups_to_delete {
-        delete_by_name(&bridge, backup.directory_name.as_str())?
+        delete_by_name(&datastore, backup.directory_name.as_str())?
     }
 
     Ok(())
 }
 
-fn delete_keep_last(bridge: &S3, keep_last: usize) -> Result<(), Error> {
-    let mut index_file = bridge.index_file()?;
+fn delete_keep_last(datastore: &S3, keep_last: usize) -> Result<(), Error> {
+    let mut index_file = datastore.index_file()?;
 
     index_file
         .backups
@@ -287,26 +287,26 @@ fn delete_keep_last(bridge: &S3, keep_last: usize) -> Result<(), Error> {
 
     if let Some(backups) = index_file.backups.get(keep_last..) {
         for backup in backups {
-            delete_by_name(&bridge, backup.directory_name.as_str())?;
+            delete_by_name(&datastore, backup.directory_name.as_str())?;
         }
     }
 
     Ok(())
 }
 
-fn delete_by_name(bridge: &S3, backup_name: &str) -> Result<(), Error> {
-    let mut index_file = bridge.index_file()?;
+fn delete_by_name(datastore: &S3, backup_name: &str) -> Result<(), Error> {
+    let mut index_file = datastore.index_file()?;
 
-    let bucket = &bridge.bucket;
+    let bucket = &datastore.bucket;
 
     let _ =
-        delete_directory(&bridge.client, bucket, backup_name).map_err(|err| Error::from(err))?;
+        delete_directory(&datastore.client, bucket, backup_name).map_err(|err| Error::from(err))?;
 
     index_file
         .backups
         .retain(|b| b.directory_name != backup_name);
 
-    bridge.write_index_file(&index_file)
+    datastore.write_index_file(&index_file)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -555,11 +555,11 @@ mod tests {
     use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
 
-    use crate::bridge::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
-    use crate::bridge::{Backup, Bridge};
-    use crate::cli::BackupDeleteArgs;
+    use crate::cli::DumpDeleteArgs;
     use crate::config::Endpoint;
     use crate::connector::Connector;
+    use crate::datastore::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
+    use crate::datastore::{Backup, Datastore};
     use crate::utils::epoch_millis;
     use crate::S3;
 
@@ -761,8 +761,8 @@ mod tests {
         .is_ok());
 
         assert!(s3
-            .delete(&BackupDeleteArgs {
-                backup: Some("backup-1".to_string()),
+            .delete(&DumpDeleteArgs {
+                dump: Some("backup-1".to_string()),
                 older_than: None,
                 keep_last: None
             })
@@ -773,8 +773,8 @@ mod tests {
         assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
 
         assert!(s3
-            .delete(&BackupDeleteArgs {
-                backup: Some("backup-2".to_string()),
+            .delete(&DumpDeleteArgs {
+                dump: Some("backup-2".to_string()),
                 older_than: None,
                 keep_last: None
             })
@@ -834,8 +834,8 @@ mod tests {
         .is_ok());
 
         assert!(s3
-            .delete(&BackupDeleteArgs {
-                backup: None,
+            .delete(&DumpDeleteArgs {
+                dump: None,
                 older_than: Some("6d".to_string()),
                 keep_last: None
             })
@@ -846,8 +846,8 @@ mod tests {
         assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
 
         assert!(s3
-            .delete(&BackupDeleteArgs {
-                backup: None,
+            .delete(&DumpDeleteArgs {
+                dump: None,
                 older_than: Some("5d".to_string()),
                 keep_last: None
             })
@@ -923,8 +923,8 @@ mod tests {
         .is_ok());
 
         assert!(s3
-            .delete(&BackupDeleteArgs {
-                backup: None,
+            .delete(&DumpDeleteArgs {
+                dump: None,
                 older_than: None,
                 keep_last: Some(2)
             })
@@ -936,8 +936,8 @@ mod tests {
         assert!(get_object(&s3.client, bucket.as_str(), "backup-3/testing-key.dump").is_ok());
 
         assert!(s3
-            .delete(&BackupDeleteArgs {
-                backup: None,
+            .delete(&DumpDeleteArgs {
+                dump: None,
                 older_than: None,
                 keep_last: Some(1)
             })
