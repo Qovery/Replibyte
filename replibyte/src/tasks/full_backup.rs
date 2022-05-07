@@ -11,22 +11,20 @@ use crate::Source;
 type DataMessage = (u16, Queries);
 
 /// FullBackupTask is a wrapping struct to execute the synchronization between a *Source* and a *Datastore*
-pub struct FullBackupTask<'a, S, B>
+pub struct FullBackupTask<'a, S>
 where
     S: Source,
-    B: Datastore + 'static,
 {
     source: S,
-    datastore: B,
+    datastore: Box<dyn Datastore>,
     options: SourceOptions<'a>,
 }
 
-impl<'a, S, B> FullBackupTask<'a, S, B>
+impl<'a, S> FullBackupTask<'a, S>
 where
     S: Source,
-    B: Datastore + 'static,
 {
-    pub fn new(source: S, datastore: B, options: SourceOptions<'a>) -> Self {
+    pub fn new(source: S, datastore: Box<dyn Datastore>, options: SourceOptions<'a>) -> Self {
         FullBackupTask {
             source,
             datastore,
@@ -35,10 +33,9 @@ where
     }
 }
 
-impl<'a, S, B> Task for FullBackupTask<'a, S, B>
+impl<'a, S> Task for FullBackupTask<'a, S>
 where
     S: Source,
-    B: Datastore + 'static,
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
         mut self,

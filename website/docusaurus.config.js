@@ -41,6 +41,9 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      metadata: [{
+        name: 'keywords', content: 'seed database, postgresql, postgres, mysql, mongodb, database, preview environment'
+      }],
       navbar: {
         title: 'Replibyte',
         logo: {

@@ -34,7 +34,7 @@ pub struct S3 {
 }
 
 impl S3 {
-    pub fn new<S: Into<String>>(
+    pub fn aws<S: Into<String>>(
         bucket: S,
         region: S,
         access_key_id: S,
@@ -75,6 +75,22 @@ impl S3 {
             enable_compression: true,
             encryption_key: None,
         }
+    }
+
+    pub fn gcp<S: Into<String>>(
+        bucket: S,
+        region: S,
+        gs_access_key_id: S,
+        gs_secret_access_key: S,
+        endpoint: Endpoint,
+    ) -> Self {
+        S3::aws(
+            bucket,
+            region,
+            gs_access_key_id,
+            gs_secret_access_key,
+            endpoint,
+        )
     }
 
     fn create_index_file(&self) -> Result<IndexFile, Error> {
@@ -168,10 +184,11 @@ impl Datastore for S3 {
         self.write_index_file(&index_file)
     }
 
-    fn read<'a, F>(&self, options: &ReadOptions, mut data_callback: F) -> Result<(), Error>
-    where
-        F: FnMut(Bytes),
-    {
+    fn read(
+        &self,
+        options: &ReadOptions,
+        mut data_callback: &mut dyn FnMut(Bytes),
+    ) -> Result<(), Error> {
         let mut index_file = self.index_file()?;
         let backup = index_file.find_backup(options)?;
 
@@ -582,7 +599,7 @@ mod tests {
     fn s3(bucket: &str) -> S3 {
         let (access_key_id, secret_access_key) = credentials();
 
-        S3::new(
+        S3::aws(
             bucket.to_string(),
             "us-east-2".to_string(),
             access_key_id,

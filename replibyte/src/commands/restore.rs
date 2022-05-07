@@ -20,15 +20,14 @@ use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::Task;
 
 /// Restore a backup in a local container
-pub fn local<F, B>(
+pub fn local<F>(
     args: &RestoreLocalArgs,
-    mut datastore: B,
+    mut datastore: Box<dyn Datastore>,
     config: Config,
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
     F: Fn(usize, usize) -> (),
-    B: Datastore + 'static,
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key);
@@ -183,15 +182,14 @@ where
 }
 
 /// Restore a backup in the configured destination
-pub fn remote<F, B>(
+pub fn remote<F>(
     args: &RestoreArgs,
-    mut datastore: B,
+    mut datastore: Box<dyn Datastore>,
     config: Config,
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
     F: Fn(usize, usize) -> (),
-    B: Datastore + 'static,
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key);

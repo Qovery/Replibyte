@@ -11,9 +11,10 @@ source:
 destination:
   connection_uri: mongodb://root:password@localhost:27018/?authSource=admin
 datastore:
-  bucket: replibyte-test
-  region: us-east-2
-  access_key_id: minioadmin
-  secret_access_key: minioadmin
-  endpoint:
-    custom: 'http://localhost:9000'
+  aws:
+    bucket: replibyte-test
+    region: us-east-2
+    access_key_id: minioadmin
+    secret_access_key: minioadmin
+    endpoint:
+      custom: 'http://localhost:9000'

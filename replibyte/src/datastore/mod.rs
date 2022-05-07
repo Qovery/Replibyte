@@ -18,9 +18,11 @@ pub trait Datastore: Connector + Send + Sync {
     fn index_file(&self) -> Result<IndexFile, Error>;
     fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error>;
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error>;
-    fn read<F>(&self, options: &ReadOptions, data_callback: F) -> Result<(), Error>
-    where
-        F: FnMut(Bytes);
+    fn read(
+        &self,
+        options: &ReadOptions,
+        data_callback: &mut dyn FnMut(Bytes),
+    ) -> Result<(), Error>;
     fn set_compression(&mut self, enable: bool);
     fn set_encryption_key(&mut self, key: String);
     fn set_backup_name(&mut self, key: String);

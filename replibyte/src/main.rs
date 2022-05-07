@@ -12,7 +12,7 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
-use crate::config::{Config, DatabaseSubsetConfig};
+use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
 use crate::datastore::s3::S3;
 use crate::datastore::Datastore;
 use crate::source::{Source, SourceOptions};
@@ -110,13 +110,22 @@ fn main() {
 }
 
 fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
-    let mut datastore = S3::new(
-        config.datastore.bucket()?,
-        config.datastore.region()?,
-        config.datastore.access_key_id()?,
-        config.datastore.secret_access_key()?,
-        config.datastore.endpoint()?,
-    );
+    let mut datastore: Box<dyn Datastore> = match &config.datastore {
+        DatastoreConfig::AWS(config) => Box::new(S3::aws(
+            config.bucket()?,
+            config.region()?,
+            config.access_key_id()?,
+            config.secret_access_key()?,
+            config.endpoint()?,
+        )),
+        DatastoreConfig::GCP(config) => Box::new(S3::gcp(
+            config.bucket()?,
+            config.region()?,
+            config.gs_access_key_id()?,
+            config.gs_secret_access_key()?,
+            config.endpoint()?,
+        )),
+    };
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 

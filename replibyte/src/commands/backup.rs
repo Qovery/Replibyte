@@ -6,8 +6,6 @@ use timeago::Formatter;
 
 use crate::cli::{DumpCreateArgs, DumpDeleteArgs};
 use crate::config::{Config, ConnectionUri};
-use crate::connector::Connector;
-use crate::datastore::s3::S3;
 use crate::datastore::Datastore;
 
 use crate::source::mongodb::MongoDB;
@@ -21,9 +19,9 @@ use crate::tasks::Task;
 use crate::utils::{epoch_millis, table, to_human_readable_unit};
 
 /// Display all backups
-pub fn list(s3: &mut S3) -> Result<(), Error> {
-    let _ = s3.init()?;
-    let mut index_file = s3.index_file()?;
+pub fn list(datastore: &mut Box<dyn Datastore>) -> Result<(), Error> {
+    let _ = datastore.init()?;
+    let mut index_file = datastore.index_file()?;
 
     if index_file.backups.is_empty() {
         println!("<empty> no backups available\n");
@@ -53,15 +51,14 @@ pub fn list(s3: &mut S3) -> Result<(), Error> {
 }
 
 // Run a new backup
-pub fn run<F, B>(
+pub fn run<F>(
     args: &DumpCreateArgs,
-    mut datastore: B,
+    mut datastore: Box<dyn Datastore>,
     config: Config,
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
     F: Fn(usize, usize) -> (),
-    B: Datastore + 'static,
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key)
@@ -191,10 +188,7 @@ where
     }
 }
 
-pub fn delete<B>(datastore: B, args: &DumpDeleteArgs) -> anyhow::Result<()>
-where
-    B: Datastore + 'static,
-{
+pub fn delete(datastore: Box<dyn Datastore>, args: &DumpDeleteArgs) -> anyhow::Result<()> {
     let _ = datastore.delete(args)?;
     println!("Backup deleted!");
     Ok(())
