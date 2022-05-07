@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
-use crate::utils::binary_exists;
+use crate::utils::{binary_exists, wait_for_command};
 
 pub struct Postgres<'a> {
     host: &'a str,
@@ -95,15 +95,7 @@ impl<'a> Destination for Postgres<'a> {
 
         let _ = process.stdin.take().unwrap().write_all(data.as_slice());
 
-        let exit_status = process.wait()?;
-        if !exit_status.success() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("command error: {:?}", exit_status.to_string()),
-            ));
-        }
-
-        Ok(())
+        wait_for_command(&mut process)
     }
 }
 

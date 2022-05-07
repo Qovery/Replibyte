@@ -22,7 +22,7 @@ use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
-use crate::utils::binary_exists;
+use crate::utils::{binary_exists, wait_for_command};
 use crate::DatabaseSubsetConfig;
 
 use super::SourceOptions;
@@ -117,19 +117,7 @@ impl<'a> Source for Postgres<'a> {
             }
         };
 
-        match process.wait() {
-            Ok(exit_status) => {
-                if !exit_status.success() {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        format!("command error: {:?}", exit_status.to_string()),
-                    ));
-                }
-            }
-            Err(err) => return Err(err),
-        }
-
-        Ok(())
+        wait_for_command(&mut process)
     }
 }
 

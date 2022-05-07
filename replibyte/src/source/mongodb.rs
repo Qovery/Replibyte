@@ -6,7 +6,7 @@ use crate::connector::Connector;
 use crate::source::Source;
 use crate::transformer::Transformer;
 use crate::types::{Column, OriginalQuery, Query};
-use crate::utils::binary_exists;
+use crate::utils::{binary_exists, wait_for_command};
 use crate::SourceOptions;
 
 use bson::{Bson, Document};
@@ -91,19 +91,7 @@ impl<'a> Source for MongoDB<'a> {
 
         read_and_transform(reader, options, query_callback)?;
 
-        match process.wait() {
-            Ok(exit_status) => {
-                if !exit_status.success() {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        format!("command error: {:?}", exit_status.to_string()),
-                    ));
-                }
-            }
-            Err(err) => return Err(err),
-        }
-
-        Ok(())
+        wait_for_command(&mut process)
     }
 }
 

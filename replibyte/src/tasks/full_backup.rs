@@ -1,4 +1,4 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::mpsc;
 use std::thread;
 
@@ -53,24 +53,26 @@ where
         let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(1);
         let datastore = self.datastore;
 
-        let join_handle = thread::spawn(move || {
+        let join_handle = thread::spawn(move || -> Result<(), Error> {
             // managing Datastore (S3) upload here
             let datastore = datastore;
 
             loop {
-                let (chunk_part, queries) = match rx.recv() {
-                    Ok(Message::Data((chunk_part, queries))) => (chunk_part, queries),
+                let result = match rx.recv() {
+                    Ok(Message::Data((chunk_part, queries))) => Ok((chunk_part, queries)),
                     Ok(Message::EOF) => break,
-                    Err(err) => panic!("{:?}", err), // FIXME what should I do here?
+                    Err(err) => Err(Error::new(ErrorKind::Other, format!("{}", err))),
                 };
 
-                let _ = match datastore.write(chunk_part, to_bytes(queries)) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        panic!("{:?}", err);
-                    } // FIXME what should we do?
-                };
+                if let Ok((chunk_part, queries)) = result {
+                    let _ = match datastore.write(chunk_part, to_bytes(queries)) {
+                        Ok(_) => {}
+                        Err(err) => return Err(Error::new(ErrorKind::Other, format!("{}", err))),
+                    };
+                }
             }
+
+            Ok(())
         });
 
         // buffer of 100MB in memory to use and re-use to upload data into datastore
@@ -105,7 +107,7 @@ where
                 buffer_size * (chunk_part as usize + 1),
             );
             queries.push(query);
-        });
+        })?;
 
         progress_callback(total_transferred_bytes, total_transferred_bytes);
 
@@ -113,7 +115,7 @@ where
         let _ = tx.send(Message::Data((chunk_part, queries)));
         let _ = tx.send(Message::EOF);
         // wait for end of upload execution
-        let _ = join_handle.join(); // FIXME catch result here
+        join_handle.join().unwrap()?;
 
         Ok(())
     }
