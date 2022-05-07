@@ -1,6 +1,6 @@
 use std::io::Error;
 
-pub mod full_backup;
+pub mod full_dump;
 pub mod full_restore;
 
 pub type TransferredBytes = usize;

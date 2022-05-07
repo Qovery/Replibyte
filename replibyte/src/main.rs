@@ -152,7 +152,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
     match sub_commands {
         SubCommand::Dump(cmd) => match cmd {
             DumpCommand::List => {
-                let _ = commands::backup::list(&mut datastore)?;
+                let _ = commands::dump::list(&mut datastore)?;
                 Ok(())
             }
             DumpCommand::Create(args) => {
@@ -160,15 +160,15 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
                     datastore.set_backup_name(name.to_string());
                 }
 
-                commands::backup::run(args, datastore, config, progress_callback)
+                commands::dump::run(args, datastore, config, progress_callback)
             }
-            DumpCommand::Delete(args) => commands::backup::delete(datastore, args),
+            DumpCommand::Delete(args) => commands::dump::delete(datastore, args),
             DumpCommand::Restore(restore_cmd) => match restore_cmd {
                 RestoreCommand::Local(args) => {
-                    commands::restore::local(args, datastore, config, progress_callback)
+                    commands::dump::restore_local(args, datastore, config, progress_callback)
                 }
                 RestoreCommand::Remote(args) => {
-                    commands::restore::remote(args, datastore, config, progress_callback)
+                    commands::dump::restore_remote(args, datastore, config, progress_callback)
                 }
             },
         },
