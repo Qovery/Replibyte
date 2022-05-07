@@ -34,18 +34,7 @@ services:
     restart: always
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test:
-        [
-          'CMD',
-          'mysqladmin',
-          'ping',
-          '-h',
-          'localhost',
-          '-u',
-          'root',
-          '--password',
-          'password',
-        ]
+      test: ['CMD', 'mysqladmin', 'ping', '-u', 'root', '--password=password']
       timeout: 45s
       interval: 10s
       retries: 10
@@ -60,18 +49,7 @@ services:
     restart: always
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test:
-        [
-          'CMD',
-          'mysqladmin',
-          'ping',
-          '-h',
-          'localhost',
-          '-u',
-          'root',
-          '--password',
-          'password',
-        ]
+      test: ['CMD', 'mysqladmin', 'ping', '-u', 'root', '--password=password']
       timeout: 45s
       interval: 10s
       retries: 10
