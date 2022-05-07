@@ -4,6 +4,8 @@
 <p align="center">Replibyte is a powerful tool to seed your databases </br>with real data and other cool features 🔥</p>
 
 <p align="center">
+<a href="https://opensource.org/licenses/MIT"> <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-yellow.svg"> </a>
+<img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
 <img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
 <img src="https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square" alt="Build and Tests">
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
@@ -38,7 +40,9 @@ Here are the features we plan to support
    2. [Restore a dump](https://www.replibyte.com/docs/guides/restore-a-dump)
    3. [Subset a dump](https://www.replibyte.com/docs/guides/subset-a-dump)
    4. [Delete a dump](https://www.replibyte.com/docs/guides/delete-a-dump)
-   4. [Deploy Replibyte](https://www.replibyte.com/docs/guides/deploy-replibyte)
+   5. Deploy Replibyte
+      1. [Container](https://www.replibyte.com/docs/guides/deploy-replibyte/container)
+      2. [Qovery](https://www.replibyte.com/docs/guides/deploy-replibyte/qovery)
 
 ## Demo
 

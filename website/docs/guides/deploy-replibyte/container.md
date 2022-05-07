@@ -1,15 +1,15 @@
 ---
-title: V. Deploy Replibyte
-sidebar_position: 5
+title: Container
+sidebar_position: 1
 ---
 
-# Deploy Replibyte
+# Deploy Replibyte as a container
 
 You are using Replibyte on your local machine to [create](/docs/guides/create-a-dump) and [restore dumps](/docs/guides/restore-a-dump), it's great, but now you might want to deploy it close to your production and development environments to automate the process. This step-by-step guide explains how to do it and share you best practices. 
 
 :::note for qovery users
 
-This guide also works with [Qovery](https://www.qovery.com)
+To deploy with [Qovery](https://www.qovery.com), follow [this guide](/docs/guides/deploy-replibyte/qovery)
 
 :::
 
@@ -191,22 +191,28 @@ If you want to run your Replibyte command properly, you will need to pass all th
 
 ```shell
 docker run -e S3_ACCESS_KEY_ID=XXX \
-          -e S3_SECRET_ACCESS_KEY=YYY \
-          -e S3_REGION=us-east-2 \
-          -e S3_BUCKET=my-test-bucket \
-          -e SOURCE_CONNECTION_URI=postgres://... \
-          -e DESTINATION_CONNECTION_URI=postgres://... \
-          -e ENCRYPTION_SECRET=itIsASecret \
-          replibyte:latest replibyte dump create
+           -e S3_SECRET_ACCESS_KEY=YYY \
+           -e S3_REGION=us-east-2 \
+           -e S3_BUCKET=my-test-bucket \
+           -e SOURCE_CONNECTION_URI=postgres://... \
+           -e DESTINATION_CONNECTION_URI=postgres://... \
+           -e ENCRYPTION_SECRET=itIsASecret \
+           replibyte:latest replibyte dump create
 ```
 
 ## Deploy container
 
-### For Qovery
+---
 
-TODO
+:::info
 
-### Others
+[Qovery](https://www.qovery.com) (the company behind Replibyte) is a platform used by more than 20 000 developers to deploy their apps on AWS in just a few seconds. Replibyte will be natively supported by Qovery in Q4 2022.
+
+:::
+
+To deploy Replibyte with Qovery - [here are the instructions](/docs/guides/deploy-replibyte/qovery).
+
+---
 
 Once you have built and tried your container, you need to push it into a Container Registry. The most popular one is [Docker Hub](https://hub.docker.com). But you can use any other Container Registry like [AWS ECR](https://aws.amazon.com/ecr/), [Google GCR](https://cloud.google.com/container-registry), [Quay](https://quay.io/)... Here, I will use Docker Hub which is free and easy to use.
 
@@ -231,10 +237,40 @@ docker push your_docker_hub_username/replibyte:latest
 
 That's it! You are ready to pull and run your replibyte image from anywhere.
 
-## Deploy Replibyte in a production environment
+## Deployment
 
-TODO
+This part depends on the platform (E.g Kubernetes, Docker Swarm, Nomad...) you use to deploy your containers. Basically, you just need to pull the container you pushed, and run it with the good parameters.
 
-## Deploy Replibyte in a development environment
+### Parameters for production
 
-TODO
+Here is the command line to dump the production
+
+```bash
+docker run -e S3_ACCESS_KEY_ID=XXX \
+           -e S3_SECRET_ACCESS_KEY=YYY \
+           -e S3_REGION=us-east-2 \
+           -e S3_BUCKET=my-test-bucket \
+           -e SOURCE_CONNECTION_URI=postgres://... \
+           -e DESTINATION_CONNECTION_URI=postgres://... \
+           -e ENCRYPTION_SECRET=itIsASecret \
+           replibyte:latest replibyte dump create
+```
+
+### Parameters to seed development databases
+
+Here is the command line to seed your development database with the latest production dump
+
+```bash
+docker run -e S3_ACCESS_KEY_ID=XXX \
+           -e S3_SECRET_ACCESS_KEY=YYY \
+           -e S3_REGION=us-east-2 \
+           -e S3_BUCKET=my-test-bucket \
+           -e SOURCE_CONNECTION_URI=postgres://... \
+           -e DESTINATION_CONNECTION_URI=postgres://... \
+           -e ENCRYPTION_SECRET=itIsASecret \
+           replibyte:latest replibyte dump restore remote -v latest
+```
+
+---
+
+Do you have any questions? Feel free to join the channel #replibyte on [our Discord server](https://discord.qovery.com).

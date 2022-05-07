@@ -61,7 +61,7 @@ const config = {
           },
           {
             href: 'https://www.qovery.com/preview-environments',
-            label: '⚡️ Preview Environments',
+            label: '⚡️ Replibyte + Qovery Preview Environments',
             position: 'right',
           },
           {
