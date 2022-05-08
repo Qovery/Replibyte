@@ -115,8 +115,8 @@ impl DatastoreAwsS3Config {
 pub struct DatastoreGcpCloudStorageConfig {
     pub bucket: String,
     pub region: String,
-    pub gs_access_key_id: String,
-    pub gs_secret_access_key: String,
+    pub access_key: String,
+    pub secret: String,
     pub endpoint: Option<Endpoint>,
 }
 
@@ -131,14 +131,14 @@ impl DatastoreGcpCloudStorageConfig {
         substitute_env_var(self.region.as_str())
     }
 
-    /// decode and return the access_key_id value
-    pub fn gs_access_key_id(&self) -> Result<String, Error> {
-        substitute_env_var(self.gs_access_key_id.as_str())
+    /// decode and return the access_key value
+    pub fn access_key(&self) -> Result<String, Error> {
+        substitute_env_var(self.access_key.as_str())
     }
 
-    /// decode and return the secret_access_key value
-    pub fn gs_secret_access_key(&self) -> Result<String, Error> {
-        substitute_env_var(self.gs_secret_access_key.as_str())
+    /// decode and return the secret value
+    pub fn secret(&self) -> Result<String, Error> {
+        substitute_env_var(self.secret.as_str())
     }
 
     /// decode and return the endpoint value
@@ -470,10 +470,10 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Endpoint {
-    #[serde(rename = "custom")]
-    Custom(String),
     #[serde(rename = "default")]
     Default,
+    #[serde(rename = "custom")]
+    Custom(String),
 }
 
 /// take as input $KEY_ENV_VAR and convert it into a real value if the env var does exist

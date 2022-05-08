@@ -1,0 +1,119 @@
+---
+sidebar_position: 6
+---
+
+# Datastores
+
+Replibyte supports multiple datastores like AWS S3, GCP Cloud Storage (any other S3 compatible service), and your local disk.
+
+## AWS S3
+
+### Generate API Keys
+
+To generate your API keys:
+
+![](/img/datastore/aws/01.png)
+
+1. Sign in into your AWS console
+2. Click on **IAM** or search for **IAM**
+3. Select the **Users** page.
+4. Click on **Add users**.
+
+5. Create a user with "**Access Key - Programmatic Access**"
+![](/img/datastore/aws/02.png)
+
+:::caution
+
+Restrict access as much as possible. Replibyte just need write/read access within a dedicated bucket.
+
+:::
+
+6. Set the permissions you need for this user.
+![](/img/datastore/aws/03.png)
+
+7. Copy the **Access key** and the **Secret**
+
+### Replibyte configuration
+
+Here is the datastore configuration to use:
+
+```yaml
+...
+datastore:
+  aws:
+    bucket: <your_bucket>
+    region: <your_region>
+    access_key_id: XXX
+    secret_access_key: XXX
+...
+```
+
+## GCP Cloud Storage
+
+### Generate API Keys
+
+To generate your API keys compatible with the S3 protocol:
+
+![Screenshot to configure GCP cloud storage](/img/datastore/gcp/01.jpg)
+
+1. Sign in into your GCP console
+2. Click on the Cloud Storage
+3. Click on the **INTEROPERABILITY** tab
+4. Click on **CREATE A KEY**
+5. Copy the **Access key** and the **Secret**
+
+### Create bucket
+
+Replibyte does not create the bucket automatically for GCP Cloud Storage. You'll need to create it manually.
+
+:::caution
+
+Do not turn on object "versioning".
+
+:::
+
+### Replibyte configuration
+
+Here is the datastore configuration to use:
+
+```yaml
+...
+datastore:
+  gcp:
+    bucket: your-bucket-name
+    region: us-central1
+    access_key: $GS_ACCESS_KEY
+    secret: $GS_SECRET
+...
+```
+
+You can find the GCP Cloud Storage bucket locations [here](https://cloud.google.com/storage/docs/locations).
+
+## Other S3 compatible
+
+Refer to [AWS S3](#aws-s3) for the default S3 wire compatible protocol and the custom endpoint parameter:
+
+```yaml
+...
+datastore:
+  aws:
+    bucket: <your_bucket>
+    region: <your_region>
+    access_key_id: XXX
+    secret_access_key: XXX
+    endpoint:
+      custom: 'https://your-s3-compatible-endpoint'
+...
+```
+
+`access_key_id` and `secret_access_key` must be valid hash-based message authentication code (HMAC) keys. Refer to the service to use to get those keys.
+
+## Local disk
+
+> Work in progress
+
+## Add another datastore
+
+Do you need another datastore? Replibyte is extensible and any datastore can be supported. You are free to contribute by opening an issue or/and a pull request.
+
+To contribute, please see the [contributing](/docs/contributing) page.

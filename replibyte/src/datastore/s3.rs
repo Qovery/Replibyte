@@ -1,3 +1,4 @@
+use std::io::SeekFrom::End;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
@@ -23,11 +24,13 @@ use crate::types::Bytes;
 use crate::utils::epoch_millis;
 
 const INDEX_FILE_NAME: &str = "metadata.json";
+const GOOGLE_CLOUD_STORAGE_URL: &str = "https://storage.googleapis.com";
 
 pub struct S3 {
     bucket: String,
     root_key: String,
     region: String,
+    endpoint: Endpoint,
     client: Client,
     enable_compression: bool,
     encryption_key: Option<String>,
@@ -57,7 +60,7 @@ impl S3 {
 
         let s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
 
-        let s3_config = match endpoint {
+        let s3_config = match &endpoint {
             Endpoint::Default => s3_config_builder.build(),
             Endpoint::Custom(url) => match http::Uri::from_str(url.as_str()) {
                 Ok(uri) => s3_config_builder
@@ -71,6 +74,7 @@ impl S3 {
             bucket: bucket.into().to_string(),
             root_key: format!("backup-{}", epoch_millis()),
             region,
+            endpoint,
             client: Client::from_conf(s3_config),
             enable_compression: true,
             encryption_key: None,
@@ -80,17 +84,18 @@ impl S3 {
     pub fn gcp<S: Into<String>>(
         bucket: S,
         region: S,
-        gs_access_key_id: S,
-        gs_secret_access_key: S,
+        access_key: S,
+        secret: S,
         endpoint: Endpoint,
     ) -> Self {
-        S3::aws(
-            bucket,
-            region,
-            gs_access_key_id,
-            gs_secret_access_key,
-            endpoint,
-        )
+        let endpoint = match endpoint {
+            // change for default GCP Cloud Storage endpoint
+            Endpoint::Default => Endpoint::Custom(GOOGLE_CLOUD_STORAGE_URL.to_string()),
+            // passthrough
+            Endpoint::Custom(url) => Endpoint::Custom(url),
+        };
+
+        S3::aws(bucket, region, access_key, secret, endpoint)
     }
 
     fn create_index_file(&self) -> Result<IndexFile, Error> {
@@ -107,7 +112,15 @@ impl S3 {
 
 impl Connector for S3 {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = create_bucket(&self.client, self.bucket.as_str(), self.region.as_str())?;
+        match &self.endpoint {
+            Endpoint::Custom(url) if url.as_str() == GOOGLE_CLOUD_STORAGE_URL => {
+                // Do not try to create bucket - the current S3 client does not supports well GCP Cloud Storage
+            }
+            _ => {
+                let _ = create_bucket(&self.client, self.bucket.as_str(), self.region.as_str())?;
+            }
+        }
+
         self.create_index_file().map(|_| ())
     }
 }
@@ -132,56 +145,14 @@ impl Datastore for S3 {
     }
 
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
-        // compress data?
-        let data = if self.enable_compression {
-            compress(data)?
-        } else {
-            data
-        };
-
-        // encrypt data?
-        let data = match &self.encryption_key {
-            Some(key) => encrypt(data, key.as_str())?,
-            None => data,
-        };
-
-        let data_size = data.len();
-        let key = format!("{}/{}.dump", self.root_key.as_str(), file_part);
-
-        info!("upload object '{}' part {} on", key.as_str(), file_part);
-
-        let _ = create_object(&self.client, self.bucket.as_str(), key.as_str(), data)?;
-
-        // update index file
-        let mut index_file = self.index_file()?;
-
-        let mut new_backup = Backup {
-            directory_name: self.root_key.clone(),
-            size: 0,
-            created_at: epoch_millis(),
-            compressed: self.enable_compression,
-            encrypted: self.encryption_key.is_some(),
-        };
-
-        // find or create Backup
-        let mut backup = index_file
-            .backups
-            .iter_mut()
-            .find(|b| b.directory_name.as_str() == self.root_key.as_str())
-            .unwrap_or(&mut new_backup);
-
-        if backup.size == 0 {
-            // it means it's a new backup.
-            // We need to add it into the index_file.backups
-            new_backup.size = data_size;
-            index_file.backups.push(new_backup);
-        } else {
-            // update total backup size
-            backup.size = backup.size + data_size;
-        }
-
-        // save index file
-        self.write_index_file(&index_file)
+        write_objects(
+            self,
+            file_part,
+            data,
+            self.bucket.as_str(),
+            self.root_key.as_str(),
+            &self.client,
+        )
     }
 
     fn read(
@@ -258,7 +229,7 @@ impl Datastore for S3 {
                     return Err(Error::new(
                         ErrorKind::Other,
                         "command error: invalid `--older-than` format. Use `--older-than=14d`",
-                    ))
+                    ));
                 }
             };
 
@@ -274,6 +245,74 @@ impl Datastore for S3 {
             "command error: parameters or options required",
         ))
     }
+
+    fn compression_enabled(&self) -> bool {
+        self.enable_compression
+    }
+
+    fn encryption_key(&self) -> &Option<String> {
+        &self.encryption_key
+    }
+}
+
+fn write_objects<B: Datastore>(
+    datastore: &B,
+    file_part: u16,
+    data: Bytes,
+    bucket: &str,
+    root_key: &str,
+    client: &Client,
+) -> Result<(), Error> {
+    // compress data?
+    let data = if datastore.compression_enabled() {
+        compress(data)?
+    } else {
+        data
+    };
+
+    // encrypt data?
+    let data = match datastore.encryption_key() {
+        Some(key) => encrypt(data, key.as_str())?,
+        None => data,
+    };
+
+    let data_size = data.len();
+    let key = format!("{}/{}.dump", root_key, file_part);
+
+    info!("upload object '{}' part {} on", key.as_str(), file_part);
+
+    let _ = create_object(client, bucket, key.as_str(), data)?;
+
+    // update index file
+    let mut index_file = datastore.index_file()?;
+
+    let mut new_backup = Backup {
+        directory_name: root_key.to_string(),
+        size: 0,
+        created_at: epoch_millis(),
+        compressed: datastore.compression_enabled(),
+        encrypted: datastore.encryption_key().is_some(),
+    };
+
+    // find or create Backup
+    let mut backup = index_file
+        .backups
+        .iter_mut()
+        .find(|b| b.directory_name.as_str() == root_key)
+        .unwrap_or(&mut new_backup);
+
+    if backup.size == 0 {
+        // it means it's a new backup.
+        // We need to add it into the index_file.backups
+        new_backup.size = data_size;
+        index_file.backups.push(new_backup);
+    } else {
+        // update total backup size
+        backup.size = backup.size + data_size;
+    }
+
+    // save index file
+    datastore.write_index_file(&index_file)
 }
 
 fn delete_older_than(datastore: &S3, days: i64) -> Result<(), Error> {
@@ -571,6 +610,7 @@ fn delete_directory<'a>(
 mod tests {
     use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
+    use std::future::pending;
 
     use crate::cli::DumpDeleteArgs;
     use crate::config::Endpoint;
@@ -585,19 +625,23 @@ mod tests {
     const MINIO_ENDPOINT: &str = "http://localhost:9000";
     const MINIO_CREDENTIALS: &str = "minioadmin";
 
-    fn bucket() -> String {
+    fn aws_bucket() -> String {
         format!("replibyte-test-{}", Faker.fake::<String>().to_lowercase())
     }
 
-    fn credentials() -> (String, String) {
+    fn gcp_bucket() -> String {
+        "replibyte-test-us".to_string()
+    }
+
+    fn aws_credentials() -> (String, String) {
         (
             std::env::var("AWS_ACCESS_KEY_ID").unwrap_or(MINIO_CREDENTIALS.to_string()),
             std::env::var("AWS_SECRET_ACCESS_KEY").unwrap_or(MINIO_CREDENTIALS.to_string()),
         )
     }
 
-    fn s3(bucket: &str) -> S3 {
-        let (access_key_id, secret_access_key) = credentials();
+    fn aws_s3(bucket: &str) -> S3 {
+        let (access_key_id, secret_access_key) = aws_credentials();
 
         S3::aws(
             bucket.to_string(),
@@ -608,10 +652,36 @@ mod tests {
         )
     }
 
+    fn gcp_credentials() -> (String, String, Endpoint) {
+        let endpoint = if std::env::var("GS_ACCESS_KEY").is_err() {
+            Endpoint::Custom(MINIO_ENDPOINT.to_string())
+        } else {
+            Endpoint::Default
+        };
+
+        (
+            std::env::var("GS_ACCESS_KEY").unwrap_or(MINIO_CREDENTIALS.to_string()),
+            std::env::var("GS_SECRET").unwrap_or(MINIO_CREDENTIALS.to_string()),
+            endpoint,
+        )
+    }
+
+    fn gcp_s3(bucket: &str) -> S3 {
+        let (access_key, secret, endpoint) = gcp_credentials();
+
+        S3::gcp(
+            bucket.to_string(),
+            "us-central1".to_string(),
+            access_key,
+            secret,
+            endpoint,
+        )
+    }
+
     #[test]
     fn init_s3() {
-        let bucket = bucket();
-        let mut s3 = s3(bucket.as_str());
+        let bucket = aws_bucket();
+        let mut s3 = aws_s3(bucket.as_str());
         // executed twice to check that there is no error at the second call
         assert!(s3.init().is_ok());
         assert!(s3.init().is_ok());
@@ -620,10 +690,10 @@ mod tests {
     }
 
     #[test]
-    fn create_and_get_and_delete_object() {
-        let bucket = bucket();
+    fn create_and_get_and_delete_object_for_aws_s3() {
+        let bucket = aws_bucket();
 
-        let mut s3 = s3(bucket.as_str());
+        let mut s3 = aws_s3(bucket.as_str());
         let _ = s3.init().expect("s3 init failed");
 
         let key = format!("testing-object-{}", Faker.fake::<String>());
@@ -691,9 +761,77 @@ mod tests {
     }
 
     #[test]
+    fn create_and_get_and_delete_object_for_gcp_s3() {
+        let bucket = gcp_bucket();
+        let mut s3 = gcp_s3(bucket.as_str());
+        let _ = s3.init().expect("s3 init failed");
+
+        let key = format!("testing-object-{}", Faker.fake::<String>());
+
+        assert_eq!(
+            get_object(&s3.client, bucket.as_str(), key.as_str())
+                .err()
+                .unwrap(),
+            S3Error::ObjectDoesNotExist {
+                bucket: bucket.as_str(),
+                key: key.as_str(),
+            }
+        );
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            key.as_str(),
+            b"hello w0rld".to_vec(),
+        )
+        .is_ok());
+
+        assert_eq!(
+            get_object(&s3.client, bucket.as_str(), key.as_str()).unwrap(),
+            b"hello w0rld"
+        );
+
+        // check that the object is updated
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            key.as_str(),
+            b"hello w0rld updated".to_vec(),
+        )
+        .is_ok());
+
+        assert_eq!(
+            get_object(&s3.client, bucket.as_str(), key.as_str()).unwrap(),
+            b"hello w0rld updated"
+        );
+
+        assert!(delete_object(&s3.client, bucket.as_str(), key.as_str()).is_ok());
+
+        assert_eq!(
+            delete_object(&s3.client, bucket.as_str(), key.as_str())
+                .err()
+                .unwrap(),
+            S3Error::ObjectDoesNotExist {
+                bucket: bucket.as_str(),
+                key: key.as_str(),
+            }
+        );
+
+        assert_eq!(
+            get_object(&s3.client, bucket.as_str(), key.as_str())
+                .err()
+                .unwrap(),
+            S3Error::ObjectDoesNotExist {
+                bucket: bucket.as_str(),
+                key: key.as_str(),
+            }
+        );
+    }
+
+    #[test]
     fn test_s3_index_file() {
-        let bucket = bucket();
-        let mut s3 = s3(bucket.as_str());
+        let bucket = aws_bucket();
+        let mut s3 = aws_s3(bucket.as_str());
 
         let _ = s3.init().expect("s3 init failed");
 
@@ -720,8 +858,8 @@ mod tests {
 
     #[test]
     fn test_backup_name() {
-        let bucket = bucket();
-        let mut s3 = s3(bucket.as_str());
+        let bucket = aws_bucket();
+        let mut s3 = aws_s3(bucket.as_str());
 
         s3.set_backup_name("custom-backup-name".to_string());
 
@@ -730,8 +868,8 @@ mod tests {
 
     #[test]
     fn test_s3_backup_delete_by_name() {
-        let bucket = bucket();
-        let mut s3 = s3(bucket.as_str());
+        let bucket = aws_bucket();
+        let mut s3 = aws_s3(bucket.as_str());
 
         let _ = s3.init().expect("s3 init failed");
 
@@ -781,7 +919,7 @@ mod tests {
             .delete(&DumpDeleteArgs {
                 dump: Some("backup-1".to_string()),
                 older_than: None,
-                keep_last: None
+                keep_last: None,
             })
             .is_ok());
 
@@ -793,7 +931,7 @@ mod tests {
             .delete(&DumpDeleteArgs {
                 dump: Some("backup-2".to_string()),
                 older_than: None,
-                keep_last: None
+                keep_last: None,
             })
             .is_ok());
         assert!(s3.index_file().unwrap().backups.is_empty());
@@ -802,8 +940,8 @@ mod tests {
 
     #[test]
     fn test_s3_backup_delete_older_than() {
-        let bucket = bucket();
-        let mut s3 = s3(bucket.as_str());
+        let bucket = aws_bucket();
+        let mut s3 = aws_s3(bucket.as_str());
 
         let _ = s3.init().expect("s3 init failed");
 
@@ -854,7 +992,7 @@ mod tests {
             .delete(&DumpDeleteArgs {
                 dump: None,
                 older_than: Some("6d".to_string()),
-                keep_last: None
+                keep_last: None,
             })
             .is_ok());
 
@@ -866,7 +1004,7 @@ mod tests {
             .delete(&DumpDeleteArgs {
                 dump: None,
                 older_than: Some("5d".to_string()),
-                keep_last: None
+                keep_last: None,
             })
             .is_ok());
 
@@ -877,8 +1015,8 @@ mod tests {
 
     #[test]
     fn test_s3_backup_keep_last() {
-        let bucket = bucket();
-        let mut s3 = s3(bucket.as_str());
+        let bucket = aws_bucket();
+        let mut s3 = aws_s3(bucket.as_str());
 
         let _ = s3.init().expect("s3 init failed");
 
@@ -943,7 +1081,7 @@ mod tests {
             .delete(&DumpDeleteArgs {
                 dump: None,
                 older_than: None,
-                keep_last: Some(2)
+                keep_last: Some(2),
             })
             .is_ok());
 
@@ -956,7 +1094,7 @@ mod tests {
             .delete(&DumpDeleteArgs {
                 dump: None,
                 older_than: None,
-                keep_last: Some(1)
+                keep_last: Some(1),
             })
             .is_ok());
 

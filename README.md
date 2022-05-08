@@ -1,7 +1,7 @@
 <p align="center"> <img src="assets/RepliByte%20Logo.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">Seed Your Development Database With Real Data ⚡️</h3>
-<p align="center">Replibyte is a powerful tool to seed your databases </br>with real data and other cool features 🔥</p>
+<p align="center">Replibyte is a blazingly fast tool to seed your databases </br>with your production data while keeping sensitive data safe 🔥</p>
 
 <p align="center">
 <a href="https://opensource.org/licenses/MIT"> <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-yellow.svg"> </a>

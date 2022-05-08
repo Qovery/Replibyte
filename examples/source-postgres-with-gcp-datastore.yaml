@@ -1,0 +1,16 @@
+source:
+  connection_uri: postgres://root:password@localhost:5432/root
+  transformers:
+    - database: public
+      table: employees
+      columns:
+        - name: fist_name
+          transformer_name: first-name
+        - name: last_name
+          transformer_name: random
+datastore:
+  gcp:
+    bucket: replibyte-test
+    region: us-west1
+    access_key: $GS_ACCESS_KEY_ID
+    secret: $GS_SECRET_ACCESS_KEY

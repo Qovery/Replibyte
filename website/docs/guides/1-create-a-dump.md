@@ -198,6 +198,12 @@ datastore:
     secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
 
+:::note
+
+Check out [all the Datastore available](/docs/datastores).
+
+:::
+
 Finally, you can run the following command according to you chosen option above:
 
 <details>

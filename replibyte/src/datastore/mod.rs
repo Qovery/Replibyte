@@ -23,7 +23,9 @@ pub trait Datastore: Connector + Send + Sync {
         options: &ReadOptions,
         data_callback: &mut dyn FnMut(Bytes),
     ) -> Result<(), Error>;
+    fn compression_enabled(&self) -> bool;
     fn set_compression(&mut self, enable: bool);
+    fn encryption_key(&self) -> &Option<String>;
     fn set_encryption_key(&mut self, key: String);
     fn set_backup_name(&mut self, key: String);
     fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error>;

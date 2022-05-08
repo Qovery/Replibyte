@@ -121,8 +121,8 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
         DatastoreConfig::GCP(config) => Box::new(S3::gcp(
             config.bucket()?,
             config.region()?,
-            config.gs_access_key_id()?,
-            config.gs_secret_access_key()?,
+            config.access_key()?,
+            config.secret()?,
             config.endpoint()?,
         )),
     };
