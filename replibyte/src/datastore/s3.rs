@@ -72,7 +72,7 @@ impl S3 {
 
         S3 {
             bucket: bucket.into().to_string(),
-            root_key: format!("backup-{}", epoch_millis()),
+            root_key: format!("dump-{}", epoch_millis()),
             region,
             endpoint,
             client: Client::from_conf(s3_config),
@@ -201,7 +201,7 @@ impl Datastore for S3 {
         self.enable_compression = enable;
     }
 
-    fn set_backup_name(&mut self, name: String) {
+    fn set_dump_name(&mut self, name: String) {
         self.root_key = name;
     }
 
@@ -861,7 +861,7 @@ mod tests {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
-        s3.set_backup_name("custom-backup-name".to_string());
+        s3.set_dump_name("custom-backup-name".to_string());
 
         assert_eq!(s3.root_key, "custom-backup-name".to_string())
     }

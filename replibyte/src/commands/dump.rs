@@ -11,6 +11,7 @@ use crate::config::{Config, ConnectionUri};
 use crate::datastore::Datastore;
 use crate::datastore::ReadOptions;
 use crate::destination;
+use crate::destination::generic_stdout::GenericStdout;
 use crate::destination::mongodb_docker::{MongoDBDocker, DEFAULT_MONGO_CONTAINER_PORT};
 use crate::destination::mysql_docker::{
     MysqlDocker, DEFAULT_MYSQL_CONTAINER_PORT, DEFAULT_MYSQL_IMAGE_TAG,
@@ -19,7 +20,6 @@ use crate::destination::postgres_docker::{
     PostgresDocker, DEFAULT_POSTGRES_CONTAINER_PORT, DEFAULT_POSTGRES_DB,
     DEFAULT_POSTGRES_IMAGE_TAG, DEFAULT_POSTGRES_PASSWORD, DEFAULT_POSTGRES_USER,
 };
-use crate::destination::postgres_stdout::PostgresStdout;
 use crate::source::mongodb::MongoDB;
 use crate::source::mysql::Mysql;
 use crate::source::mysql_stdin::MysqlStdin;
@@ -31,13 +31,13 @@ use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::Task;
 use crate::utils::{epoch_millis, table, to_human_readable_unit};
 
-/// Display all backups
+/// List all dumps
 pub fn list(datastore: &mut Box<dyn Datastore>) -> Result<(), Error> {
     let _ = datastore.init()?;
     let mut index_file = datastore.index_file()?;
 
     if index_file.backups.is_empty() {
-        println!("<empty> no backups available\n");
+        println!("<empty> no dumps available\n");
         return Ok(());
     }
 
@@ -63,7 +63,7 @@ pub fn list(datastore: &mut Box<dyn Datastore>) -> Result<(), Error> {
     Ok(())
 }
 
-// Run a new backup
+// Create a new dump
 pub fn run<F>(
     args: &DumpCreateArgs,
     mut datastore: Box<dyn Datastore>,
@@ -189,7 +189,7 @@ where
                 }
             }
 
-            println!("Backup successful!");
+            println!("Dump created successfully!");
             Ok(())
         }
         None => {
@@ -203,11 +203,11 @@ where
 
 pub fn delete(datastore: Box<dyn Datastore>, args: &DumpDeleteArgs) -> anyhow::Result<()> {
     let _ = datastore.delete(args)?;
-    println!("Backup deleted!");
+    println!("Dump deleted!");
     Ok(())
 }
 
-/// Restore a backup in a local container
+/// Restore a dump in a local container
 pub fn restore_local<F>(
     args: &RestoreLocalArgs,
     mut datastore: Box<dyn Datastore>,
@@ -223,10 +223,17 @@ where
 
     let options = match args.value.as_str() {
         "latest" => ReadOptions::Latest,
-        v => ReadOptions::Backup {
+        v => ReadOptions::Dump {
             name: v.to_string(),
         },
     };
+
+    if args.output {
+        let mut generic_stdout = GenericStdout::new();
+        let task = FullRestoreTask::new(&mut generic_stdout, datastore, options);
+        let _ = task.run(|_, _| {})?; // do not display the progress bar
+        return Ok(());
+    }
 
     if args.image == "postgres".to_string() || args.image == "postgresql".to_string() {
         let port = args.port.unwrap_or(DEFAULT_POSTGRES_CONTAINER_PORT);
@@ -240,7 +247,7 @@ where
         let _ = task.run(progress_callback)?;
 
         print_connection_string_and_wait(
-            "To connect to your Postgres database, use the following connection string:",
+            "To connect to your PostgreSQL instance, use the following connection string:",
             &format!(
                 "postgres://{}:{}@localhost:{}/{}",
                 DEFAULT_POSTGRES_USER, DEFAULT_POSTGRES_PASSWORD, port, DEFAULT_POSTGRES_DB
@@ -288,7 +295,7 @@ where
         let _ = task.run(progress_callback)?;
 
         print_connection_string_and_wait(
-            "To connect to your MongoDB database, use the following connection string:",
+            "To connect to your MongoDB instance, use the following connection string:",
             &format!("mongodb://root:password@localhost:{}/root", port),
         );
 
@@ -333,7 +340,7 @@ where
         let _ = task.run(progress_callback)?;
 
         print_connection_string_and_wait(
-            "To connect to your MySQL database, use the following connection string:",
+            "To connect to your MySQL instance, use the following connection string:",
             &format!("mysql://root:password@127.0.0.1:{}/root", port),
         );
 
@@ -369,7 +376,7 @@ where
     Ok(())
 }
 
-/// Restore a backup in the configured destination
+/// Restore a dump in the configured destination
 pub fn restore_remote<F>(
     args: &RestoreArgs,
     mut datastore: Box<dyn Datastore>,
@@ -387,14 +394,14 @@ where
         Some(destination) => {
             let options = match args.value.as_str() {
                 "latest" => ReadOptions::Latest,
-                v => ReadOptions::Backup {
+                v => ReadOptions::Dump {
                     name: v.to_string(),
                 },
             };
 
             if args.output {
-                let mut postgres = PostgresStdout::default();
-                let task = FullRestoreTask::new(&mut postgres, datastore, options);
+                let mut generic_stdout = GenericStdout::new();
+                let task = FullRestoreTask::new(&mut generic_stdout, datastore, options);
                 let _ = task.run(|_, _| {})?; // do not display the progress bar
                 return Ok(());
             }

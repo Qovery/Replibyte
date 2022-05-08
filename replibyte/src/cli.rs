@@ -104,7 +104,7 @@ pub struct DumpCreateArgs {
     #[clap(short, long, parse(from_os_str), value_name = "dump file")]
     /// dump file
     pub file: Option<PathBuf>,
-    /// backup name
+    /// dump name
     #[clap(short, long)]
     pub name: Option<String>,
 }

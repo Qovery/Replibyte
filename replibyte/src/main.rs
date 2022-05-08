@@ -157,7 +157,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
             }
             DumpCommand::Create(args) => {
                 if let Some(name) = &args.name {
-                    datastore.set_backup_name(name.to_string());
+                    datastore.set_dump_name(name.to_string());
                 }
 
                 commands::dump::run(args, datastore, config, progress_callback)

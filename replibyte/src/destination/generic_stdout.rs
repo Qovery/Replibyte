@@ -4,28 +4,28 @@ use crate::connector::Connector;
 use crate::destination::Destination;
 use crate::types::Bytes;
 
-/// Stream Mysql dump output on stdout
-pub struct MysqlStdout {}
+/// Stream dump output on stdout
+pub struct GenericStdout {}
 
-impl MysqlStdout {
+impl GenericStdout {
     pub fn new() -> Self {
-        MysqlStdout {}
+        GenericStdout {}
     }
 }
 
-impl Default for MysqlStdout {
+impl Default for GenericStdout {
     fn default() -> Self {
-        MysqlStdout {}
+        GenericStdout {}
     }
 }
 
-impl Connector for MysqlStdout {
+impl Connector for GenericStdout {
     fn init(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<'a> Destination for MysqlStdout {
+impl<'a> Destination for GenericStdout {
     fn write(&self, data: Bytes) -> Result<(), Error> {
         let mut stdout = stdout();
         let _ = stdout.write_all(data.as_slice());

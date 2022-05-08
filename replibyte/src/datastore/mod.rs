@@ -27,7 +27,7 @@ pub trait Datastore: Connector + Send + Sync {
     fn set_compression(&mut self, enable: bool);
     fn encryption_key(&self) -> &Option<String>;
     fn set_encryption_key(&mut self, key: String);
-    fn set_backup_name(&mut self, key: String);
+    fn set_dump_name(&mut self, name: String);
     fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error>;
 }
 
@@ -47,7 +47,7 @@ impl IndexFile {
                     None => return Err(Error::new(ErrorKind::Other, "No backups available.")),
                 }
             }
-            ReadOptions::Backup { name } => {
+            ReadOptions::Dump { name } => {
                 match self
                     .backups
                     .iter()
@@ -78,7 +78,7 @@ pub struct Backup {
 #[derive(Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub enum ReadOptions {
     Latest,
-    Backup { name: String },
+    Dump { name: String },
 }
 
 fn compress(data: Bytes) -> Result<Bytes, Error> {
