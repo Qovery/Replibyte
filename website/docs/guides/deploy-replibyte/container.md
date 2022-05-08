@@ -169,9 +169,7 @@ And you can try your container with `docker run replibyte:latest replibyte`
 docker run replibyte:latest replibyte
 
 
-replibyte 0.1.0
-Qovery
-RepliByte is a tool to synchronize cloud databases and fake sensitive data, just pass `-h`
+Replibyte is a tool to seed your databases with your production data while keeping sensitive data safe, just pass `-h`
 
 USAGE:
     replibyte [OPTIONS] --config <configuration file> <SUBCOMMAND>

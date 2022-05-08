@@ -248,6 +248,35 @@ SQL output:
 INSERT INTO public.my_table (payment_card) VALUE ('1234***************');
 ```
 
+Redacted transformer has more options, like the `width` and the `character` to use
+
+```yaml
+source:
+  connection_uri: $DATABASE_URL
+  transformers:
+    - database: public
+      table: employees
+      columns:
+        - name: last_name
+          transformer_name: redacted
+          transformer_options:
+            character: '#'
+            width: 20
+# ...
+```
+
+SQL input:
+
+```sql
+INSERT INTO public.my_table (payment_card) VALUE ('1234 1234 1234 1234');
+```
+
+SQL output:
+
+```sql
+INSERT INTO public.my_table (payment_card) VALUE ('123####################');
+```
+
 ## Transient
 
 Does not change anything (good for testing purpose)

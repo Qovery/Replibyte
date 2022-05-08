@@ -2,7 +2,7 @@
 edition = "2021"
 version = "0.1.0"
 name = "replibyte"
-authors = ["Qovery"]
+authors = ["Qovery Team", "Fab", "Benny", "Contributos"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

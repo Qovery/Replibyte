@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
-/// RepliByte is a tool to synchronize cloud databases and fake sensitive data, just pass `-h`
+/// Replibyte is a tool to seed your databases with your production data while keeping sensitive data safe, just pass `-h`
 #[derive(Parser, Debug)]
-#[clap(author, about, long_about = None)]
+#[clap(about, long_about = None)]
 #[clap(propagate_version = true)]
 pub struct CLI {
     /// Replibyte configuration file
