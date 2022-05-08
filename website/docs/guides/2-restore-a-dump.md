@@ -85,7 +85,7 @@ destination:
 and run the following command:
 
 ```shell
-replibyte -c conf.yaml dump restore remote
+replibyte -c conf.yaml dump restore remote -v latest
 ```
 
 ---
