@@ -56,7 +56,15 @@ impl Config {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct DatastoreConfig {
+pub enum DatastoreConfig {
+    #[serde(rename = "aws")]
+    AWS(DatastoreAwsS3Config),
+    #[serde(rename = "gcp")]
+    GCP(DatastoreGcpCloudStorageConfig),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct DatastoreAwsS3Config {
     // At the moment we do support only S3 as B,
     // in a near future we'll need to make it generic
     pub bucket: String,
@@ -66,7 +74,7 @@ pub struct DatastoreConfig {
     pub endpoint: Option<Endpoint>,
 }
 
-impl DatastoreConfig {
+impl DatastoreAwsS3Config {
     /// decode and return the bucket value
     pub fn bucket(&self) -> Result<String, Error> {
         substitute_env_var(self.bucket.as_str())
@@ -85,6 +93,52 @@ impl DatastoreConfig {
     /// decode and return the secret_access_key value
     pub fn secret_access_key(&self) -> Result<String, Error> {
         substitute_env_var(self.secret_access_key.as_str())
+    }
+
+    /// decode and return the endpoint value
+    pub fn endpoint(&self) -> Result<Endpoint, Error> {
+        if let Some(endpoint) = &self.endpoint {
+            match endpoint {
+                Endpoint::Custom(url) => match substitute_env_var(url.as_str()) {
+                    Ok(substituted_url) => Ok(Endpoint::Custom(substituted_url)),
+                    Err(err) => Err(err),
+                },
+                _ => Ok(Endpoint::Default),
+            }
+        } else {
+            Ok(Endpoint::Default)
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct DatastoreGcpCloudStorageConfig {
+    pub bucket: String,
+    pub region: String,
+    pub access_key: String,
+    pub secret: String,
+    pub endpoint: Option<Endpoint>,
+}
+
+impl DatastoreGcpCloudStorageConfig {
+    /// decode and return the bucket value
+    pub fn bucket(&self) -> Result<String, Error> {
+        substitute_env_var(self.bucket.as_str())
+    }
+
+    /// decode and return the region value
+    pub fn region(&self) -> Result<String, Error> {
+        substitute_env_var(self.region.as_str())
+    }
+
+    /// decode and return the access_key value
+    pub fn access_key(&self) -> Result<String, Error> {
+        substitute_env_var(self.access_key.as_str())
+    }
+
+    /// decode and return the secret value
+    pub fn secret(&self) -> Result<String, Error> {
+        substitute_env_var(self.secret.as_str())
     }
 
     /// decode and return the endpoint value
@@ -416,10 +470,10 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Endpoint {
-    #[serde(rename = "custom")]
-    Custom(String),
     #[serde(rename = "default")]
     Default,
+    #[serde(rename = "custom")]
+    Custom(String),
 }
 
 /// take as input $KEY_ENV_VAR and convert it into a real value if the env var does exist

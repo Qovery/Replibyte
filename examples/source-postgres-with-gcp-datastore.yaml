@@ -9,8 +9,8 @@ source:
         - name: last_name
           transformer_name: random
 datastore:
-  aws:
+  gcp:
     bucket: replibyte-test
-    region: us-east-2
-    access_key_id: $AWS_ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+    region: us-west1
+    access_key: $GS_ACCESS_KEY_ID
+    secret: $GS_SECRET_ACCESS_KEY

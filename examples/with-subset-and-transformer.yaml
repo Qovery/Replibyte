@@ -18,11 +18,12 @@ source:
             character: '#'
             width: 12
 datastore:
-  bucket: replibyte-test
-  region: us-east-2
-  access_key_id: minioadmin
-  secret_access_key: minioadmin
-  endpoint:
-    custom: 'http://localhost:9000'
+  aws:
+    bucket: replibyte-test
+    region: us-east-2
+    access_key_id: minioadmin
+    secret_access_key: minioadmin
+    endpoint:
+      custom: 'http://localhost:9000'
 destination:
   connection_uri: postgres://root:password@localhost:5453/root

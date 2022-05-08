@@ -158,12 +158,11 @@ It's the big day! Let's **run and upload** our transformed dump. But wait, somet
 
 ```yaml title="Add your datastore in your conf.yaml"
 datastore:
-  bucket: my-replibyte-dumps
-  region: us-east-2
-  access_key_id: $ACCESS_KEY_ID
-  secret_access_key: $AWS_SECRET_ACCESS_KEY
-  # endpoint: # UNCOMMENT to use another S3 compatible service than AWS S3 
-  #   custom: 'https://storage.googleapis.com/storage/v1' # E.g. endpoint for GCP
+  aws:
+    bucket: my-replibyte-dumps
+    region: us-east-2
+    access_key_id: $ACCESS_KEY_ID
+    secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
 
 Here the datastore is a S3 bucket where the dump will be stored and accessible for future restore (next guide).
@@ -192,11 +191,18 @@ source:
         - name: contact_email
           transformer_name: email
 datastore:
-  bucket: my-replibyte-dumps
-  region: us-east-2
-  access_key_id: $ACCESS_KEY_ID
-  secret_access_key: $AWS_SECRET_ACCESS_KEY
+  aws:
+    bucket: my-replibyte-dumps
+    region: us-east-2
+    access_key_id: $ACCESS_KEY_ID
+    secret_access_key: $AWS_SECRET_ACCESS_KEY
 ```
+
+:::note
+
+Check out [all the Datastore available](/docs/datastores).
+
+:::
 
 Finally, you can run the following command according to you chosen option above:
 

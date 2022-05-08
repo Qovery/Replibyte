@@ -1,7 +1,8 @@
 destination:
   connection_uri: postgres://root:password@localhost:5453/root
 datastore:
-  bucket: replibyte-test
-  region: us-east-2
-  access_key_id: $AWS_ACCESS_KEY_ID
-  secret_access_key: $AWS_SECRET_ACCESS_KEY
+  aws:
+    bucket: replibyte-test
+    region: us-east-2
+    access_key_id: $AWS_ACCESS_KEY_ID
+    secret_access_key: $AWS_SECRET_ACCESS_KEY

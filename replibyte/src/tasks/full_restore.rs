@@ -8,22 +8,24 @@ use crate::tasks::{MaxBytes, Message, Task, TransferredBytes};
 use crate::types::Bytes;
 
 /// FullRestoreTask is a wrapping struct to execute the synchronization between a *Datastore* and a *Source*.
-pub struct FullRestoreTask<'a, D, B>
+pub struct FullRestoreTask<'a, D>
 where
     D: Destination,
-    B: Datastore + 'static,
 {
     destination: &'a mut D,
-    datastore: B,
+    datastore: Box<dyn Datastore>,
     read_options: ReadOptions,
 }
 
-impl<'a, D, B> FullRestoreTask<'a, D, B>
+impl<'a, D> FullRestoreTask<'a, D>
 where
     D: Destination,
-    B: Datastore + 'static,
 {
-    pub fn new(destination: &'a mut D, datastore: B, read_options: ReadOptions) -> Self {
+    pub fn new(
+        destination: &'a mut D,
+        datastore: Box<dyn Datastore>,
+        read_options: ReadOptions,
+    ) -> Self {
         FullRestoreTask {
             destination,
             datastore,
@@ -32,10 +34,9 @@ where
     }
 }
 
-impl<'a, D, B> Task for FullRestoreTask<'a, D, B>
+impl<'a, D> Task for FullRestoreTask<'a, D>
 where
     D: Destination,
-    B: Datastore + 'static,
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
         mut self,
@@ -64,7 +65,7 @@ where
             let datastore = datastore;
             let read_options = read_options;
 
-            let _ = match datastore.read(&read_options, |data| {
+            let _ = match datastore.read(&read_options, &mut |data| {
                 let _ = tx.send(Message::Data(data));
             }) {
                 Ok(_) => {}
