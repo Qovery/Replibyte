@@ -1,4 +1,3 @@
-use std::io::SeekFrom::End;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 

@@ -10,7 +10,6 @@ use crate::cli::{RestoreArgs, RestoreLocalArgs};
 use crate::config::{Config, ConnectionUri};
 use crate::datastore::Datastore;
 use crate::datastore::ReadOptions;
-use crate::destination;
 use crate::destination::generic_stdout::GenericStdout;
 use crate::destination::mongodb_docker::{MongoDBDocker, DEFAULT_MONGO_CONTAINER_PORT};
 use crate::destination::mysql_docker::{
@@ -30,6 +29,8 @@ use crate::tasks::full_dump::FullDumpTask;
 use crate::tasks::full_restore::FullRestoreTask;
 use crate::tasks::Task;
 use crate::utils::{epoch_millis, table, to_human_readable_unit};
+use crate::{destination, CLI};
+use clap::CommandFactory;
 
 /// List all dumps
 pub fn list(datastore: &mut Box<dyn Datastore>) -> Result<(), Error> {
@@ -235,7 +236,19 @@ where
         return Ok(());
     }
 
-    if args.image == "postgres".to_string() || args.image == "postgresql".to_string() {
+    let image = match &args.image {
+        Some(image) => image,
+        None => {
+            let mut cmd = CLI::command();
+            cmd.error(
+                clap::ErrorKind::MissingRequiredArgument,
+                "you must use --output or --image [database_type] option",
+            )
+            .exit();
+        }
+    };
+
+    if image.as_str() == "postgres" || image.as_str() == "postgresql" {
         let port = args.port.unwrap_or(DEFAULT_POSTGRES_CONTAINER_PORT);
         let tag = match &args.tag {
             Some(tag) => tag,
@@ -283,7 +296,7 @@ where
         }
     }
 
-    if args.image == "mongodb".to_string() {
+    if image.as_str() == "mongodb" {
         let port = args.port.unwrap_or(DEFAULT_MONGO_CONTAINER_PORT);
         let tag = match &args.tag {
             Some(tag) => tag,
@@ -328,7 +341,7 @@ where
         }
     }
 
-    if args.image == "mysql".to_string() {
+    if image.as_str() == "mysql" {
         let port = args.port.unwrap_or(DEFAULT_MYSQL_CONTAINER_PORT);
         let tag = match &args.tag {
             Some(tag) => tag,
@@ -390,22 +403,22 @@ where
         datastore.set_encryption_key(encryption_key);
     }
 
+    let options = match args.value.as_str() {
+        "latest" => ReadOptions::Latest,
+        v => ReadOptions::Dump {
+            name: v.to_string(),
+        },
+    };
+
+    if args.output {
+        let mut generic_stdout = GenericStdout::new();
+        let task = FullRestoreTask::new(&mut generic_stdout, datastore, options);
+        let _ = task.run(|_, _| {})?; // do not display the progress bar
+        return Ok(());
+    }
+
     match config.destination {
         Some(destination) => {
-            let options = match args.value.as_str() {
-                "latest" => ReadOptions::Latest,
-                v => ReadOptions::Dump {
-                    name: v.to_string(),
-                },
-            };
-
-            if args.output {
-                let mut generic_stdout = GenericStdout::new();
-                let task = FullRestoreTask::new(&mut generic_stdout, datastore, options);
-                let _ = task.run(|_, _| {})?; // do not display the progress bar
-                return Ok(());
-            }
-
             match destination.connection_uri()? {
                 ConnectionUri::Postgres(host, port, username, password, database) => {
                     let mut postgres = destination::postgres::Postgres::new(

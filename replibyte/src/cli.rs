@@ -4,10 +4,10 @@ use clap::{Args, Parser, Subcommand};
 
 /// RepliByte is a tool to synchronize cloud databases and fake sensitive data, just pass `-h`
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, about, long_about = None)]
 #[clap(propagate_version = true)]
 pub struct CLI {
-    /// replibyte configuration file
+    /// Replibyte configuration file
     #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
     pub config: PathBuf,
     #[clap(subcommand)]
@@ -89,7 +89,7 @@ pub struct RestoreLocalArgs {
     pub remove: bool,
     /// Docker image type
     #[clap(short, long, value_name = "[postgresql | mysql | mongodb]")]
-    pub image: String,
+    pub image: Option<String>,
 }
 
 /// all backup run commands
