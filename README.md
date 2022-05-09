@@ -1,7 +1,7 @@
 <p align="center"> <img src="assets/RepliByte%20Logo.png" alt="replibyte logo"/> </p>
 
 <h3 align="center">Seed Your Development Database With Real Data ⚡️</h3>
-<p align="center">Replibyte is a blazingly fast tool to seed your databases </br>with your production data while keeping sensitive data safe 🔥</p>
+<p align="center">Replibyte is a blazingly fast tool to seed your databases with your production data while keeping sensitive data safe 🔥</p>
 
 <p align="center">
 <a href="https://opensource.org/licenses/MIT"> <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-yellow.svg"> </a>
@@ -11,11 +11,36 @@
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
+## Prerequisites
+
+- MacOSX / Linux / Windows
+- Nothing more! Replibyte is stateless and does not require anything special.
+
+## Usage
+
+Create a dump
+
+```shell
+replibyte -c conf.yaml dump create
+```
+
+Restore the latest dump in a local container
+
+```shell
+replibyte -c conf.yaml dump restore local -v latest -i postgres -p 5432
+```
+
+Restore the latest dump in a remote database
+
+```shell
+replibyte -c conf.yaml dump restore remote -v latest
+```
+
 ## Features
 
 - [x] Support data backup and restore for PostgreSQL, MySQL and MongoDB
 - [x] Replace sensitive data with fake data
-- [x] Works on large database (> 10GB) (read [Design](./docs/DESIGN.md))
+- [x] Works on large database (> 10GB)
 - [x] Database Subsetting: Scale down a production database to a more reasonable size 🔥
 - [x] Start a local database with the prod data in a single command 🔥
 - [x] On-the-fly data (de)compression (Zlib)

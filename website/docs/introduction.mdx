@@ -23,6 +23,31 @@ Replibyte is a blazingly fast tool to seed your databases with your production d
 ![build and tests badge](https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square)
 [![discord server](https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square)](https://discord.qovery.com)
 
+## Prerequisites
+
+- MacOSX / Linux / Windows
+- Nothing more! Replibyte is stateless and does not require anything special.
+
+## Usage
+
+Create a dump
+
+```shell
+replibyte -c conf.yaml dump create
+```
+
+Restore the latest dump in a local container
+
+```shell
+replibyte -c conf.yaml dump restore local -v latest -i postgres -p 5432
+```
+
+Restore the latest dump in a remote database
+
+```shell
+replibyte -c conf.yaml dump restore remote -v latest
+```
+
 ## Features
 
 - [x] Support data backup and restore for PostgreSQL, MySQL and MongoDB
