@@ -321,7 +321,7 @@ impl<'a> Tokenizer<'a> {
                     Ok(Some(Token::make_word(&s, None)))
                 }
                 // string
-                '\'' => {
+                '\'' | '`' => {
                     let s = self.tokenize_single_quoted_string(chars)?;
                     Ok(Some(Token::SingleQuotedString(s)))
                 }
@@ -530,12 +530,16 @@ impl<'a> Tokenizer<'a> {
         let mut is_escaped = false;
         while let Some(&ch) = chars.peek() {
             match ch {
-                '\'' => {
+                '\'' | '`' => {
                     chars.next(); // consume
                     if is_escaped {
                         s.push(ch);
                         is_escaped = false;
-                    } else if chars.peek().map(|c| *c == '\'').unwrap_or(false) {
+                    } else if chars
+                        .peek()
+                        .map(|c| *c == '\'' || *c == '`')
+                        .unwrap_or(false)
+                    {
                         s.push(ch);
                         chars.next();
                     } else {
