@@ -314,7 +314,7 @@ impl<'a> Tokenizer<'a> {
                     Ok(Some(Token::make_word(&s, None)))
                 }
                 // string
-                '\'' => {
+                '\'' | '`' => {
                     let s = self.tokenize_single_quoted_string(chars)?;
 
                     Ok(Some(Token::SingleQuotedString(s)))
@@ -509,11 +509,11 @@ impl<'a> Tokenizer<'a> {
         let mut is_escaped = false;
         while let Some(&ch) = chars.peek() {
             match ch {
-                '\'' => {
+                '\'' | '`' => {
                     chars.next(); // consume
 
                     if let Some(next_char) = chars.peek() {
-                        if *next_char != ')' && *next_char != ',' {
+                        if ch != '`' && *next_char != ')' && *next_char != ',' {
                             is_escaped = true;
                             s.push(ch);
                         } else {
@@ -651,6 +651,7 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str>
         })
         .filter_map(|token| match token {
             Token::Word(word) => Some(word.value.as_str()), // column name
+            Token::SingleQuotedString(name) => Some(name.as_str()), // also column name
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -738,17 +739,13 @@ CREATE TABLE `customer_store` (
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("TABLE"),
             Token::Whitespace(Whitespace::Space),
-            Token::Char('`'),
-            Token::make_keyword("customer_store"),
-            Token::Char('`'),
+            Token::SingleQuotedString("customer_store".to_string()),
             Token::Whitespace(Whitespace::Space),
             Token::LParen,
             Token::Whitespace(Whitespace::Newline),
             Token::Whitespace(Whitespace::Space),
             Token::Whitespace(Whitespace::Space),
-            Token::Char('`'),
-            Token::make_keyword("store_id"),
-            Token::Char('`'),
+            Token::SingleQuotedString("store_id".to_string()),
             Token::Whitespace(Whitespace::Space),
             Token::make_word("int", None),
             Token::Whitespace(Whitespace::Space),
@@ -759,9 +756,7 @@ CREATE TABLE `customer_store` (
             Token::Whitespace(Whitespace::Newline),
             Token::Whitespace(Whitespace::Space),
             Token::Whitespace(Whitespace::Space),
-            Token::Char('`'),
-            Token::make_keyword("customer_id"),
-            Token::Char('`'),
+            Token::SingleQuotedString("customer_id".to_string()),
             Token::Whitespace(Whitespace::Space),
             Token::make_word("int", None),
             Token::Whitespace(Whitespace::Space),
@@ -774,18 +769,12 @@ CREATE TABLE `customer_store` (
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("KEY"),
             Token::Whitespace(Whitespace::Space),
-            Token::Char('`'),
-            Token::make_keyword("customer_store_store_id_customer_id_index"),
-            Token::Char('`'),
+            Token::SingleQuotedString("customer_store_store_id_customer_id_index".to_string()),
             Token::Whitespace(Whitespace::Space),
             Token::LParen,
-            Token::Char('`'),
-            Token::make_keyword("store_id"),
-            Token::Char('`'),
+            Token::SingleQuotedString("store_id".to_string()),
             Token::Comma,
-            Token::Char('`'),
-            Token::make_keyword("customer_id"),
-            Token::Char('`'),
+            Token::SingleQuotedString("customer_id".to_string()),
             Token::RParen,
             Token::Whitespace(Whitespace::Newline),
             Token::RParen,
@@ -821,9 +810,7 @@ CREATE TABLE `customer_store` (
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("INTO"),
             Token::Whitespace(Whitespace::Space),
-            Token::Char('`'),
-            Token::make_keyword("images"),
-            Token::Char('`'),
+            Token::SingleQuotedString("images".to_string()),
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("VALUES"),
             Token::Whitespace(Whitespace::Space),
@@ -905,9 +892,7 @@ CREATE TABLE `customer_store` (
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("INTO"),
             Token::Whitespace(Whitespace::Space),
-            Token::Char('`'),
-            Token::make_keyword("country"),
-            Token::Char('`'),
+            Token::SingleQuotedString("country".to_string()),
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("VALUES"),
             Token::Whitespace(Whitespace::Space),
