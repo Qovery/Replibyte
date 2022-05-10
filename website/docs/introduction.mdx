@@ -36,6 +36,17 @@ Create a dump
 replibyte -c conf.yaml dump create
 ```
 
+List all dumps
+
+```shell
+replibyte -c conf.yaml dump list
+
+type          name                  size    when                    compressed  encrypted
+PostgreSQL    dump-1647706359405    154MB   Yesterday at 03:00 am   true        true
+PostgreSQL    dump-1647731334517    152MB   2 days ago at 03:00 am  true        true
+PostgreSQL    dump-1647734369306    149MB   3 days ago at 03:00 am  true        true
+```
+
 Restore the latest dump in a local container
 
 ```shell
