@@ -547,6 +547,21 @@ mod tests {
             None,
             InsertIntoQuery {
                 table_name: "test".to_string(),
+                columns: vec![Column::StringValue(
+                    r#""firstName""#.to_string(),
+                    "romaric".to_string(),
+                )],
+            },
+        );
+        assert_eq!(
+            query.data(),
+            b"INSERT INTO test (\"firstName\") VALUES ('romaric');"
+        );
+
+        let query = to_query(
+            None,
+            InsertIntoQuery {
+                table_name: "test".to_string(),
                 columns: vec![Column::BooleanValue("is_valid".to_string(), true)],
             },
         );
