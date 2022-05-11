@@ -1,0 +1,15 @@
+source:
+  connection_uri: postgres://root:password@localhost:5432/root
+  transformers:
+    - database: public
+      table: employees
+      columns:
+        - name: first_name
+          transformer_name: first-name
+        - name: last_name
+          transformer_name: random
+datastore:
+  local_disk:
+    dir: ./my-datastore
+destination:
+  connection_uri: postgres://root:password@localhost:5453/root

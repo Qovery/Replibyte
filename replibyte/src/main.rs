@@ -13,6 +13,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
+use crate::datastore::local_disk::LocalDisk;
 use crate::datastore::s3::S3;
 use crate::datastore::Datastore;
 use crate::source::{Source, SourceOptions};
@@ -125,6 +126,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
             config.secret()?,
             config.endpoint()?,
         )),
+        DatastoreConfig::LocalDisk(config) => Box::new(LocalDisk::new(config.dir()?)),
     };
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);

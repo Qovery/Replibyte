@@ -11,7 +11,10 @@ use crate::cli::DumpDeleteArgs;
 use crate::connector::Connector;
 use crate::types::Bytes;
 
+pub mod local_disk;
 pub mod s3;
+
+const INDEX_FILE_NAME: &str = "metadata.json";
 
 pub trait Datastore: Connector + Send + Sync {
     /// Getting Index file with all the backups information

@@ -22,7 +22,8 @@ use crate::runtime::block_on;
 use crate::types::Bytes;
 use crate::utils::epoch_millis;
 
-const INDEX_FILE_NAME: &str = "metadata.json";
+use super::INDEX_FILE_NAME;
+
 const GOOGLE_CLOUD_STORAGE_URL: &str = "https://storage.googleapis.com";
 
 pub struct S3 {

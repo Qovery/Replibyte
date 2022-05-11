@@ -61,6 +61,8 @@ pub enum DatastoreConfig {
     AWS(DatastoreAwsS3Config),
     #[serde(rename = "gcp")]
     GCP(DatastoreGcpCloudStorageConfig),
+    #[serde(rename = "local_disk")]
+    LocalDisk(DatastoreLocalDiskConfig),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -154,6 +156,18 @@ impl DatastoreGcpCloudStorageConfig {
         } else {
             Ok(Endpoint::Default)
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct DatastoreLocalDiskConfig {
+    pub dir: String,
+}
+
+impl DatastoreLocalDiskConfig {
+    /// decode and return the directory value
+    pub fn dir(&self) -> Result<String, Error> {
+        substitute_env_var(self.dir.as_str())
     }
 }
 
