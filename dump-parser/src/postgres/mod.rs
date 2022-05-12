@@ -594,7 +594,7 @@ fn is_identifier_start(ch: char) -> bool {
     // See https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
     // We don't yet support identifiers beginning with "letters with
     // diacritical marks and non-Latin letters"
-    ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
+    ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == '"'
 }
 
 fn is_identifier_part(ch: char) -> bool {
@@ -603,6 +603,7 @@ fn is_identifier_part(ch: char) -> bool {
         || ('0'..='9').contains(&ch)
         || ch == '$'
         || ch == '_'
+        || ch == '"'
 }
 
 /// Read from `chars` until `predicate` returns `false` or EOF is hit.
@@ -667,7 +668,7 @@ pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&st
     None
 }
 
-pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str> {
+pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
@@ -686,7 +687,18 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str>
             _ => true,
         })
         .filter_map(|token| match token {
-            Token::Word(word) => Some(word.value.as_str()), // column name
+            Token::Word(word) => {
+                Some(
+                   format!(
+                       "{quote_style}{value}{quote_style}",
+                       value=word.value.as_str(),
+                       quote_style= match word.quote_style {
+                           Some(quote) => quote.to_string(),
+                           None => "".to_string(),
+                       }
+                   )
+               ) // column name with escaping
+            },
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -894,10 +906,9 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
 
     #[test]
     fn test_get_column_names_from_insert_into_query() {
-        let q = r"
-INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title)
-VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
-";
+        let q = r#"INSERT INTO public.customers (customer_id, company_name, contact_name, contact_title, "upperCaseColumnName" )
+VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL, NULL);
+"#;
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
@@ -913,6 +924,7 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
                 "company_name",
                 "contact_name",
                 "contact_title",
+                r#""upperCaseColumnName""#
             ]
         );
     }
