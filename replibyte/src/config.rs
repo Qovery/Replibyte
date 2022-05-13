@@ -159,7 +159,7 @@ impl DatastoreGcpCloudStorageConfig {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct SourceConfig {
-    pub connection_uri: String,
+    pub connection_uri: Option<String>,
     pub compression: Option<bool>,
     pub transformers: Vec<TransformerConfig>,
     pub skip: Option<Vec<SkipConfig>>,
@@ -168,7 +168,13 @@ pub struct SourceConfig {
 
 impl SourceConfig {
     pub fn connection_uri(&self) -> Result<ConnectionUri, Error> {
-        parse_connection_uri(self.connection_uri.as_str())
+        match &self.connection_uri {
+            Some(connection_uri) => parse_connection_uri(connection_uri.as_str()),
+            None => Err(Error::new(
+                ErrorKind::Other,
+                format!("missing <source.connection_uri> in the configuration file"),
+            )),
+        }
     }
 }
 
