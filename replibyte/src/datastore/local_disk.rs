@@ -1,7 +1,7 @@
-use std::fs::{read, read_dir, write, File, OpenOptions};
+use std::fs::{read, read_dir, write, DirBuilder, OpenOptions};
 use std::io::{BufReader, Error, Read, Write};
 
-use log::{debug, info};
+use log::{debug, error, info};
 
 use crate::cli::DumpDeleteArgs;
 use crate::connector::Connector;
@@ -30,7 +30,6 @@ impl LocalDisk {
     }
 
     fn create_index_file(&self) -> Result<IndexFile, Error> {
-        // TODO: creating dir if not exists
         match self.index_file() {
             Ok(index_file) => Ok(index_file),
             Err(_) => {
@@ -51,11 +50,15 @@ impl Connector for LocalDisk {
 
 impl Datastore for LocalDisk {
     fn index_file(&self) -> Result<IndexFile, Error> {
-        info!("reading index_file from datastore");
+        info!(
+            "reading index_file from local_disk datastore at: {}",
+            &self.dir
+        );
 
         let file = OpenOptions::new()
             .read(true)
             .open(format!("{}/{}", self.dir, INDEX_FILE_NAME))?;
+
         let reader = BufReader::new(file);
 
         let index_file: IndexFile =
@@ -65,14 +68,17 @@ impl Datastore for LocalDisk {
     }
 
     fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error> {
-        info!("writing index_file to datastore");
+        info!("writing index_file to local_disk datastore");
+        let index_file_path = format!("{}/{}", self.dir, INDEX_FILE_NAME);
 
+        debug!("opening index_file at {}", index_file_path);
         let file = OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(format!("{}/{}", self.dir, INDEX_FILE_NAME))?;
+            .open(&index_file_path)?;
 
+        debug!("writing index_file at {}", index_file_path.as_str());
         serde_json::to_writer(file, index_file).map_err(|err| Error::from(err))
     }
 
@@ -91,17 +97,29 @@ impl Datastore for LocalDisk {
         };
 
         let data_size = data.len();
-        let key = format!("{}/{}.dump", self.dump_name, file_part);
-        let dir = &self.dir;
-        let destination_path = format!("{}/{}", dir, key);
+        let dump_dir_path = format!("{}/{}", self.dir, self.dump_name);
+        let dump_file_path = format!("{}/{}.dump", dump_dir_path, file_part);
 
-        let _ = write(destination_path, data)?;
+        // create the dump directory if needed
+        DirBuilder::new()
+            .recursive(true)
+            .create(&dump_dir_path)
+            .map_err(|err| {
+                error!("error while creating the dump directory: {}", dump_dir_path);
+                err
+            })?;
+
+        debug!("writing dump at: {}", dump_file_path);
+        let _ = write(&dump_file_path, data).map_err(|err| {
+            error!("error while writing dumpt at: {}", dump_file_path);
+            err
+        })?;
 
         // update index file
         let mut index_file = self.index_file()?;
 
         let mut new_backup = Backup {
-            directory_name: dir.to_string(),
+            directory_name: self.dump_name.to_string(),
             size: 0,
             created_at: epoch_millis(),
             compressed: self.compression_enabled(),
@@ -183,7 +201,6 @@ impl Datastore for LocalDisk {
 
     fn set_encryption_key(&mut self, key: String) {
         info!("set datastore encryption_key");
-
         self.encryption_key = Some(key)
     }
 
@@ -191,7 +208,109 @@ impl Datastore for LocalDisk {
         self.dump_name = name
     }
 
-    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error> {
+    fn delete_by_name(&self, name: String) -> Result<(), Error> {
         todo!()
+    }
+
+    fn delete_older_than(&self, days: i64) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn delete_keep_last(&self, keep_last: usize) -> Result<(), Error> {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use tempfile::tempdir;
+
+    use crate::{
+        connector::Connector,
+        datastore::{Backup, Datastore, ReadOptions},
+        utils::epoch_millis,
+    };
+
+    use super::LocalDisk;
+
+    #[test]
+    fn init_local_disk() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+
+        // executed twice to check that there is no error at the second call
+        assert!(local_disk.init().is_ok());
+        assert!(local_disk.init().is_ok());
+    }
+
+    #[test]
+    fn test_write_and_read() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+        let _ = local_disk.init().expect("local_disk init failed");
+
+        let bytes: Vec<u8> = b"hello world".to_vec();
+
+        assert!(local_disk.write(1, bytes).is_ok());
+
+        // index_file should contain 1 dump
+        let mut index_file = local_disk.index_file().unwrap();
+        assert_eq!(index_file.backups.len(), 1);
+
+        let dump = index_file.find_backup(&ReadOptions::Latest).unwrap();
+
+        // part 1 of dump should exists
+        assert!(Path::new(&format!(
+            "{}/{}/1.dump",
+            dir.path().to_str().unwrap(),
+            dump.directory_name
+        ))
+        .exists());
+
+        let mut dump_content: Vec<u8> = vec![];
+        assert!(local_disk
+            .read(&ReadOptions::Latest, &mut |bytes| {
+                let mut b = bytes;
+                dump_content.append(&mut b);
+            })
+            .is_ok());
+        assert_eq!(dump_content, b"hello world".to_vec())
+    }
+
+    #[test]
+    fn test_index_file() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+        let _ = local_disk.init().expect("local_disk init failed");
+
+        assert!(local_disk.index_file().is_ok());
+
+        let mut index_file = local_disk.index_file().unwrap();
+
+        assert!(index_file.backups.is_empty());
+
+        index_file.backups.push(Backup {
+            directory_name: "backup-1".to_string(),
+            size: 0,
+            created_at: epoch_millis(),
+            compressed: true,
+            encrypted: false,
+        });
+
+        assert!(local_disk.write_index_file(&index_file).is_ok());
+
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+    }
+
+    #[test]
+    fn test_backup_name() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+
+        local_disk.set_dump_name("custom-backup-name".to_string());
+
+        assert_eq!(local_disk.dump_name, "custom-backup-name".to_string())
     }
 }

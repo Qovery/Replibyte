@@ -31,7 +31,50 @@ pub trait Datastore: Connector + Send + Sync {
     fn encryption_key(&self) -> &Option<String>;
     fn set_encryption_key(&mut self, key: String);
     fn set_dump_name(&mut self, name: String);
-    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error>;
+    fn delete_by_name(&self, name: String) -> Result<(), Error>;
+    fn delete_older_than(&self, days: i64) -> Result<(), Error>;
+    fn delete_keep_last(&self, keep_last: usize) -> Result<(), Error>;
+
+    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error> {
+        if let Some(backup_name) = &args.dump {
+            return self.delete_by_name(backup_name.to_string());
+        }
+
+        if let Some(older_than) = &args.older_than {
+            let days = match older_than.chars().nth_back(0) {
+                Some('d') => {
+                    // remove the last character which corresponds to the unit
+                    let mut older_than = older_than.to_string();
+                    older_than.pop();
+
+                    match older_than.parse::<i64>() {
+                        Ok(days) => days,
+                        Err(err) => return Err(Error::new(
+                            ErrorKind::Other,
+                            format!("command error: {} - invalid `--older-than` format. Use `--older-than=14d`", err),
+                        )),
+                    }
+                }
+                _ => {
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        "command error: invalid `--older-than` format. Use `--older-than=14d`",
+                    ));
+                }
+            };
+
+            return self.delete_older_than(days);
+        }
+
+        if let Some(keep_last) = args.keep_last {
+            return self.delete_keep_last(keep_last);
+        }
+
+        Err(Error::new(
+            ErrorKind::Other,
+            "command error: parameters or options required",
+        ))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
