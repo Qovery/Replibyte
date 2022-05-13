@@ -95,11 +95,11 @@ pub struct RestoreLocalArgs {
 /// all backup run commands
 #[derive(Args, Debug)]
 pub struct DumpCreateArgs {
-    #[clap(short, long, value_name = "[postgresql | mysql | mongodb]")]
+    #[clap(name = "source_type", short, long, value_name = "[postgresql | mysql]", possible_values = &["postgresql", "mysql"], requires = "input")]
     /// database source type to import
     pub source_type: Option<String>,
     /// import dump from stdin
-    #[clap(short, long)]
+    #[clap(name = "input", short, long, requires = "source_type")]
     pub input: bool,
     #[clap(short, long, parse(from_os_str), value_name = "dump file")]
     /// dump file

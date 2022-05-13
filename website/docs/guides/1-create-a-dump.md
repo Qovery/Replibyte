@@ -221,10 +221,13 @@ replibyte -c conf.yaml dump create
 <summary>Option 2 and 3: Create a transformed dump from a dump file</summary>
 
 ```shell
-cat your_dump.sql | replibyte -c conf.yaml dump create -i
+cat your_dump.sql | replibyte -c conf.yaml dump create -i -s postgresql
 ```
 
 `-i` parameter is required to read the data from the input.
+
+`-s` parameter is required if you don't have a `source.connection_uri` in the configuration file. (Valid values are `postgresql`, `postgres`, `mysql`)
+
 
 </details>
 
