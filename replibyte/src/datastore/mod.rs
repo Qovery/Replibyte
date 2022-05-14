@@ -1,5 +1,6 @@
 use aes_gcm::aead::{Aead, NewAead};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
+use chrono::{Duration, Utc};
 use std::io::{Error, ErrorKind, Read, Write};
 
 use flate2::read::ZlibDecoder;
@@ -11,7 +12,10 @@ use crate::cli::DumpDeleteArgs;
 use crate::connector::Connector;
 use crate::types::Bytes;
 
+pub mod local_disk;
 pub mod s3;
+
+const INDEX_FILE_NAME: &str = "metadata.json";
 
 pub trait Datastore: Connector + Send + Sync {
     /// Getting Index file with all the backups information
@@ -28,7 +32,85 @@ pub trait Datastore: Connector + Send + Sync {
     fn encryption_key(&self) -> &Option<String>;
     fn set_encryption_key(&mut self, key: String);
     fn set_dump_name(&mut self, name: String);
-    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error>;
+    fn delete_by_name(&self, name: String) -> Result<(), Error>;
+
+    fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error> {
+        if let Some(backup_name) = &args.dump {
+            return self.delete_by_name(backup_name.to_string());
+        }
+
+        if let Some(older_than) = &args.older_than {
+            let days = match older_than.chars().nth_back(0) {
+                Some('d') => {
+                    // remove the last character which corresponds to the unit
+                    let mut older_than = older_than.to_string();
+                    older_than.pop();
+
+                    match older_than.parse::<i64>() {
+                        Ok(days) => days,
+                        Err(err) => return Err(Error::new(
+                            ErrorKind::Other,
+                            format!("command error: {} - invalid `--older-than` format. Use `--older-than=14d`", err),
+                        )),
+                    }
+                }
+                _ => {
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        "command error: invalid `--older-than` format. Use `--older-than=14d`",
+                    ));
+                }
+            };
+
+            return self.delete_older_than(days);
+        }
+
+        if let Some(keep_last) = args.keep_last {
+            return self.delete_keep_last(keep_last);
+        }
+
+        Err(Error::new(
+            ErrorKind::Other,
+            "command error: parameters or options required",
+        ))
+    }
+
+    fn delete_older_than(&self, days: i64) -> Result<(), Error> {
+        let index_file = self.index_file()?;
+
+        let threshold_date = Utc::now() - Duration::days(days);
+        let threshold_date = threshold_date.timestamp_millis() as u128;
+
+        let backups_to_delete: Vec<Backup> = index_file
+            .backups
+            .into_iter()
+            .filter(|b| b.created_at.lt(&threshold_date))
+            .collect();
+
+        for backup in backups_to_delete {
+            let dump_name = backup.directory_name;
+            self.delete_by_name(dump_name)?
+        }
+
+        Ok(())
+    }
+
+    fn delete_keep_last(&self, keep_last: usize) -> Result<(), Error> {
+        let mut index_file = self.index_file()?;
+
+        index_file
+            .backups
+            .sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        if let Some(backups) = index_file.backups.get(keep_last..) {
+            for backup in backups {
+                let dump_name = &backup.directory_name;
+                self.delete_by_name(dump_name.to_string())?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
