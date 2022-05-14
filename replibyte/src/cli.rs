@@ -4,8 +4,7 @@ use clap::{Args, Parser, Subcommand};
 
 /// Replibyte is a tool to seed your databases with your production data while keeping sensitive data safe, just pass `-h`
 #[derive(Parser, Debug)]
-#[clap(version, about, long_about = None)]
-#[clap(propagate_version = true)]
+#[clap(about, long_about = None)]
 pub struct CLI {
     /// Replibyte configuration file
     #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
