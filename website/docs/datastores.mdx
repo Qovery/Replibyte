@@ -110,7 +110,39 @@ datastore:
 
 ## Local disk
 
-> Work in progress
+### Create a directory
+
+Replibyte does not create the directory automatically for you. You'll need to create it manually.
+
+For example, you can create a directory by running:
+
+```sh
+mkdir /data/replibyte
+```
+
+### Replibyte configuration
+
+Here is the datastore configuration to use:
+
+```yaml
+...
+datastore:
+  local_disk:
+    dir: <your_directory_path>
+...
+```
+
+`dir` must be a readable and writable directory to the user running `replibyte`.
+
+So, to use our previously created `/data/replibyte` directory, the datastore config must be:
+
+```yaml
+...
+datastore:
+  local_disk:
+    dir: /data/replibyte
+...
+```
 
 ## Add another datastore
 
