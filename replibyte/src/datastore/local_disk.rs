@@ -1,9 +1,8 @@
-use std::fs::{read, read_dir, write, DirBuilder, OpenOptions};
+use std::fs::{read, read_dir, remove_dir_all, write, DirBuilder, OpenOptions};
 use std::io::{BufReader, Error, Read, Write};
 
 use log::{debug, error, info};
 
-use crate::cli::DumpDeleteArgs;
 use crate::connector::Connector;
 use crate::types;
 use crate::utils::epoch_millis;
@@ -209,15 +208,18 @@ impl Datastore for LocalDisk {
     }
 
     fn delete_by_name(&self, name: String) -> Result<(), Error> {
-        todo!()
-    }
+        let mut index_file = self.index_file()?;
 
-    fn delete_older_than(&self, days: i64) -> Result<(), Error> {
-        todo!()
-    }
+        let dump_dir_path = format!("{}/{}", self.dir, name);
+        remove_dir_all(&dump_dir_path).map_err(|err| {
+            error!("error while removing the dump directory: {}", dump_dir_path);
+            err
+        })?;
 
-    fn delete_keep_last(&self, keep_last: usize) -> Result<(), Error> {
-        todo!()
+        // update the index_file.
+        index_file.backups.retain(|b| b.directory_name != name);
+
+        self.write_index_file(&index_file)
     }
 }
 
@@ -225,15 +227,32 @@ impl Datastore for LocalDisk {
 mod tests {
     use std::path::Path;
 
+    use chrono::{Duration, Utc};
     use tempfile::tempdir;
 
     use crate::{
+        cli::DumpDeleteArgs,
         connector::Connector,
         datastore::{Backup, Datastore, ReadOptions},
         utils::epoch_millis,
     };
 
     use super::LocalDisk;
+
+    // update_backup_date is a helper function that updates the date of a dump inside the index file.
+    fn update_backup_date(local_disk: &LocalDisk, dump_name: String, days_before_now: i64) {
+        let mut index_file = local_disk.index_file().unwrap();
+
+        let mut backup = index_file
+            .backups
+            .iter_mut()
+            .find(|b| b.directory_name == dump_name)
+            .unwrap();
+        backup.created_at =
+            (Utc::now() - Duration::days(days_before_now)).timestamp_millis() as u128;
+
+        let _ = local_disk.write_index_file(&index_file);
+    }
 
     #[test]
     fn init_local_disk() {
@@ -312,5 +331,197 @@ mod tests {
         local_disk.set_dump_name("custom-backup-name".to_string());
 
         assert_eq!(local_disk.dump_name, "custom-backup-name".to_string())
+    }
+
+    #[test]
+    fn test_delete_by_name() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+
+        // init local_disk
+        let _ = local_disk.init().expect("local_disk init failed");
+        assert!(local_disk.index_file().is_ok());
+        let index_file = local_disk.index_file().unwrap();
+        assert!(index_file.backups.is_empty());
+
+        // create dump 1
+        local_disk.set_dump_name("dump-1".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-1".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+        assert!(Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+
+        // create dump 2
+        local_disk.set_dump_name("dump-2".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-2".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 2);
+        assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+
+        // remove dump 1
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: Some("dump-1".to_string()),
+                older_than: None,
+                keep_last: None
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+        assert!(!Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+
+        // remove dump 2
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: Some("dump-2".to_string()),
+                older_than: None,
+                keep_last: None
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 0);
+        assert!(!Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+    }
+
+    #[test]
+    fn test_delete_keep_last() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+
+        // init local_disk
+        let _ = local_disk.init().expect("local_disk init failed");
+        assert!(local_disk.index_file().is_ok());
+        let index_file = local_disk.index_file().unwrap();
+        assert!(index_file.backups.is_empty());
+
+        // create dump 1
+        local_disk.set_dump_name("dump-1".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-1".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+        assert!(Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+
+        // create dump 2
+        local_disk.set_dump_name("dump-2".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-2".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 2);
+        assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+
+        // create dump 3
+        local_disk.set_dump_name("dump-3".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-3".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 3);
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: None,
+                older_than: None,
+                keep_last: Some(2),
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 2);
+        // only dump-1 must be deleted
+        assert!(!Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: None,
+                older_than: None,
+                keep_last: Some(1),
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+        // only dump-3 must exists
+        assert!(!Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        assert!(!Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+    }
+
+    #[test]
+    fn test_delete_older_than() {
+        let dir = tempdir().expect("cannot create tempdir");
+        let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
+
+        // init local_disk
+        let _ = local_disk.init().expect("local_disk init failed");
+        assert!(local_disk.index_file().is_ok());
+        let index_file = local_disk.index_file().unwrap();
+        assert!(index_file.backups.is_empty());
+
+        // create dump 1
+        local_disk.set_dump_name("dump-1".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-1".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+        assert!(Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        update_backup_date(&local_disk, "dump-1".to_string(), 5);
+
+        // create dump 2
+        local_disk.set_dump_name("dump-2".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-2".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 2);
+        assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        update_backup_date(&local_disk, "dump-2".to_string(), 3);
+
+        // create dump 3
+        local_disk.set_dump_name("dump-3".to_string());
+        let bytes: Vec<u8> = b"hello world from dump-3".to_vec();
+        assert!(local_disk.write(1, bytes).is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 3);
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+
+        // delete dump older than 6 days doesn't remove any dump
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: None,
+                older_than: Some("6d".to_string()),
+                keep_last: None,
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 3);
+        assert!(Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+
+        // delete dump older than 4 days must remove dump-1
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: None,
+                older_than: Some("4d".to_string()),
+                keep_last: None,
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 2);
+        assert!(!Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+
+        // delete dump older than 1 day must remove dump-2
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: None,
+                older_than: Some("1d".to_string()),
+                keep_last: None,
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 1);
+        assert!(!Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        assert!(!Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+
+        // delete dump older than 0 day must remove dump-3
+        assert!(local_disk
+            .delete(&DumpDeleteArgs {
+                dump: None,
+                older_than: Some("0d".to_string()),
+                keep_last: None,
+            })
+            .is_ok());
+        assert_eq!(local_disk.index_file().unwrap().backups.len(), 0);
+        assert!(!Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
     }
 }

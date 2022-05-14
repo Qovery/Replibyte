@@ -8,10 +8,8 @@ use aws_sdk_s3::model::{
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::os_shim_internal::Env;
-use chrono::{Duration, Utc};
 use log::{error, info};
 
-use crate::cli::DumpDeleteArgs;
 use crate::config::Endpoint;
 use crate::connector::Connector;
 use crate::datastore::s3::S3Error::FailedObjectUpload;
@@ -223,43 +221,6 @@ impl Datastore for S3 {
         index_file.backups.retain(|b| b.directory_name != name);
 
         self.write_index_file(&index_file)
-    }
-
-    fn delete_older_than(&self, days: i64) -> Result<(), Error> {
-        let index_file = self.index_file()?;
-
-        let threshold_date = Utc::now() - Duration::days(days);
-        let threshold_date = threshold_date.timestamp_millis() as u128;
-
-        let backups_to_delete: Vec<Backup> = index_file
-            .backups
-            .into_iter()
-            .filter(|b| b.created_at.lt(&threshold_date))
-            .collect();
-
-        for backup in backups_to_delete {
-            let dump_name = backup.directory_name;
-            self.delete_by_name(dump_name)?
-        }
-
-        Ok(())
-    }
-
-    fn delete_keep_last(&self, keep_last: usize) -> Result<(), Error> {
-        let mut index_file = self.index_file()?;
-
-        index_file
-            .backups
-            .sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-        if let Some(backups) = index_file.backups.get(keep_last..) {
-            for backup in backups {
-                let dump_name = &backup.directory_name;
-                self.delete_by_name(dump_name.to_string())?;
-            }
-        }
-
-        Ok(())
     }
 }
 
