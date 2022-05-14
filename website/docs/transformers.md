@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # Transformers
 
-A transformer is useful to change/hide the value of a specified column. Replibyte provides pre-made transformers. You can also [build your own Transformer in web assembly](#wasm).
+A transformer is useful to change/hide the value of a specified column. Replibyte provides pre-made transformers. You can also [build your own Transformer in web assembly](/docs/transformers#custom-with-web-assembly-wasm).
 
 :::note
 
