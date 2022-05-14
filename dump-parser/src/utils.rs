@@ -70,7 +70,7 @@ where
         if total_bytes <= 1 || is_last_line_buf_bytes_by_end_of_query {
             let mut buf_bytes_to_keep: Vec<u8> = Vec::new();
 
-            if buf_bytes.len() > 1 && count_empty_lines == 0 {
+            if buf_bytes.len() > 1 {
                 let query_str = str::from_utf8(buf_bytes.as_slice()).unwrap(); // FIXME remove unwrap
 
                 for statement in list_statements(query_str) {
@@ -262,7 +262,56 @@ fn list_statements(query: &str) -> Vec<Statement> {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{list_statements, Statement};
+    use crate::utils::{
+        list_sql_queries_from_dump_reader, list_statements, ListQueryResult, Statement,
+    };
+    use std::io::BufReader;
+
+    #[test]
+    fn check_list_sql_queries_from_dump_reader() {
+        let r = r#"INSERT INTO public.Users(uuid, "text", name) VALUES ('a84ac0c6-2348-45c0-b86c-8d34e251a859', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras eu nisi tempor, viverra turpis sit amet, sodales augue. Vivamus sit amet erat urna. Morbi porta, quam nec consequat suscipit, ante diam tempus risus, et consequat erat odio sed magna. Maecenas dignissim quam nibh, nec congue magna convallis a.
+
+Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhoncus leo, eu congue erat. Cras id magna ac dui convallis ultricies. Donec sed elit ac urna condimentum auctor. Nunc nec nulla id dui feugiat dictum sit amet nec orci. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae.
+
+
+', 'some-name');"#.as_bytes();
+        let reader = BufReader::new(r);
+
+        let mut queries = vec![];
+
+        list_sql_queries_from_dump_reader(reader, |query| {
+            queries.push(query.to_string());
+            ListQueryResult::Continue
+        });
+
+        assert!(queries.len() > 0);
+    }
+
+    #[test]
+    fn check_list_sql_statements_with_multiple_lines() {
+        let s = list_statements(
+            r#"INSERT INTO public.Users(uuid, "text", name) VALUES ('a84ac0c6-2348-45c0-b86c-8d34e251a859', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras eu nisi tempor, viverra turpis sit amet, sodales augue. Vivamus sit amet erat urna. Morbi porta, quam nec consequat suscipit, ante diam tempus risus, et consequat erat odio sed magna. Maecenas dignissim quam nibh, nec congue magna convallis a.
+
+Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhoncus leo, eu congue erat. Cras id magna ac dui convallis ultricies. Donec sed elit ac urna condimentum auctor. Nunc nec nulla id dui feugiat dictum sit amet nec orci. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae.
+
+
+', 'some-name');
+            "#,
+        );
+        assert_eq!(s.len(), 3);
+
+        match s.get(0).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(s) => {
+                assert!(s.valid);
+            }
+        }
+    }
 
     #[test]
     fn check_list_sql_statements() {

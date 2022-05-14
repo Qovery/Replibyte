@@ -688,17 +688,15 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<Strin
         })
         .filter_map(|token| match token {
             Token::Word(word) => {
-                Some(
-                   format!(
-                       "{quote_style}{value}{quote_style}",
-                       value=word.value.as_str(),
-                       quote_style= match word.quote_style {
-                           Some(quote) => quote.to_string(),
-                           None => "".to_string(),
-                       }
-                   )
-               ) // column name with escaping
-            },
+                Some(format!(
+                    "{quote_style}{value}{quote_style}",
+                    value = word.value.as_str(),
+                    quote_style = match word.quote_style {
+                        Some(quote) => quote.to_string(),
+                        None => "".to_string(),
+                    }
+                )) // column name with escaping
+            }
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -778,7 +776,7 @@ pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
 mod tests {
     use crate::postgres::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-        trim_pre_whitespaces, Token, Tokenizer, Whitespace, Word,
+        trim_pre_whitespaces, Token, Tokenizer, Whitespace,
     };
 
     #[test]
