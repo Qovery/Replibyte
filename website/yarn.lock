@@ -9,6 +9,24 @@
   dependencies:
     "@algolia/autocomplete-shared" "1.5.2"
 
+"@algolia/autocomplete-core@1.6.3":
+  "integrity" "sha512-dqQqRt01fX3YuVFrkceHsoCnzX0bLhrrg8itJI1NM68KjrPYQPYsE+kY8EZTCM4y8VDnhqJErR73xe/ZsV+qAA=="
+  "resolved" "https://registry.npmjs.org/@algolia/autocomplete-core/-/autocomplete-core-1.6.3.tgz"
+  "version" "1.6.3"
+  dependencies:
+    "@algolia/autocomplete-shared" "1.6.3"
+
+"@algolia/autocomplete-js@^1.5.1":
+  "integrity" "sha512-WgzufbwaAU6owis5NK/02q21zPyUW5lji+KRr1zgJffxW8nX5SGZ8OWmv73J187klwURHymxqsBEV4fdj0LDuw=="
+  "resolved" "https://registry.npmjs.org/@algolia/autocomplete-js/-/autocomplete-js-1.6.3.tgz"
+  "version" "1.6.3"
+  dependencies:
+    "@algolia/autocomplete-core" "1.6.3"
+    "@algolia/autocomplete-preset-algolia" "1.6.3"
+    "@algolia/autocomplete-shared" "1.6.3"
+    "htm" "^3.0.0"
+    "preact" "^10.0.0"
+
 "@algolia/autocomplete-preset-algolia@1.5.2":
   "integrity" "sha512-3MRYnYQFJyovANzSX2CToS6/5cfVjbLLqFsZTKcvF3abhQzxbqwwaMBlJtt620uBUOeMzhdfasKhCc40+RHiZw=="
   "resolved" "https://registry.npmjs.org/@algolia/autocomplete-preset-algolia/-/autocomplete-preset-algolia-1.5.2.tgz"
@@ -16,10 +34,27 @@
   dependencies:
     "@algolia/autocomplete-shared" "1.5.2"
 
+"@algolia/autocomplete-preset-algolia@1.6.3":
+  "integrity" "sha512-IJVyknSDZJRheE5sKffRJN7ukJJDAtvuKiHrk0VLZCJHR/o7XQkowu/6axhUIBRZ6Q2JFzV9hzYZ0PbtSJo9gA=="
+  "resolved" "https://registry.npmjs.org/@algolia/autocomplete-preset-algolia/-/autocomplete-preset-algolia-1.6.3.tgz"
+  "version" "1.6.3"
+  dependencies:
+    "@algolia/autocomplete-shared" "1.6.3"
+
 "@algolia/autocomplete-shared@1.5.2":
   "integrity" "sha512-ylQAYv5H0YKMfHgVWX0j0NmL8XBcAeeeVQUmppnnMtzDbDnca6CzhKj3Q8eF9cHCgcdTDdb5K+3aKyGWA0obug=="
   "resolved" "https://registry.npmjs.org/@algolia/autocomplete-shared/-/autocomplete-shared-1.5.2.tgz"
   "version" "1.5.2"
+
+"@algolia/autocomplete-shared@1.6.3":
+  "integrity" "sha512-UV46bnkTztyADFaETfzFC5ryIdGVb2zpAoYgu0tfcuYWjhg1KbLXveFffZIrGVoboqmAk1b+jMrl6iCja1i3lg=="
+  "resolved" "https://registry.npmjs.org/@algolia/autocomplete-shared/-/autocomplete-shared-1.6.3.tgz"
+  "version" "1.6.3"
+
+"@algolia/autocomplete-theme-classic@^1.5.1":
+  "integrity" "sha512-TGtErtYlhDa/88jCzmYK2uvPEKEDs073Uj11BAN3W+yrrpDMEjcGXvOFbUGR9Gb+nxlCznM9wK2/j8932DAXXw=="
+  "resolved" "https://registry.npmjs.org/@algolia/autocomplete-theme-classic/-/autocomplete-theme-classic-1.6.3.tgz"
+  "version" "1.6.3"
 
 "@algolia/cache-browser-local-storage@4.13.0":
   "integrity" "sha512-nj1vHRZauTqP/bluwkRIgEADEimqojJgoTRCel5f6q8WCa9Y8QeI4bpDQP28FoeKnDRYa3J5CauDlN466jqRhg=="
@@ -76,7 +111,7 @@
     "@algolia/requester-common" "4.13.0"
     "@algolia/transporter" "4.13.0"
 
-"@algolia/client-search@^4.9.1", "@algolia/client-search@4.13.0":
+"@algolia/client-search@^4.12.0", "@algolia/client-search@^4.5.1", "@algolia/client-search@^4.9.1", "@algolia/client-search@4.13.0":
   "integrity" "sha512-blgCKYbZh1NgJWzeGf+caKE32mo3j54NprOf0LZVCubQb3Kx37tk1Hc8SDs9bCAE8hUvf3cazMPIg7wscSxspA=="
   "resolved" "https://registry.npmjs.org/@algolia/client-search/-/client-search-4.13.0.tgz"
   "version" "4.13.0"
@@ -1203,6 +1238,20 @@
   "resolved" "https://registry.npmjs.org/@braintree/sanitize-url/-/sanitize-url-3.1.0.tgz"
   "version" "3.1.0"
 
+"@cmfcmf/docusaurus-search-local@^0.10.0":
+  "integrity" "sha512-X6xabJvvbbgrqgkYUUHSER5kswonKRZatNDJmZTsNiCxFKCephbDL1Kui6QLN6jmorPNWSupj7aMSP3HObHnUg=="
+  "resolved" "https://registry.npmjs.org/@cmfcmf/docusaurus-search-local/-/docusaurus-search-local-0.10.0.tgz"
+  "version" "0.10.0"
+  dependencies:
+    "@algolia/autocomplete-js" "^1.5.1"
+    "@algolia/autocomplete-theme-classic" "^1.5.1"
+    "@algolia/client-search" "^4.12.0"
+    "algoliasearch" "^4.12.0"
+    "cheerio" "^1.0.0-rc.9"
+    "clsx" "^1.1.1"
+    "lunr-languages" "^1.4.0"
+    "mark.js" "^8.11.1"
+
 "@colors/colors@1.5.0":
   "integrity" "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="
   "resolved" "https://registry.npmjs.org/@colors/colors/-/colors-1.5.0.tgz"
@@ -1223,7 +1272,7 @@
     "@docsearch/css" "3.0.0"
     "algoliasearch" "^4.0.0"
 
-"@docusaurus/core@2.0.0-beta.18":
+"@docusaurus/core@^v2.0.0-beta.15", "@docusaurus/core@2.0.0-beta.18":
   "integrity" "sha512-puV7l+0/BPSi07Xmr8tVktfs1BzhC8P5pm6Bs2CfvysCJ4nefNCD1CosPc1PGBWy901KqeeEJ1aoGwj9tU3AUA=="
   "resolved" "https://registry.npmjs.org/@docusaurus/core/-/core-2.0.0-beta.18.tgz"
   "version" "2.0.0-beta.18"
@@ -2441,7 +2490,7 @@
   dependencies:
     "@algolia/events" "^4.0.1"
 
-"algoliasearch@^4.0.0", "algoliasearch@^4.13.0", "algoliasearch@^4.9.1", "algoliasearch@>= 3.1 < 5":
+"algoliasearch@^4.0.0", "algoliasearch@^4.12.0", "algoliasearch@^4.13.0", "algoliasearch@^4.9.1", "algoliasearch@>= 3.1 < 5":
   "integrity" "sha512-oHv4faI1Vl2s+YC0YquwkK/TsaJs79g2JFg5FDm2rKN12VItPTAeQ7hyJMHarOPPYuCnNC5kixbtcqvb21wchw=="
   "resolved" "https://registry.npmjs.org/algoliasearch/-/algoliasearch-4.13.0.tgz"
   "version" "4.13.0"
@@ -3048,7 +3097,7 @@
     "lodash.reject" "^4.4.0"
     "lodash.some" "^4.4.0"
 
-"cheerio@^1.0.0-rc.10":
+"cheerio@^1.0.0-rc.10", "cheerio@^1.0.0-rc.9":
   "integrity" "sha512-g0J0q/O6mW8z5zxQ3A8E8J1hUgp4SMOvEoW/x84OwyHKe/Zccz83PVT4y5Crcr530FV6NgmKI1qvGTKVl9XXVw=="
   "resolved" "https://registry.npmjs.org/cheerio/-/cheerio-1.0.0-rc.10.tgz"
   "version" "1.0.0-rc.10"
@@ -5084,6 +5133,11 @@
     "readable-stream" "^2.0.1"
     "wbuf" "^1.1.0"
 
+"htm@^3.0.0":
+  "integrity" "sha512-983Vyg8NwUE7JkZ6NmOqpCZ+sh1bKv2iYTlUkzlWmA5JD2acKoxd4KVxbMmxX/85mtfdnDmTFoNKcg5DGAvxNQ=="
+  "resolved" "https://registry.npmjs.org/htm/-/htm-3.1.1.tgz"
+  "version" "3.1.1"
+
 "html-entities@^2.3.2":
   "integrity" "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
   "resolved" "https://registry.npmjs.org/html-entities/-/html-entities-2.3.3.tgz"
@@ -6015,6 +6069,11 @@
   dependencies:
     "yallist" "^4.0.0"
 
+"lunr-languages@^1.4.0":
+  "integrity" "sha512-Be5vFuc8NAheOIjviCRms3ZqFFBlzns3u9DXpPSZvALetgnydAN0poV71pVLFn0keYy/s4VblMMkqewTLe+KPg=="
+  "resolved" "https://registry.npmjs.org/lunr-languages/-/lunr-languages-1.9.0.tgz"
+  "version" "1.9.0"
+
 "make-dir@^2.0.0", "make-dir@^2.1.0":
   "integrity" "sha512-LS9X+dc8KLxXCb8dni79fLIIUA5VyZoyjSMCwTluaXA0o27cCK0bhXkpgw+sTXVpPy/lSO57ilRixqk0vDmtRA=="
   "resolved" "https://registry.npmjs.org/make-dir/-/make-dir-2.1.0.tgz"
@@ -6041,6 +6100,11 @@
   "version" "1.0.0"
   dependencies:
     "object-visit" "^1.0.0"
+
+"mark.js@^8.11.1":
+  "integrity" "sha1-GA8fnr74sOY45BZq1S24eb6y/8U="
+  "resolved" "https://registry.npmjs.org/mark.js/-/mark.js-8.11.1.tgz"
+  "version" "8.11.1"
 
 "markdown-escapes@^1.0.0":
   "integrity" "sha512-8z4efJYk43E0upd0NbVXwgSTQs6cT3T06etieCMEg7dRbzCbxUCK/GHlX8mhHRDcp+OLlHkPKsvqQTCvsRl2cg=="
@@ -7099,6 +7163,11 @@
     "nanoid" "^3.3.3"
     "picocolors" "^1.0.0"
     "source-map-js" "^1.0.2"
+
+"preact@^10.0.0":
+  "integrity" "sha512-GLjn0I3r6ka+NvxJUppsVFqb4V0qDTEHT/QxHlidPuClGaxF/4AI2Qti4a0cv3XMh5n1+D3hLScW10LRIm5msQ=="
+  "resolved" "https://registry.npmjs.org/preact/-/preact-10.7.2.tgz"
+  "version" "10.7.2"
 
 "prepend-http@^2.0.0":
   "integrity" "sha1-6SQ0v6XqjBn0HN/UAddBo8gZ2Jc="

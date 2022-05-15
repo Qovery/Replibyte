@@ -16,6 +16,7 @@ const config = {
   organizationName: 'Qovery', // Usually your GitHub org/user name.
   projectName: 'replibyte', // Usually your repo name.
 
+  plugins: [require.resolve("@cmfcmf/docusaurus-search-local")],
   presets: [
     [
       '@docusaurus/preset-classic',
@@ -39,7 +40,7 @@ const config = {
   ],
 
   themeConfig:
-    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+  /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       metadata: [{
         name: 'keywords', content: 'seed database, postgresql, postgres, mysql, mongodb, database, preview environment'
