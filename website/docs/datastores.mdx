@@ -8,6 +8,9 @@ Replibyte supports multiple datastores like AWS S3, GCP Cloud Storage (any other
 
 ## AWS S3
 
+You can use the default ways of configuring AWS credentials, but if you need to specify customized credentials or a profile
+to use you can do so via the datastore configuration.
+
 ### Generate API Keys
 
 To generate your API keys:
@@ -42,11 +45,16 @@ Here is the datastore configuration to use:
 datastore:
   aws:
     bucket: <your_bucket>
-    region: <your_region>
-    access_key_id: XXX
-    secret_access_key: XXX
+    profile: <your_profile> # optional
+    region: <your_region> # optional
+    credentials: # optional
+      access_key_id: XXX
+      secret_access_key: XXX
+      session_token: XXX # optional
 ...
 ```
+
+You can omit the optional properties in which case the default configuration mechanisms will be used, like with the AWS CLI.
 
 ## GCP Cloud Storage
 
@@ -99,8 +107,9 @@ datastore:
   aws:
     bucket: <your_bucket>
     region: <your_region>
-    access_key_id: XXX
-    secret_access_key: XXX
+    credentials:
+      access_key_id: XXX
+      secret_access_key: XXX
     endpoint:
       custom: 'https://your-s3-compatible-endpoint'
 ...

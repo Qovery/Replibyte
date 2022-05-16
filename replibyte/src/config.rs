@@ -70,10 +70,17 @@ pub struct DatastoreAwsS3Config {
     // At the moment we do support only S3 as B,
     // in a near future we'll need to make it generic
     pub bucket: String,
-    pub region: String,
+    pub region: Option<String>,
+    pub profile: Option<String>,
+    pub credentials: Option<AwsCredentials>,
+    pub endpoint: Option<Endpoint>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct AwsCredentials {
     pub access_key_id: String,
     pub secret_access_key: String,
-    pub endpoint: Option<Endpoint>,
+    pub session_token: Option<String>,
 }
 
 impl DatastoreAwsS3Config {
@@ -83,18 +90,38 @@ impl DatastoreAwsS3Config {
     }
 
     /// decode and return the region value
-    pub fn region(&self) -> Result<String, Error> {
-        substitute_env_var(self.region.as_str())
+    pub fn region(&self) -> Result<Option<String>, Error> {
+        self.region
+            .as_ref()
+            .map(|region| substitute_env_var(region))
+            .transpose()
     }
 
-    /// decode and return the access_key_id value
-    pub fn access_key_id(&self) -> Result<String, Error> {
-        substitute_env_var(self.access_key_id.as_str())
+    /// decode and return profile value
+    pub fn profile(&self) -> Result<Option<String>, Error> {
+        self.profile
+            .as_ref()
+            .map(|profile| substitute_env_var(profile))
+            .transpose()
     }
 
-    /// decode and return the secret_access_key value
-    pub fn secret_access_key(&self) -> Result<String, Error> {
-        substitute_env_var(self.secret_access_key.as_str())
+    /// decode and return the credentials
+    pub fn credentials(&self) -> Result<Option<AwsCredentials>, Error> {
+        if let Some(credentials) = &self.credentials {
+            let session_token = if let Some(session_token) = &credentials.session_token {
+                Some(substitute_env_var(session_token)?)
+            } else {
+                None
+            };
+
+            Ok(Some(AwsCredentials {
+                access_key_id: substitute_env_var(&credentials.access_key_id)?,
+                secret_access_key: substitute_env_var(&credentials.secret_access_key)?,
+                session_token,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     /// decode and return the endpoint value

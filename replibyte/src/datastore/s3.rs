@@ -1,16 +1,19 @@
+use std::borrow::Cow;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
-use aws_config::provider_config::ProviderConfig;
+use aws_config::profile::retry_config::ProfileFileRetryConfigProvider;
+use aws_config::profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider};
 use aws_sdk_s3::model::{
     BucketLocationConstraint, CreateBucketConfiguration, Delete, Object, ObjectIdentifier,
 };
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
-use aws_types::os_shim_internal::Env;
+use aws_types::region::Region;
+use aws_types::Credentials;
 use log::{error, info};
 
-use crate::config::Endpoint;
+use crate::config::{AwsCredentials, Endpoint};
 use crate::connector::Connector;
 use crate::datastore::s3::S3Error::FailedObjectUpload;
 use crate::datastore::{
@@ -27,7 +30,7 @@ const GOOGLE_CLOUD_STORAGE_URL: &str = "https://storage.googleapis.com";
 pub struct S3 {
     bucket: String,
     root_key: String,
-    region: String,
+    region: Option<String>,
     endpoint: Endpoint,
     client: Client,
     enable_compression: bool,
@@ -35,26 +38,58 @@ pub struct S3 {
 }
 
 impl S3 {
-    pub fn aws<S: Into<String>>(
+    pub fn aws<S>(
         bucket: S,
-        region: S,
-        access_key_id: S,
-        secret_access_key: S,
+        region: Option<S>,
+        profile: Option<S>,
+        credentials: Option<AwsCredentials>,
         endpoint: Endpoint,
-    ) -> Self {
-        let access_key_id = access_key_id.into();
-        let secret_access_key = secret_access_key.into();
-        let region = region.into();
+    ) -> anyhow::Result<Self>
+    where
+        S: 'static + AsRef<str> + Into<Cow<'static, str>> + Clone,
+    {
+        let mut config_loader = aws_config::from_env();
 
-        let sdk_config = block_on(
-            aws_config::from_env()
-                .configure(ProviderConfig::default().with_env(Env::from_slice(&[
-                    ("AWS_ACCESS_KEY_ID", access_key_id.as_str()),
-                    ("AWS_SECRET_ACCESS_KEY", secret_access_key.as_str()),
-                    ("AWS_REGION", region.as_str()),
-                ])))
-                .load(),
-        );
+        if let Some(profile) = profile {
+            config_loader = config_loader
+                .region(
+                    ProfileFileRegionProvider::builder()
+                        .profile_name(profile.as_ref())
+                        .build(),
+                )
+                .credentials_provider(
+                    ProfileFileCredentialsProvider::builder()
+                        .profile_name(profile.as_ref())
+                        .build(),
+                )
+                .retry_config(
+                    block_on(
+                        ProfileFileRetryConfigProvider::builder()
+                            .profile_name(profile.as_ref())
+                            .build()
+                            .retry_config_builder(),
+                    )?
+                    .build(),
+                )
+        }
+
+        if let Some(region) = region.clone() {
+            let region: Cow<str> = region.into();
+
+            config_loader = config_loader.region(Region::new(region))
+        }
+
+        if let Some(credentials) = credentials {
+            config_loader = config_loader.credentials_provider(Credentials::new(
+                credentials.access_key_id,
+                credentials.secret_access_key,
+                credentials.session_token,
+                None,
+                "replibyte-config",
+            ))
+        }
+
+        let sdk_config = block_on(config_loader.load());
 
         let s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
 
@@ -68,24 +103,27 @@ impl S3 {
             },
         };
 
-        S3 {
-            bucket: bucket.into().to_string(),
+        Ok(S3 {
+            bucket: bucket.as_ref().into(),
             root_key: format!("dump-{}", epoch_millis()),
-            region,
+            region: region.map(|region| region.as_ref().into()),
             endpoint,
             client: Client::from_conf(s3_config),
             enable_compression: true,
             encryption_key: None,
-        }
+        })
     }
 
-    pub fn gcp<S: Into<String>>(
+    pub fn gcp<S>(
         bucket: S,
         region: S,
         access_key: S,
         secret: S,
         endpoint: Endpoint,
-    ) -> Self {
+    ) -> anyhow::Result<Self>
+    where
+        S: 'static + AsRef<str> + Into<Cow<'static, str>> + Clone,
+    {
         let endpoint = match endpoint {
             // change for default GCP Cloud Storage endpoint
             Endpoint::Default => Endpoint::Custom(GOOGLE_CLOUD_STORAGE_URL.to_string()),
@@ -93,7 +131,17 @@ impl S3 {
             Endpoint::Custom(url) => Endpoint::Custom(url),
         };
 
-        S3::aws(bucket, region, access_key, secret, endpoint)
+        S3::aws(
+            bucket,
+            Some(region),
+            None,
+            Some(AwsCredentials {
+                access_key_id: access_key.as_ref().into(),
+                secret_access_key: secret.as_ref().into(),
+                session_token: None,
+            }),
+            endpoint,
+        )
     }
 
     fn create_index_file(&self) -> Result<IndexFile, Error> {
@@ -115,7 +163,7 @@ impl Connector for S3 {
                 // Do not try to create bucket - the current S3 client does not supports well GCP Cloud Storage
             }
             _ => {
-                let _ = create_bucket(&self.client, self.bucket.as_str(), self.region.as_str())?;
+                let _ = create_bucket(&self.client, self.bucket.as_str(), self.region.as_ref())?;
             }
         }
 
@@ -347,11 +395,18 @@ impl<'a> From<S3Error<'a>> for Error {
     }
 }
 
-fn create_bucket<'a>(client: &Client, bucket: &'a str, region: &str) -> Result<(), S3Error<'a>> {
-    let constraint = BucketLocationConstraint::from(region);
-    let cfg = CreateBucketConfiguration::builder()
-        .location_constraint(constraint)
-        .build();
+fn create_bucket<'a, S: AsRef<str>>(
+    client: &Client,
+    bucket: &'a str,
+    region: Option<S>,
+) -> Result<(), S3Error<'a>> {
+    let mut cfg = CreateBucketConfiguration::builder();
+    if let Some(region) = region {
+        let constraint = BucketLocationConstraint::from(region.as_ref());
+        cfg = cfg.location_constraint(constraint);
+    }
+
+    let cfg = cfg.build();
 
     if let Ok(_) = block_on(
         client
@@ -529,10 +584,9 @@ fn delete_directory<'a>(
 mod tests {
     use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
-    use std::future::pending;
 
     use crate::cli::DumpDeleteArgs;
-    use crate::config::Endpoint;
+    use crate::config::{AwsCredentials, Endpoint};
     use crate::connector::Connector;
     use crate::datastore::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
     use crate::datastore::{Backup, Datastore};
@@ -564,11 +618,16 @@ mod tests {
 
         S3::aws(
             bucket.to_string(),
-            "us-east-2".to_string(),
-            access_key_id,
-            secret_access_key,
+            None,
+            None,
+            Some(AwsCredentials {
+                access_key_id,
+                secret_access_key,
+                session_token: None,
+            }),
             Endpoint::Custom(MINIO_ENDPOINT.to_string()),
         )
+        .unwrap()
     }
 
     fn gcp_credentials() -> (String, String, Endpoint) {
@@ -595,6 +654,7 @@ mod tests {
             secret,
             endpoint,
         )
+        .unwrap()
     }
 
     #[test]
