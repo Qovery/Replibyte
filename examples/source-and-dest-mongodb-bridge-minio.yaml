@@ -14,7 +14,8 @@ datastore:
   aws:
     bucket: replibyte-test
     region: us-east-2
-    access_key_id: minioadmin
-    secret_access_key: minioadmin
+    credentials:
+      access_key_id: minioadmin
+      secret_access_key: minioadmin
     endpoint:
       custom: 'http://localhost:9000'
