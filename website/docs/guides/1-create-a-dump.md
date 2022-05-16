@@ -161,8 +161,10 @@ datastore:
   aws:
     bucket: my-replibyte-dumps
     region: us-east-2
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+    credentials:
+      access_key_id: $ACCESS_KEY_ID
+      secret_access_key: $AWS_SECRET_ACCESS_KEY
+      session_token: XXX # optional
 ```
 
 Here the datastore is a S3 bucket where the dump will be stored and accessible for future restore (next guide).
@@ -194,8 +196,10 @@ datastore:
   aws:
     bucket: my-replibyte-dumps
     region: us-east-2
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+    credentials:
+      access_key_id: $ACCESS_KEY_ID
+      secret_access_key: $AWS_SECRET_ACCESS_KEY
+      session_token: XXX # optional
 ```
 
 :::note
