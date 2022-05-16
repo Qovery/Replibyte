@@ -115,17 +115,17 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
         DatastoreConfig::AWS(config) => Box::new(S3::aws(
             config.bucket()?,
             config.region()?,
-            config.access_key_id()?,
-            config.secret_access_key()?,
+            config.profile()?,
+            config.credentials()?,
             config.endpoint()?,
-        )),
+        )?),
         DatastoreConfig::GCP(config) => Box::new(S3::gcp(
             config.bucket()?,
             config.region()?,
             config.access_key()?,
             config.secret()?,
             config.endpoint()?,
-        )),
+        )?),
         DatastoreConfig::LocalDisk(config) => Box::new(LocalDisk::new(config.dir()?)),
     };
 
