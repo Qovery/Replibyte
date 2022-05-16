@@ -33,8 +33,7 @@ jobs:
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
           RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
           FILE=replibyte_${RELEASE_NAME}_x86_64-unknown-linux-musl
-          sudo mv replibyte $FILE
-          sudo tar -czvf ${FILE}.tar.gz $FILE && sudo rm $FILE
+          sudo tar -czvf ${FILE}.tar.gz replibyte && sudo rm replibyte
           sudo touch ${FILE}.tar.gz.sha256sum && sudo chmod 777 ${FILE}.tar.gz.sha256sum
           sudo sha256sum "${FILE}.tar.gz" | cut -d ' ' -f 1 > ${FILE}.tar.gz.sha256sum
 
@@ -73,8 +72,7 @@ jobs:
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
           RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
           FILE=replibyte_${RELEASE_NAME}_x86_64-pc-windows-gnu.exe
-          sudo mv replibyte.exe $FILE
-          sudo zip -9r ${FILE}.zip $FILE && sudo rm $FILE
+          sudo zip -9r ${FILE}.zip replibyte.exe && sudo rm replibyte.exe
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
           sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
 
@@ -114,8 +112,7 @@ jobs:
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
           RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
           FILE=replibyte_${RELEASE_NAME}_x86_64-apple-darwin
-          sudo mv replibyte $FILE
-          sudo zip -9r ${FILE}.zip $FILE && sudo rm $FILE
+          sudo zip -9r ${FILE}.zip replibyte && sudo rm replibyte
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
           CHECKSUM=$(sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1)
           echo "${CHECKSUM} ${FILE}.zip" > ${FILE}.zip.sha256sum
