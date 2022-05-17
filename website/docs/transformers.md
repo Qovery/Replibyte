@@ -284,3 +284,74 @@ Does not change anything (good for testing purpose)
 ## Custom with Web Assembly (wasm)
 
 Are you ready to get into the matrix? Take a look [here](/docs/advanced-guides/web-assembly-transformer) 👀
+
+## Nested fields
+
+:::note
+
+Support MongoDB only.
+
+:::
+
+### Embedded sub-document (object)
+
+For a document looking like this for which you want to transform the `email` and `phone_number` fields
+
+```json
+{
+  "contact": {
+      "email": "john.doe@example.com",
+      "phone_number": "123456"
+  }
+}
+```
+
+The configuration file to use is:
+
+```yaml
+source:
+  connection_uri: $DATABASE_URL
+  transformers:
+    - database: my_database
+      table: my_collection
+      columns:
+        - name: contact.email
+          transformer_name: email
+        - name: contact.phone_number
+          transformer_name: phone-number
+```
+
+
+### Embedded array of documents (array of objects)
+
+For a document looking like this for which you want to transform the `email` and `phone_number` fields
+
+```json
+{
+  "contacts": [
+    {
+      "email": "john.doe@example.com",
+      "phone_number": "123456"
+    },
+    {
+      "email": "jane.doe@example.com",
+      "phone_number": "123456"
+    }
+  ]
+}
+```
+
+The configuration file to use is:
+
+```yaml
+source:
+  connection_uri: $DATABASE_URL
+  transformers:
+    - database: my_database
+      table: my_collection
+      columns:
+        - name: contacts.$[].email
+          transformer_name: email
+        - name: contacts.$[].phone_number
+          transformer_name: phone-number
+```
