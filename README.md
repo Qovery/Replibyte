@@ -49,7 +49,7 @@ replibyte -c conf.yaml dump restore remote -v latest
 
 ## Features
 
-- [x] Support data backup and restore for PostgreSQL, MySQL and MongoDB
+- [x] Support data dump and restore for PostgreSQL, MySQL and MongoDB
 - [x] Replace sensitive data with fake data
 - [x] Works on large database (> 10GB)
 - [x] Database Subsetting: Scale down a production database to a more reasonable size 🔥

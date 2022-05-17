@@ -57,20 +57,20 @@ replicate the data in a stream of bytes and does not store anything on a local d
 ### Limitations
 
 - Tested with PostgreSQL 13 and 14. It should work with prior versions.
-- RepliByte as not been designed to run multiple backups targeting the same Bridge. The Index File does not manage concurrent write (ATM).
+- RepliByte as not been designed to run multiple dumps targeting the same Bridge. The Index File does not manage concurrent write (ATM).
 
 ### Index file structure
 
-An index file describe the structure of your backups and all of them.
+An index file describe the structure of your dumps and all of them.
 
 Here is the manifest file that you can find at the root of your target `Bridge` (E.g: S3).
 
 ```json
 {
-  "backups": [
+  "dumps": [
     {
       "size": 1024000,
-      "directory_name": "backup-{epoch timestamp}",
+      "directory_name": "dump-{epoch timestamp}",
       "created_at": "epoch timestamp",
       "compressed": true,
       "encrypted": true

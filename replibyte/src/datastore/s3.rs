@@ -12,12 +12,13 @@ use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::region::Region;
 use aws_types::Credentials;
 use log::{error, info};
+use serde_json::Value;
 
 use crate::config::{AwsCredentials, Endpoint};
 use crate::connector::Connector;
 use crate::datastore::s3::S3Error::FailedObjectUpload;
 use crate::datastore::{
-    compress, decompress, decrypt, encrypt, Backup, Datastore, IndexFile, ReadOptions,
+    compress, decompress, decrypt, encrypt, Datastore, Dump, IndexFile, ReadOptions,
 };
 use crate::runtime::block_on;
 use crate::types::Bytes;
@@ -148,7 +149,7 @@ impl S3 {
         match self.index_file() {
             Ok(index_file) => Ok(index_file),
             Err(_) => {
-                let index_file = IndexFile { backups: vec![] };
+                let index_file = IndexFile::new();
                 let _ = self.write_index_file(&index_file)?;
                 Ok(index_file)
             }
@@ -178,6 +179,13 @@ impl Datastore for S3 {
         Ok(index_file)
     }
 
+    fn raw_index_file(&self) -> Result<Value, Error> {
+        let object = get_object(&self.client, self.bucket.as_str(), INDEX_FILE_NAME)?;
+        let index_file = serde_json::from_slice(object.as_slice())?;
+
+        Ok(index_file)
+    }
+
     fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error> {
         let index_file_json = serde_json::to_vec(index_file)?;
 
@@ -188,6 +196,25 @@ impl Datastore for S3 {
             index_file_json,
         )
         .map_err(|err| Error::from(err))
+    }
+
+    fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error> {
+        let index_file_json = serde_json::to_vec(raw_index_file)?;
+
+        create_object(
+            &self.client,
+            self.bucket.as_str(),
+            INDEX_FILE_NAME,
+            index_file_json,
+        )
+        .map_err(|err| Error::from(err))
+    }
+
+    fn index_file_exists(&self) -> bool {
+        match get_object(&self.client, &self.bucket, INDEX_FILE_NAME) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
@@ -207,18 +234,18 @@ impl Datastore for S3 {
         mut data_callback: &mut dyn FnMut(Bytes),
     ) -> Result<(), Error> {
         let mut index_file = self.index_file()?;
-        let backup = index_file.find_backup(options)?;
+        let dump = index_file.find_dump(options)?;
 
         for object in list_objects(
             &self.client,
             self.bucket.as_str(),
-            Some(backup.directory_name.as_str()),
+            Some(dump.directory_name.as_str()),
         )? {
             let data = get_object(&self.client, self.bucket.as_str(), object.key().unwrap())?;
 
             // decrypt data?
-            let data = if backup.encrypted {
-                // It should be safe to unwrap here because the backup is marked as encrypted in the backup manifest
+            let data = if dump.encrypted {
+                // It should be safe to unwrap here because the dump is marked as encrypted in the dump manifest
                 // so if there is no encryption key set at the datastore level we want to panic.
                 let encryption_key = self.encryption_key.as_ref().unwrap();
                 decrypt(data, encryption_key.as_str())?
@@ -227,7 +254,7 @@ impl Datastore for S3 {
             };
 
             // decompress data?
-            let data = if backup.compressed {
+            let data = if dump.compressed {
                 decompress(data)?
             } else {
                 data
@@ -266,7 +293,7 @@ impl Datastore for S3 {
 
         let _ = delete_directory(&self.client, bucket, &name).map_err(|err| Error::from(err))?;
 
-        index_file.backups.retain(|b| b.directory_name != name);
+        index_file.dumps.retain(|b| b.directory_name != name);
 
         self.write_index_file(&index_file)
     }
@@ -303,7 +330,7 @@ fn write_objects<B: Datastore>(
     // update index file
     let mut index_file = datastore.index_file()?;
 
-    let mut new_backup = Backup {
+    let mut new_dump = Dump {
         directory_name: root_key.to_string(),
         size: 0,
         created_at: epoch_millis(),
@@ -311,21 +338,21 @@ fn write_objects<B: Datastore>(
         encrypted: datastore.encryption_key().is_some(),
     };
 
-    // find or create Backup
-    let mut backup = index_file
-        .backups
+    // find or create dump
+    let mut dump = index_file
+        .dumps
         .iter_mut()
         .find(|b| b.directory_name.as_str() == root_key)
-        .unwrap_or(&mut new_backup);
+        .unwrap_or(&mut new_dump);
 
-    if backup.size == 0 {
-        // it means it's a new backup.
-        // We need to add it into the index_file.backups
-        new_backup.size = data_size;
-        index_file.backups.push(new_backup);
+    if dump.size == 0 {
+        // it means it's a new dump.
+        // We need to add it into the index_file.dumps
+        new_dump.size = data_size;
+        index_file.dumps.push(new_dump);
     } else {
-        // update total backup size
-        backup.size = backup.size + data_size;
+        // update total dump size
+        dump.size = dump.size + data_size;
     }
 
     // save index file
@@ -429,6 +456,7 @@ fn create_bucket<'a, S: AsRef<str>>(
     match result {
         Ok(_) => {}
         Err(err) => {
+            println!("{}", err);
             error!("{}", err);
             return Err(S3Error::FailedToCreateBucket { bucket });
         }
@@ -584,16 +612,17 @@ fn delete_directory<'a>(
 mod tests {
     use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
+    use serde_json::json;
 
     use crate::cli::DumpDeleteArgs;
     use crate::config::{AwsCredentials, Endpoint};
     use crate::connector::Connector;
+    use crate::datastore::migration::Migration;
     use crate::datastore::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
-    use crate::datastore::{Backup, Datastore};
+    use crate::datastore::{Datastore, Dump, INDEX_FILE_NAME};
     use crate::utils::epoch_millis;
     use crate::S3;
 
-    const BUCKET_NAME: &str = "replibyte-test";
     const REGION: &str = "us-east-2";
     const MINIO_ENDPOINT: &str = "http://localhost:9000";
     const MINIO_CREDENTIALS: &str = "minioadmin";
@@ -818,10 +847,10 @@ mod tests {
 
         let mut index_file = s3.index_file().unwrap();
 
-        assert!(index_file.backups.is_empty());
+        assert!(index_file.dumps.is_empty());
 
-        index_file.backups.push(Backup {
-            directory_name: "backup-1".to_string(),
+        index_file.dumps.push(Dump {
+            directory_name: "dump-1".to_string(),
             size: 0,
             created_at: epoch_millis(),
             compressed: true,
@@ -830,23 +859,23 @@ mod tests {
 
         assert!(s3.write_index_file(&index_file).is_ok());
 
-        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 1);
 
         assert!(delete_bucket(&s3.client, bucket.as_str(), true).is_ok());
     }
 
     #[test]
-    fn test_backup_name() {
+    fn test_dump_name() {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
-        s3.set_dump_name("custom-backup-name".to_string());
+        s3.set_dump_name("custom-dump-name".to_string());
 
-        assert_eq!(s3.root_key, "custom-backup-name".to_string())
+        assert_eq!(s3.root_key, "custom-dump-name".to_string())
     }
 
     #[test]
-    fn test_s3_backup_delete_by_name() {
+    fn test_s3_dump_delete_by_name() {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
@@ -856,19 +885,19 @@ mod tests {
 
         let mut index_file = s3.index_file().unwrap();
 
-        assert!(index_file.backups.is_empty());
+        assert!(index_file.dumps.is_empty());
 
-        // Add 2 backups in the manifest
-        index_file.backups.push(Backup {
-            directory_name: "backup-1".to_string(),
+        // Add 2 dumps in the manifest
+        index_file.dumps.push(Dump {
+            directory_name: "dump-1".to_string(),
             size: 0,
             created_at: epoch_millis(),
             compressed: true,
             encrypted: false,
         });
 
-        index_file.backups.push(Backup {
-            directory_name: "backup-2".to_string(),
+        index_file.dumps.push(Dump {
+            directory_name: "dump-2".to_string(),
             size: 0,
             created_at: epoch_millis(),
             compressed: true,
@@ -876,12 +905,12 @@ mod tests {
         });
 
         assert!(s3.write_index_file(&index_file).is_ok());
-        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 2);
 
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-1/testing-key.dump",
+            "dump-1/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
@@ -889,36 +918,36 @@ mod tests {
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-2/testing-key.dump",
+            "dump-2/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
 
         assert!(s3
             .delete(&DumpDeleteArgs {
-                dump: Some("backup-1".to_string()),
+                dump: Some("dump-1".to_string()),
                 older_than: None,
                 keep_last: None,
             })
             .is_ok());
 
-        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 1);
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-1/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-2/testing-key.dump").is_ok());
 
         assert!(s3
             .delete(&DumpDeleteArgs {
-                dump: Some("backup-2".to_string()),
+                dump: Some("dump-2".to_string()),
                 older_than: None,
                 keep_last: None,
             })
             .is_ok());
-        assert!(s3.index_file().unwrap().backups.is_empty());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
+        assert!(s3.index_file().unwrap().dumps.is_empty());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-2/testing-key.dump").is_err());
     }
 
     #[test]
-    fn test_s3_backup_delete_older_than() {
+    fn test_s3_dump_delete_older_than() {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
@@ -928,20 +957,20 @@ mod tests {
 
         let mut index_file = s3.index_file().unwrap();
 
-        assert!(index_file.backups.is_empty());
+        assert!(index_file.dumps.is_empty());
 
-        // Add a backup from 5 days ago
-        index_file.backups.push(Backup {
-            directory_name: "backup-1".to_string(),
+        // Add a dump from 5 days ago
+        index_file.dumps.push(Dump {
+            directory_name: "dump-1".to_string(),
             size: 0,
             created_at: (Utc::now() - Duration::days(5)).timestamp_millis() as u128,
             compressed: true,
             encrypted: false,
         });
 
-        // Add a backup from now
-        index_file.backups.push(Backup {
-            directory_name: "backup-2".to_string(),
+        // Add a dump from now
+        index_file.dumps.push(Dump {
+            directory_name: "dump-2".to_string(),
             size: 0,
             created_at: epoch_millis(),
             compressed: true,
@@ -949,12 +978,12 @@ mod tests {
         });
 
         assert!(s3.write_index_file(&index_file).is_ok());
-        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 2);
 
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-1/testing-key.dump",
+            "dump-1/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
@@ -962,7 +991,7 @@ mod tests {
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-2/testing-key.dump",
+            "dump-2/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
@@ -975,9 +1004,9 @@ mod tests {
             })
             .is_ok());
 
-        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_ok());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 2);
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-1/testing-key.dump").is_ok());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-2/testing-key.dump").is_ok());
 
         assert!(s3
             .delete(&DumpDeleteArgs {
@@ -987,13 +1016,13 @@ mod tests {
             })
             .is_ok());
 
-        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_ok());
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 1);
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-1/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-2/testing-key.dump").is_ok());
     }
 
     #[test]
-    fn test_s3_backup_keep_last() {
+    fn test_s3_dump_keep_last() {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
@@ -1003,26 +1032,26 @@ mod tests {
 
         let mut index_file = s3.index_file().unwrap();
 
-        assert!(index_file.backups.is_empty());
+        assert!(index_file.dumps.is_empty());
 
-        index_file.backups.push(Backup {
-            directory_name: "backup-1".to_string(),
+        index_file.dumps.push(Dump {
+            directory_name: "dump-1".to_string(),
             size: 0,
             created_at: (Utc::now() - Duration::days(3)).timestamp_millis() as u128,
             compressed: true,
             encrypted: false,
         });
 
-        index_file.backups.push(Backup {
-            directory_name: "backup-2".to_string(),
+        index_file.dumps.push(Dump {
+            directory_name: "dump-2".to_string(),
             size: 0,
             created_at: (Utc::now() - Duration::days(5)).timestamp_millis() as u128,
             compressed: true,
             encrypted: false,
         });
 
-        index_file.backups.push(Backup {
-            directory_name: "backup-3".to_string(),
+        index_file.dumps.push(Dump {
+            directory_name: "dump-3".to_string(),
             size: 0,
             created_at: epoch_millis(),
             compressed: true,
@@ -1030,12 +1059,12 @@ mod tests {
         });
 
         assert!(s3.write_index_file(&index_file).is_ok());
-        assert_eq!(s3.index_file().unwrap().backups.len(), 3);
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 3);
 
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-1/testing-key.dump",
+            "dump-1/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
@@ -1043,7 +1072,7 @@ mod tests {
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-2/testing-key.dump",
+            "dump-2/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
@@ -1051,7 +1080,7 @@ mod tests {
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
-            "backup-3/testing-key.dump",
+            "dump-3/testing-key.dump",
             b"hello w0rld".to_vec(),
         )
         .is_ok());
@@ -1064,10 +1093,10 @@ mod tests {
             })
             .is_ok());
 
-        assert_eq!(s3.index_file().unwrap().backups.len(), 2);
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_ok());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-3/testing-key.dump").is_ok());
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 2);
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-1/testing-key.dump").is_ok());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-2/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-3/testing-key.dump").is_ok());
 
         assert!(s3
             .delete(&DumpDeleteArgs {
@@ -1077,9 +1106,74 @@ mod tests {
             })
             .is_ok());
 
-        assert_eq!(s3.index_file().unwrap().backups.len(), 1);
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-1/testing-key.dump").is_err());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-2/testing-key.dump").is_err());
-        assert!(get_object(&s3.client, bucket.as_str(), "backup-3/testing-key.dump").is_ok());
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 1);
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-1/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-2/testing-key.dump").is_err());
+        assert!(get_object(&s3.client, bucket.as_str(), "dump-3/testing-key.dump").is_ok());
+    }
+
+    #[test]
+    fn test_migrate_add_index_file_version_and_rename_backups_to_dumps() {
+        let bucket = aws_bucket();
+        let s3 = aws_s3(bucket.as_str());
+
+        // create a fake index file
+        let value = json!({
+            "backups": [
+                {
+                    "directory_name": "dump-1653170039392",
+                    "size": 62279,
+                    "created_at": 1234,
+                    "compressed": true,
+                    "encrypted": false
+                },
+                {
+                    "directory_name": "dump-1653170570014",
+                    "size": 62283,
+                    "created_at": 5678,
+                    "compressed": true,
+                    "encrypted": false
+                }
+            ]
+        });
+
+        assert!(create_object(
+            &s3.client,
+            bucket.as_str(),
+            INDEX_FILE_NAME,
+            value.to_string().into_bytes()
+        )
+        .is_ok());
+
+        let mut s3: Box<dyn Datastore> = Box::new(s3);
+        let migration = Migration::new(&s3, "0.1.0");
+        assert!(migration.run().is_ok());
+
+        let _ = s3.init().expect("s3 init failed");
+
+        // assert
+        assert!(s3.index_file().is_ok());
+        assert_eq!(s3.index_file().unwrap().v, Some("0.1.0".to_string()));
+        assert_eq!(s3.index_file().unwrap().dumps.len(), 2);
+        assert_eq!(
+            s3.index_file().unwrap().dumps.get(0),
+            Some(&Dump {
+                directory_name: "dump-1653170039392".to_string(),
+                size: 62279,
+                created_at: 1234,
+                compressed: true,
+                encrypted: false
+            })
+        );
+        assert_eq!(
+            s3.index_file().unwrap().dumps.get(1),
+            Some(&Dump {
+                directory_name: "dump-1653170570014".to_string(),
+                size: 62283,
+                created_at: 5678,
+                compressed: true,
+                encrypted: false
+            })
+        );
     }
 }

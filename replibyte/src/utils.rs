@@ -76,3 +76,7 @@ pub fn wait_for_command(process: &mut Child) -> Result<(), Error> {
         )),
     }
 }
+
+pub fn get_replibyte_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}

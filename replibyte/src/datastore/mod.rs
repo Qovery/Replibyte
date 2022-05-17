@@ -1,6 +1,7 @@
 use aes_gcm::aead::{Aead, NewAead};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use chrono::{Duration, Utc};
+use serde_json::Value;
 use std::io::{Error, ErrorKind, Read, Write};
 
 use flate2::read::ZlibDecoder;
@@ -11,16 +12,21 @@ use serde::{Deserialize, Serialize};
 use crate::cli::DumpDeleteArgs;
 use crate::connector::Connector;
 use crate::types::Bytes;
+use crate::utils::get_replibyte_version;
 
 pub mod local_disk;
+pub mod migration;
 pub mod s3;
 
 const INDEX_FILE_NAME: &str = "metadata.json";
 
 pub trait Datastore: Connector + Send + Sync {
-    /// Getting Index file with all the backups information
+    /// Getting Index file with all the dumps information
     fn index_file(&self) -> Result<IndexFile, Error>;
+    fn raw_index_file(&self) -> Result<Value, Error>;
     fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error>;
+    fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error>;
+    fn index_file_exists(&self) -> bool;
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error>;
     fn read(
         &self,
@@ -35,8 +41,8 @@ pub trait Datastore: Connector + Send + Sync {
     fn delete_by_name(&self, name: String) -> Result<(), Error>;
 
     fn delete(&self, args: &DumpDeleteArgs) -> Result<(), Error> {
-        if let Some(backup_name) = &args.dump {
-            return self.delete_by_name(backup_name.to_string());
+        if let Some(dump_name) = &args.dump {
+            return self.delete_by_name(dump_name.to_string());
         }
 
         if let Some(older_than) = &args.older_than {
@@ -81,14 +87,14 @@ pub trait Datastore: Connector + Send + Sync {
         let threshold_date = Utc::now() - Duration::days(days);
         let threshold_date = threshold_date.timestamp_millis() as u128;
 
-        let backups_to_delete: Vec<Backup> = index_file
-            .backups
+        let dumps_to_delete: Vec<Dump> = index_file
+            .dumps
             .into_iter()
             .filter(|b| b.created_at.lt(&threshold_date))
             .collect();
 
-        for backup in backups_to_delete {
-            let dump_name = backup.directory_name;
+        for dump in dumps_to_delete {
+            let dump_name = dump.directory_name;
             self.delete_by_name(dump_name)?
         }
 
@@ -99,12 +105,12 @@ pub trait Datastore: Connector + Send + Sync {
         let mut index_file = self.index_file()?;
 
         index_file
-            .backups
+            .dumps
             .sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
-        if let Some(backups) = index_file.backups.get(keep_last..) {
-            for backup in backups {
-                let dump_name = &backup.directory_name;
+        if let Some(dumps) = index_file.dumps.get(keep_last..) {
+            for dump in dumps {
+                let dump_name = &dump.directory_name;
                 self.delete_by_name(dump_name.to_string())?;
             }
         }
@@ -113,33 +119,41 @@ pub trait Datastore: Connector + Send + Sync {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IndexFile {
-    pub backups: Vec<Backup>,
+    pub v: Option<String>,
+    pub dumps: Vec<Dump>,
 }
 
 impl IndexFile {
-    pub fn find_backup(&mut self, options: &ReadOptions) -> Result<&Backup, Error> {
+    pub fn new() -> Self {
+        Self {
+            v: Some(get_replibyte_version().to_string()),
+            dumps: vec![],
+        }
+    }
+
+    pub fn find_dump(&mut self, options: &ReadOptions) -> Result<&Dump, Error> {
         match options {
             ReadOptions::Latest => {
-                self.backups.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                self.dumps.sort_by(|a, b| a.created_at.cmp(&b.created_at));
 
-                match self.backups.last() {
-                    Some(backup) => Ok(backup),
-                    None => return Err(Error::new(ErrorKind::Other, "No backups available.")),
+                match self.dumps.last() {
+                    Some(dump) => Ok(dump),
+                    None => return Err(Error::new(ErrorKind::Other, "No dumps available.")),
                 }
             }
             ReadOptions::Dump { name } => {
                 match self
-                    .backups
+                    .dumps
                     .iter()
-                    .find(|backup| backup.directory_name.as_str() == name.as_str())
+                    .find(|dump| dump.directory_name.as_str() == name.as_str())
                 {
-                    Some(backup) => Ok(backup),
+                    Some(dump) => Ok(dump),
                     None => {
                         return Err(Error::new(
                             ErrorKind::Other,
-                            format!("Can't find backup with name '{}'", name),
+                            format!("Can't find dump with name '{}'", name),
                         ));
                     }
                 }
@@ -148,8 +162,8 @@ impl IndexFile {
     }
 }
 
-#[derive(Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Backup {
+#[derive(Debug, Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
+pub struct Dump {
     pub directory_name: String,
     pub size: usize,
     pub created_at: u128,

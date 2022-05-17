@@ -4,7 +4,8 @@ use clap::{Args, Parser, Subcommand};
 
 /// Replibyte is a tool to seed your databases with your production data while keeping sensitive data safe, just pass `-h`
 #[derive(Parser, Debug)]
-#[clap(about, long_about = None)]
+#[clap(version, about, long_about = None)]
+#[clap(propagate_version = true)]
 pub struct CLI {
     /// Replibyte configuration file
     #[clap(short, long, parse(from_os_str), value_name = "configuration file")]
@@ -19,7 +20,7 @@ pub struct CLI {
 /// sub commands
 #[derive(Subcommand, Debug)]
 pub enum SubCommand {
-    /// all backup commands
+    /// all dump commands
     #[clap(subcommand)]
     Dump(DumpCommand),
     /// all transformers command
@@ -30,14 +31,14 @@ pub enum SubCommand {
 /// all dump commands
 #[derive(Subcommand, Debug)]
 pub enum DumpCommand {
-    /// list available backups
+    /// list available dumps
     List,
-    /// launch backup -- use `-h` to show all the options
+    /// launch dump -- use `-h` to show all the options
     Create(DumpCreateArgs),
     /// all restore commands
     #[clap(subcommand)]
     Restore(RestoreCommand),
-    /// delete a backup from the defined datastore
+    /// delete a dump from the defined datastore
     Delete(DumpDeleteArgs),
 }
 
@@ -51,28 +52,28 @@ pub enum TransformerCommand {
 /// all restore commands
 #[derive(Subcommand, Debug)]
 pub enum RestoreCommand {
-    /// Restore backup inside a local Docker container
+    /// Restore dump inside a local Docker container
     Local(RestoreLocalArgs),
-    /// Restore backup inside the configured destination
+    /// Restore dump inside the configured destination
     Remote(RestoreArgs),
 }
 
 /// all restore commands
 #[derive(Args, Debug)]
 pub struct RestoreArgs {
-    /// restore backup -- set `latest` or `<backup name>` - use `backup list` command to list all backups available
-    #[clap(short, long, value_name = "[latest | backup name]")]
+    /// restore dump -- set `latest` or `<dump name>` - use `dump list` command to list all dumps available
+    #[clap(short, long, value_name = "[latest | dump name]")]
     pub value: String,
     /// stream output on stdout
     #[clap(short, long)]
     pub output: bool,
 }
 
-/// restore backup in a local Docker container
+/// restore dump in a local Docker container
 #[derive(Args, Debug)]
 pub struct RestoreLocalArgs {
-    /// restore backup -- set `latest` or `<backup name>` - use `backup list` command to list all backups available
-    #[clap(short, long, value_name = "[latest | backup name]")]
+    /// restore dump -- set `latest` or `<dump name>` - use `dump list` command to list all dumps available
+    #[clap(short, long, value_name = "[latest | dump name]")]
     pub value: String,
     /// stream output on stdout
     #[clap(short, long)]
@@ -91,7 +92,7 @@ pub struct RestoreLocalArgs {
     pub image: Option<String>,
 }
 
-/// all backup run commands
+/// all dump run commands
 #[derive(Args, Debug)]
 pub struct DumpCreateArgs {
     #[clap(name = "source_type", short, long, value_name = "[postgresql | mysql | mongodb]", possible_values = &["postgresql", "mysql", "mongodb"], requires = "input")]
@@ -111,13 +112,13 @@ pub struct DumpCreateArgs {
 #[derive(Args, Debug)]
 #[clap(group = clap::ArgGroup::new("delete-mode").multiple(false))]
 pub struct DumpDeleteArgs {
-    /// Name of the backup to delete
+    /// Name of the dump to delete
     #[clap(group = "delete-mode")]
     pub dump: Option<String>,
-    /// Remove all backups older than the specified number of days. Example: `14d` for deleting backups older than 14 days
+    /// Remove all dumps older than the specified number of days. Example: `14d` for deleting dumps older than 14 days
     #[clap(long, group = "delete-mode")]
     pub older_than: Option<String>,
-    /// Keep only the last N backups
+    /// Keep only the last N dumps
     #[clap(long, group = "delete-mode")]
     pub keep_last: Option<usize>,
 }
