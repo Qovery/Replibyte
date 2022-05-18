@@ -38,6 +38,9 @@ RUN cargo build --release
 # our final base
 FROM rust:1.59-slim-buster
 
+# used to configure Github Packages
+LABEL org.opencontainers.image.source https://github.com/qovery/replibyte
+
 # Install Postgres and MySQL binaries
 RUN apt-get clean && apt-get update && apt-get install -y \
     wget \
