@@ -107,6 +107,7 @@ jobs:
             sh -c "CC=o64-clang CXX=o64-clang++ cargo build --release --target x86_64-apple-darwin"
 
       - name: Prepare release
+        id: prep
         run: |
           cd target/x86_64-apple-darwin/release
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
@@ -115,7 +116,8 @@ jobs:
           sudo zip -9r ${FILE}.zip replibyte && sudo rm replibyte
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
           CHECKSUM=$(sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1)
-          echo "${CHECKSUM} ${FILE}.zip" > ${FILE}.zip.sha256sum
+          echo "${CHECKSUM}" > ${FILE}.zip.sha256sum
+          echo "::set-output name=sha256::${CHECKSUM}"
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -124,6 +126,9 @@ jobs:
             target/x86_64-apple-darwin/release/replibyte_*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    outputs:
+      sha256: ${{ steps.prep.outputs.sha256 }}
 
   publish-on-homebrew:
     runs-on: ubuntu-latest
@@ -139,6 +144,6 @@ jobs:
           formula-name: replibyte
           homebrew-tap: Qovery/homebrew-replibyte
           download-url: https://github.com/Qovery/replibyte/releases/download/${{ steps.extract-version.outputs.tag-name }}/replibyte_${{ steps.extract-version.outputs.tag-name }}_x86_64-apple-darwin.zip
-          download-sha256: https://github.com/Qovery/replibyte/releases/download/${{ steps.extract-version.outputs.tag-name }}/replibyte_${{ steps.extract-version.outputs.tag-name }}_x86_64-apple-darwin.zip.sha256sum
+          download-sha256: ${{ needs.build-mac.outputs.sha256 }}
         env:
           COMMITTER_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
