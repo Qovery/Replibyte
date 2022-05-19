@@ -2227,6 +2227,7 @@ dependencies = [
  "lazy_static",
  "log",
  "machine-uid",
+ "percent-encoding",
  "prettytable-rs",
  "rand 0.8.5",
  "reqwest",

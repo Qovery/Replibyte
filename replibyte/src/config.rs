@@ -8,6 +8,7 @@ use crate::transformer::random::RandomTransformer;
 use crate::transformer::redacted::{RedactedTransformer, RedactedTransformerOptions};
 use crate::transformer::transient::TransientTransformer;
 use crate::transformer::Transformer;
+use percent_encoding::percent_decode_str;
 use serde;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -413,7 +414,9 @@ fn get_port(url: &Url, default_port: u16) -> Result<u16, Error> {
 
 fn get_username(url: &Url) -> Result<String, Error> {
     match url.username() {
-        username if username != "" => Ok(username.to_string()),
+        username if username != "" => Ok(percent_decode_str(&username)
+            .decode_utf8_lossy()
+            .to_string()),
         _ => Err(Error::new(
             ErrorKind::Other,
             "missing <username> property from connection uri",
@@ -616,6 +619,20 @@ mod tests {
                 "localhost".to_string(),
                 5432,
                 "root".to_string(),
+                "password".to_string(),
+                "db".to_string(),
+            ),
+        )
+    }
+
+    #[test]
+    fn parse_postgres_connection_uri_with_username_with_special_chars_db() {
+        assert_eq!(
+            parse_connection_uri("postgres://root@azure:password@localhost:5432/db").unwrap(),
+            ConnectionUri::Postgres(
+                "localhost".to_string(),
+                5432,
+                "root@azure".to_string(),
                 "password".to_string(),
                 "db".to_string(),
             ),
