@@ -105,25 +105,27 @@ impl TelemetryClient {
 
                 let mut transformers = HashSet::new();
 
-                for transformer in &x.transformers {
-                    for column in &transformer.columns {
-                        transformers.insert(match column.transformer {
-                            TransformerTypeConfig::Random => "random",
-                            TransformerTypeConfig::RandomDate => "random-date",
-                            TransformerTypeConfig::FirstName => "first-name",
-                            TransformerTypeConfig::Email => "email",
-                            TransformerTypeConfig::KeepFirstChar => "keep-first-char",
-                            TransformerTypeConfig::PhoneNumber => "phone-number",
-                            TransformerTypeConfig::CreditCard => "credit-card",
-                            TransformerTypeConfig::Redacted(_) => "redacted",
-                            TransformerTypeConfig::Transient => "transient",
-                            TransformerTypeConfig::CustomWasm(_) => "custom-wasm",
-                        });
+                if let Some(transformers_config) = &x.transformers {
+                    for transformer in transformers_config {
+                        for column in &transformer.columns {
+                            transformers.insert(match column.transformer {
+                                TransformerTypeConfig::Random => "random",
+                                TransformerTypeConfig::RandomDate => "random-date",
+                                TransformerTypeConfig::FirstName => "first-name",
+                                TransformerTypeConfig::Email => "email",
+                                TransformerTypeConfig::KeepFirstChar => "keep-first-char",
+                                TransformerTypeConfig::PhoneNumber => "phone-number",
+                                TransformerTypeConfig::CreditCard => "credit-card",
+                                TransformerTypeConfig::Redacted(_) => "redacted",
+                                TransformerTypeConfig::Transient => "transient",
+                                TransformerTypeConfig::CustomWasm(_) => "custom-wasm",
+                            });
+                        }
                     }
-                }
 
-                for (idx, transformer_name) in transformers.iter().enumerate() {
-                    props.insert(format!("transformer_{}", idx), transformer_name.to_string());
+                    for (idx, transformer_name) in transformers.iter().enumerate() {
+                        props.insert(format!("transformer_{}", idx), transformer_name.to_string());
+                    }
                 }
             }
             None => {}

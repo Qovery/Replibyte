@@ -85,19 +85,21 @@ where
             datastore.set_compression(source.compression.unwrap_or(true));
 
             // Match the transformers from the config
-            let transformers = source
-                .transformers
-                .iter()
-                .flat_map(|transformer| {
-                    transformer.columns.iter().map(|column| {
-                        column.transformer.transformer(
-                            transformer.database.as_str(),
-                            transformer.table.as_str(),
-                            column.name.as_str(),
-                        )
+            let transformers = match &source.transformers {
+                Some(transformers) => transformers
+                    .iter()
+                    .flat_map(|transformer| {
+                        transformer.columns.iter().map(|column| {
+                            column.transformer.transformer(
+                                transformer.database.as_str(),
+                                transformer.table.as_str(),
+                                column.name.as_str(),
+                            )
+                        })
                     })
-                })
-                .collect::<Vec<_>>();
+                    .collect::<Vec<_>>(),
+                None => vec![],
+            };
 
             let empty_config = vec![];
             let skip_config = match &source.skip {
