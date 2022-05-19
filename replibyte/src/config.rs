@@ -202,7 +202,7 @@ impl DatastoreLocalDiskConfig {
 pub struct SourceConfig {
     pub connection_uri: Option<String>,
     pub compression: Option<bool>,
-    pub transformers: Vec<TransformerConfig>,
+    pub transformers: Option<Vec<TransformerConfig>>,
     pub skip: Option<Vec<SkipConfig>>,
     pub database_subset: Option<DatabaseSubsetConfig>,
 }
