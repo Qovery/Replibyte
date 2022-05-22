@@ -210,13 +210,6 @@ impl Datastore for S3 {
         .map_err(|err| Error::from(err))
     }
 
-    fn index_file_exists(&self) -> bool {
-        match get_object(&self.client, &self.bucket, INDEX_FILE_NAME) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
-    }
-
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
         write_objects(
             self,
@@ -456,8 +449,7 @@ fn create_bucket<'a, S: AsRef<str>>(
     match result {
         Ok(_) => {}
         Err(err) => {
-            println!("{}", err);
-            error!("{}", err);
+            error!("{}", err.to_string());
             return Err(S3Error::FailedToCreateBucket { bucket });
         }
     }
@@ -504,7 +496,8 @@ fn create_object<'a>(
             .send(),
     );
 
-    if let Err(_) = result {
+    if let Err(err) = result {
+        error!("{}", err.to_string());
         return Err(S3Error::FailedObjectUpload { bucket, key });
     }
 
@@ -532,7 +525,7 @@ fn list_objects<'a>(
     let objects = match objects {
         Ok(objects) => objects,
         Err(err) => {
-            error!("{}", err);
+            error!("{}", err.to_string());
             return Err(S3Error::FailedToListObjects { bucket });
         }
     };
@@ -599,7 +592,7 @@ fn delete_directory<'a>(
         ) {
             Ok(_) => Ok(()),
             Err(err) => {
-                eprintln!("{}", err);
+                error!("{}", err.to_string());
                 Err(S3Error::FailedToDeleteDirectory { bucket, directory })
             }
         }
@@ -617,9 +610,13 @@ mod tests {
     use crate::cli::DumpDeleteArgs;
     use crate::config::{AwsCredentials, Endpoint};
     use crate::connector::Connector;
-    use crate::datastore::migration::Migration;
-    use crate::datastore::s3::{create_object, delete_bucket, delete_object, get_object, S3Error};
+    use crate::datastore::s3::{
+        create_bucket, create_object, delete_bucket, delete_object, get_object, S3Error,
+    };
     use crate::datastore::{Datastore, Dump, INDEX_FILE_NAME};
+    use crate::migration::rename_backups_to_dumps::RenameBackupsToDump;
+    use crate::migration::update_version_number::UpdateVersionNumber;
+    use crate::migration::Migrator;
     use crate::utils::epoch_millis;
     use crate::S3;
 
@@ -647,7 +644,7 @@ mod tests {
 
         S3::aws(
             bucket.to_string(),
-            None,
+            Some(REGION.to_string()),
             None,
             Some(AwsCredentials {
                 access_key_id,
@@ -1137,6 +1134,10 @@ mod tests {
             ]
         });
 
+        // create a test bucket
+        assert!(create_bucket(&s3.client, bucket.as_str(), Some(REGION.to_string())).is_ok());
+
+        // create a test metadata.json file
         assert!(create_object(
             &s3.client,
             bucket.as_str(),
@@ -1146,14 +1147,21 @@ mod tests {
         .is_ok());
 
         let mut s3: Box<dyn Datastore> = Box::new(s3);
-        let migration = Migration::new(&s3, "0.1.0");
-        assert!(migration.run().is_ok());
+        let migrator = Migrator::new(
+            "0.7.3",
+            &s3,
+            vec![
+                Box::new(UpdateVersionNumber::new("0.7.3")),
+                Box::new(RenameBackupsToDump::default()),
+            ],
+        );
+        assert!(migrator.migrate().is_ok());
 
         let _ = s3.init().expect("s3 init failed");
 
         // assert
         assert!(s3.index_file().is_ok());
-        assert_eq!(s3.index_file().unwrap().v, Some("0.1.0".to_string()));
+        assert_eq!(s3.index_file().unwrap().v, Some("0.7.3".to_string()));
         assert_eq!(s3.index_file().unwrap().dumps.len(), 2);
         assert_eq!(
             s3.index_file().unwrap().dumps.get(0),

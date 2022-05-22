@@ -97,41 +97,7 @@ docker run -it --name replibyte \
 
 ## Running in a cloud environment
 
-```shell
-docker run replibyte:latest replibyte
-
-
-Replibyte is a tool to seed your databases with your production data while keeping sensitive data safe, just pass `-h`
-
-USAGE:
-    replibyte [OPTIONS] --config <configuration file> <SUBCOMMAND>
-
-OPTIONS:
-    -c, --config <configuration file>    replibyte configuration file
-    -h, --help                           Print help information
-    -n, --no-telemetry                   disable telemetry
-    -V, --version                        Print version information
-
-SUBCOMMANDS:
-    dump           all dump commands
-    help           Print this message or the help of the given subcommand(s)
-    transformer    all transformers command
-```
-
-If you want to run your Replibyte command properly, you will need to pass all the arguments with the `docker run -e` parameter. E.g:
-
-```shell
-docker run -e S3_ACCESS_KEY_ID=XXX \
-           -e S3_SECRET_ACCESS_KEY=YYY \
-           -e S3_REGION=us-east-2 \
-           -e S3_BUCKET=my-test-bucket \
-           -e SOURCE_CONNECTION_URI=postgres://... \
-           -e DESTINATION_CONNECTION_URI=postgres://... \
-           -e ENCRYPTION_SECRET=itIsASecret \
-           replibyte:latest replibyte dump create
-```
-
-## Deploy container
+### Deploy with Qovery
 
 ---
 

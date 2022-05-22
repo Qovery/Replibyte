@@ -15,7 +15,6 @@ use crate::types::Bytes;
 use crate::utils::get_replibyte_version;
 
 pub mod local_disk;
-pub mod migration;
 pub mod s3;
 
 const INDEX_FILE_NAME: &str = "metadata.json";
@@ -26,7 +25,6 @@ pub trait Datastore: Connector + Send + Sync {
     fn raw_index_file(&self) -> Result<Value, Error>;
     fn write_index_file(&self, index_file: &IndexFile) -> Result<(), Error>;
     fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error>;
-    fn index_file_exists(&self) -> bool;
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error>;
     fn read(
         &self,

@@ -108,12 +108,6 @@ impl Datastore for LocalDisk {
         serde_json::to_writer(file, raw_index_file).map_err(|err| Error::from(err))
     }
 
-    fn index_file_exists(&self) -> bool {
-        let index_file_path = format!("{}/{}", self.dir, INDEX_FILE_NAME);
-
-        Path::new(index_file_path.as_str()).exists()
-    }
-
     fn write(&self, file_part: u16, data: types::Bytes) -> Result<(), Error> {
         // compress data?
         let data = if self.compression_enabled() {
@@ -267,7 +261,11 @@ mod tests {
     use crate::{
         cli::DumpDeleteArgs,
         connector::Connector,
-        datastore::{migration::Migration, Datastore, Dump, ReadOptions, INDEX_FILE_NAME},
+        datastore::{Datastore, Dump, ReadOptions, INDEX_FILE_NAME},
+        migration::{
+            rename_backups_to_dumps::RenameBackupsToDump,
+            update_version_number::UpdateVersionNumber, Migrator,
+        },
         utils::epoch_millis,
     };
 
@@ -559,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_add_index_file_version_and_rename_backups_to_dumps() {
+    fn test_migrate_update_index_file_version_and_rename_backups_to_dumps() {
         // arrange
         let dir = tempdir().expect("cannot create tempdir");
         let file = OpenOptions::new()
@@ -598,8 +596,15 @@ mod tests {
         let mut local_disk: Box<dyn Datastore> =
             Box::new(LocalDisk::new(dir.path().to_str().unwrap().to_string()));
 
-        let migration = Migration::new(&local_disk, "0.1.0");
-        assert!(migration.run().is_ok());
+        let migrator = Migrator::new(
+            "0.7.3",
+            &local_disk,
+            vec![
+                Box::new(UpdateVersionNumber::new("0.7.3")),
+                Box::new(RenameBackupsToDump::default()),
+            ],
+        );
+        assert!(migrator.migrate().is_ok());
 
         let _ = local_disk.init().expect("local_disk init failed");
 
@@ -607,7 +612,7 @@ mod tests {
         assert!(local_disk.index_file().is_ok());
         assert_eq!(
             local_disk.index_file().unwrap().v,
-            Some("0.1.0".to_string())
+            Some("0.7.3".to_string())
         );
         assert_eq!(local_disk.index_file().unwrap().dumps.len(), 2);
         assert_eq!(
