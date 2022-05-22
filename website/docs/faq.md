@@ -41,9 +41,9 @@ and
 replibyte -c conf.yaml backup run -s postgres -f dump.sql
 ```
 
-### How RepliByte can list the backups? Is there an API?
+### How RepliByte can list the dumps? Is there an API?
 
-There is no API, RepliByte is fully stateless and store the backup list into the datastore (E.g. S3) via an metadata file.
+There is no API, RepliByte is fully stateless and store the dump list into the datastore (E.g. S3) via an metadata file.
 
 ### How can I contact you?
 

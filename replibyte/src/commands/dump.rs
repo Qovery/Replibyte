@@ -35,28 +35,27 @@ use clap::CommandFactory;
 
 /// List all dumps
 pub fn list(datastore: &mut Box<dyn Datastore>) -> Result<(), Error> {
-    let _ = datastore.init()?;
     let mut index_file = datastore.index_file()?;
 
-    if index_file.backups.is_empty() {
+    if index_file.dumps.is_empty() {
         println!("<empty> no dumps available\n");
         return Ok(());
     }
 
-    index_file.backups.sort_by(|a, b| a.cmp(b).reverse());
+    index_file.dumps.sort_by(|a, b| a.cmp(b).reverse());
 
     let mut table = table();
     table.set_titles(row!["name", "size", "when", "compressed", "encrypted"]);
     let formatter = Formatter::new();
     let now = epoch_millis();
 
-    for backup in index_file.backups {
+    for dump in index_file.dumps {
         table.add_row(row![
-            backup.directory_name.as_str(),
-            to_human_readable_unit(backup.size),
-            formatter.convert(Duration::from_millis((now - backup.created_at) as u64)),
-            backup.compressed,
-            backup.encrypted,
+            dump.directory_name.as_str(),
+            to_human_readable_unit(dump.size),
+            formatter.convert(Duration::from_millis((now - dump.created_at) as u64)),
+            dump.compressed,
+            dump.encrypted,
         ]);
     }
 

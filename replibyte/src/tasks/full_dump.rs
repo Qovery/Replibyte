@@ -44,9 +44,6 @@ where
         // initialize the source
         let _ = self.source.init()?;
 
-        // initialize the datastore
-        let _ = self.datastore.init()?;
-
         let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(1);
         let datastore = self.datastore;
 

@@ -10,6 +10,8 @@ use std::{env, thread};
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use migration::{migrations, Migrator};
+use utils::get_replibyte_version;
 
 use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
@@ -27,6 +29,7 @@ mod config;
 mod connector;
 mod datastore;
 mod destination;
+mod migration;
 mod runtime;
 mod source;
 mod tasks;
@@ -128,6 +131,11 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
         )?),
         DatastoreConfig::LocalDisk(config) => Box::new(LocalDisk::new(config.dir()?)),
     };
+
+    let migrator = Migrator::new(get_replibyte_version(), &datastore, migrations());
+    let _ = migrator.migrate()?;
+
+    let _ = datastore.init()?;
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 

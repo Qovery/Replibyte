@@ -45,18 +45,15 @@ where
         // initialize the destination
         let _ = self.destination.init()?;
 
-        // initialize the datastore
-        let _ = self.datastore.init()?;
-
         // bound to 1 to avoid eating too much memory if we download the dump faster than we ingest it
         let (tx, rx) = mpsc::sync_channel::<Message<Bytes>>(1);
         let datastore = self.datastore;
 
         let mut index_file = datastore.index_file()?;
-        let backup = index_file.find_backup(&self.read_options)?;
+        let dump = index_file.find_dump(&self.read_options)?;
 
         // init progress
-        progress_callback(0, backup.size);
+        progress_callback(0, dump.size);
 
         let read_options = self.read_options.clone();
 
@@ -82,7 +79,7 @@ where
                 Err(err) => panic!("{:?}", err), // FIXME what should I do here?
             };
 
-            progress_callback(data.len(), backup.size);
+            progress_callback(data.len(), dump.size);
 
             let _ = self.destination.write(data)?;
         }
@@ -90,7 +87,7 @@ where
         // wait for end of download execution
         let _ = join_handle.join(); // FIXME catch result here
 
-        progress_callback(backup.size, backup.size);
+        progress_callback(dump.size, dump.size);
 
         Ok(())
     }
