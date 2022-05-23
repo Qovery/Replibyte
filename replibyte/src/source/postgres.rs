@@ -86,8 +86,7 @@ impl<'a> Source for Postgres<'a> {
         let mut process = Command::new("pg_dump")
             .env("PGPASSWORD", self.password)
             .args([
-                "--column-inserts", // dump data as INSERT commands with column names
-                "--no-owner",       // skip restoration of object ownership
+                "--no-owner", // skip restoration of object ownership
                 "-h",
                 self.host,
                 "-p",
