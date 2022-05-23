@@ -2,7 +2,6 @@ on:
   release:
     types:
       - published
-      - created
 
 jobs:
   build-linux:
@@ -85,7 +84,8 @@ jobs:
 
   build-mac:
     runs-on: ubuntu-latest
-
+    outputs:
+      sha256sum: ${{ steps.prep.outputs.sha256sum }}
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -106,8 +106,8 @@ jobs:
             joseluisq/rust-linux-darwin-builder:1.60.0 \
             sh -c "CC=o64-clang CXX=o64-clang++ cargo build --release --target x86_64-apple-darwin"
 
-      - name: Prepare release
-        id: prep
+      - id: prep
+        name: Prepare release
         run: |
           cd target/x86_64-apple-darwin/release
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
@@ -117,7 +117,7 @@ jobs:
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
           CHECKSUM=$(sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1)
           echo "${CHECKSUM}" > ${FILE}.zip.sha256sum
-          echo "::set-output name=sha256::${CHECKSUM}"
+          printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -127,23 +127,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    outputs:
-      sha256: ${{ steps.prep.outputs.sha256 }}
-
   publish-on-homebrew:
     runs-on: ubuntu-latest
-    needs: [build-mac]
+    needs: build-mac
     steps:
-      - name: Extract version
-        id: extract-version
+      - name: Extract version and sha256sum
+        id: extract
         run: |
           printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
+          printf "::set-output name=%s::%s\n" sha256sum "${{ needs.build-mac.outputs.sha256sum }}"
       - uses: mislav/bump-homebrew-formula-action@v2
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: replibyte
           homebrew-tap: Qovery/homebrew-replibyte
-          download-url: https://github.com/Qovery/replibyte/releases/download/${{ steps.extract-version.outputs.tag-name }}/replibyte_${{ steps.extract-version.outputs.tag-name }}_x86_64-apple-darwin.zip
-          download-sha256: ${{ needs.build-mac.outputs.sha256 }}
+          download-url: https://github.com/Qovery/replibyte/releases/download/${{ steps.extract.outputs.tag-name }}/replibyte_${{ steps.extract.outputs.tag-name }}_x86_64-apple-darwin.zip
+          download-sha256: ${{ steps.extract.outputs.sha256sum }}
         env:
           COMMITTER_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
