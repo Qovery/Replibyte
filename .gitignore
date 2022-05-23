@@ -117,3 +117,5 @@ yarn-debug.log*
 yarn-error.log*
 
 /my-datastore
+
+*.release
