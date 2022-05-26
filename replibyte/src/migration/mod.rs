@@ -1,6 +1,8 @@
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
+use log::info;
+
 use crate::datastore::Datastore;
 use crate::migration::rename_backups_to_dumps::RenameBackupsToDump;
 use crate::migration::update_version_number::UpdateVersionNumber;
@@ -79,13 +81,21 @@ impl<'a> Migrator<'a> {
 
     /// run all registered migrations when the minimal version is matched.
     pub fn migrate(&self) -> Result<(), Error> {
-        for migration in &self.migrations {
-            if self.should_run_migration(migration) {
-                let _ = migration.run(&self.datastore)?;
-            }
+        match self.datastore.raw_index_file() {
+            Ok(_) => {
+                for migration in &self.migrations {
+                    if self.should_run_migration(migration) {
+                        let _ = migration.run(&self.datastore)?;
+                    }
+                }
+                Ok(())
+            },
+            Err(err) => {
+                // raw_index_file returns an error when we don't have a metadata.json file, in this case we don't need to run migrations.
+                info!("migrate: skip migrate '{}'", err.to_string());
+                Ok(())
+            },
         }
-
-        Ok(())
     }
 
     fn should_run_migration(&self, migration: &Box<dyn Migration>) -> bool {
