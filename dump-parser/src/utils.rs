@@ -161,7 +161,9 @@ fn list_statements(query: &str) -> Vec<Statement> {
 
     let mut is_statement_complete = true;
     let mut is_comment_line = false;
+    let mut is_partial_comment_line = false;
     let mut start_index = 0usize;
+    let mut previous_chars_are_whitespaces = true;
     for (idx, byte_char) in query.bytes().enumerate() {
         let next_idx = idx + 1;
 
@@ -178,8 +180,9 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 stack.clear();
                 is_statement_complete = true;
                 is_comment_line = false;
+                previous_chars_are_whitespaces = true;
             }
-            b'\'' if !is_comment_line => {
+            b'\'' if !is_comment_line && !is_partial_comment_line => {
                 if stack.get(0) == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
                         // do nothing because the ' char is escaped
@@ -191,13 +194,18 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 }
                 is_statement_complete = false;
                 is_comment_line = false;
+                previous_chars_are_whitespaces = false;
             }
-            b'(' if !is_comment_line && stack.get(0) != Some(&b'\'') => {
+            b'(' if !is_comment_line
+                && !is_partial_comment_line
+                && stack.get(0) != Some(&b'\'') =>
+            {
                 stack.insert(0, byte_char);
                 is_statement_complete = false;
                 is_comment_line = false;
+                previous_chars_are_whitespaces = false;
             }
-            b')' if !is_comment_line => {
+            b')' if !is_comment_line && !is_partial_comment_line => {
                 if stack.get(0) == Some(&b'(') {
                     let _ = stack.remove(0);
                 } else if stack.get(0) != Some(&b'\'') {
@@ -206,19 +214,34 @@ fn list_statements(query: &str) -> Vec<Statement> {
 
                 is_statement_complete = false;
                 is_comment_line = false;
+                previous_chars_are_whitespaces = false;
             }
             b'-' if !is_comment_line
+                && previous_chars_are_whitespaces
                 && is_statement_complete
                 && (query.len() > next_idx)
                 && &query[next_idx..next_idx + 1] == "-" =>
             {
                 // comment
                 is_comment_line = true;
+                previous_chars_are_whitespaces = false;
             }
-            b'\n' if !is_comment_line && is_statement_complete => {
+            b'-' if !is_statement_complete
+                && (query.len() > next_idx)
+                && &query[next_idx..next_idx + 1] == "-" =>
+            {
+                // comment
+                is_partial_comment_line = true;
+                previous_chars_are_whitespaces = false;
+            }
+            b'\n' if !is_comment_line && !is_partial_comment_line && is_statement_complete => {
+                previous_chars_are_whitespaces = true;
                 sql_statements.push(Statement::NewLine);
             }
-            b';' if !is_comment_line && stack.get(0) != Some(&b'\'') => {
+            b';' if !is_comment_line
+                && !is_partial_comment_line
+                && stack.get(0) != Some(&b'\'') =>
+            {
                 // end of query
                 sql_statements.push(Statement::Query(QueryStatement {
                     valid: stack.is_empty(),
@@ -232,8 +255,20 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 stack.clear();
                 is_statement_complete = true;
                 is_comment_line = false;
+                is_partial_comment_line = false;
+                previous_chars_are_whitespaces = false;
             }
-            _ => {}
+            b'\n' => {
+                previous_chars_are_whitespaces = true; // reset
+                is_partial_comment_line = false; // reset
+            }
+            b' ' | b'\t' => {
+                // do nothing
+            }
+            _ => {
+                previous_chars_are_whitespaces = false;
+                is_statement_complete = false;
+            }
         }
     }
 
@@ -651,7 +686,7 @@ CREATE TABLE public.toto2 (
         }
 
         let s = list_statements("INSERT INTO \n(first_name, last_name) VALUES ('jo\nhn', 'doe');SELECT * FROM toto\n\n;INSERT INTO (first_name, last_name, age) VAL\nUES ('john', 'doe', 18)\n\n\n\n;");
-        assert_eq!(s.len(), 6);
+        assert_eq!(s.len(), 3);
 
         match s.get(0).unwrap() {
             Statement::NewLine => {}
@@ -686,7 +721,7 @@ CREATE TABLE public.toto2 (
         }
 
         let s = list_statements("INSERT INTO \n(first_name, last_name VALUES ('jo\nhn', 'do''e');SELECT * FROM toto\n\n;INSERT INTO (first_name, last_name, age) VAL\nUES ('jo''hn', 'doe', 18)\n\n\n\n;");
-        assert_eq!(s.len(), 6);
+        assert_eq!(s.len(), 3);
 
         match s.get(0).unwrap() {
             Statement::NewLine => {}
@@ -706,7 +741,7 @@ CREATE TABLE public.toto2 (
                 assert!(false);
             }
             Statement::Query(s) => {
-                assert!(!s.valid);
+                assert!(s.valid);
             }
         }
 
@@ -717,6 +752,157 @@ CREATE TABLE public.toto2 (
             }
             Statement::Query(s) => {
                 assert!(s.valid);
+            }
+        }
+    }
+
+    #[test]
+    fn check_query_line_with_comment_at_the_end() {
+        let s = list_statements(
+            r#"
+-- this is a first comment
+-- this is a second comment
+SELECT * -- this is a third comment
+FROM user -- this is a fourth comment
+-- this is a fifth comment
+WHERE age > 18;
+"#,
+        );
+
+        match s.get(0).unwrap() {
+            Statement::NewLine => {
+                assert!(true);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+
+        match s.get(1).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(true);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+
+        match s.get(2).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(true);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+
+        match s.get(3).unwrap() {
+            Statement::NewLine => {
+                assert!(true);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(q) => {
+                assert!(q.valid);
+            }
+        }
+
+        match s.get(4).unwrap() {
+            Statement::NewLine => {
+                assert!(true);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+    }
+
+    #[test]
+    fn check_create_or_replace_function() {
+        let s = list_statements(
+            r#"
+-- Updates denormalized data in associated DealContact rows whenever a new
+-- DealContact is created.
+CREATE OR REPLACE FUNCTION deal_contact_created_trigger_fn ()
+  RETURNS TRIGGER
+  AS $deal_contact_created_trigger_fn$
+BEGIN
+  -- Only update the denormalized fields on a DealContact if an existing
+  -- platform user matches the userUuid or email.
+  IF NOT EXISTS (
+    SELECT
+      1
+    FROM
+      "User"
+    WHERE
+      "User"."uuid" = NEW."userUuid"
+      OR LOWER("User"."email") = LOWER(NEW."email")
+    LIMIT 1) THEN
+    -- If a matching platform user doesn't exist, then just return the newly
+    -- created DealContact as-is (NEW variable).
+    RETURN NEW;
+  END IF;
+        "#,
+        );
+
+        match s.get(0).unwrap() {
+            Statement::NewLine => {
+                assert!(true);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+
+        match s.get(1).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(true);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+
+        match s.get(2).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(true);
+            }
+            Statement::Query(_) => {
+                assert!(false);
+            }
+        }
+
+        match s.get(3).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(q) => {
+                assert!(q.valid);
             }
         }
     }
