@@ -429,6 +429,7 @@ mod tests {
         assert!(local_disk.write(1, bytes).is_ok());
         assert_eq!(local_disk.index_file().unwrap().dumps.len(), 1);
         assert!(Path::new(&format!("{}/dump-1", dir.path().to_str().unwrap())).exists());
+        update_dump_date(&local_disk, "dump-1".to_string(), 3);
 
         // create dump 2
         local_disk.set_dump_name("dump-2".to_string());
@@ -436,6 +437,7 @@ mod tests {
         assert!(local_disk.write(1, bytes).is_ok());
         assert_eq!(local_disk.index_file().unwrap().dumps.len(), 2);
         assert!(Path::new(&format!("{}/dump-2", dir.path().to_str().unwrap())).exists());
+        update_dump_date(&local_disk, "dump-2".to_string(), 2);
 
         // create dump 3
         local_disk.set_dump_name("dump-3".to_string());
@@ -443,6 +445,7 @@ mod tests {
         assert!(local_disk.write(1, bytes).is_ok());
         assert_eq!(local_disk.index_file().unwrap().dumps.len(), 3);
         assert!(Path::new(&format!("{}/dump-3", dir.path().to_str().unwrap())).exists());
+        update_dump_date(&local_disk, "dump-3".to_string(), 1);
 
         assert!(local_disk
             .delete(&DumpDeleteArgs {
