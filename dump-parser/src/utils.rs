@@ -219,16 +219,19 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'-' if !is_comment_line
                 && previous_chars_are_whitespaces
                 && is_statement_complete
-                && (query.len() > next_idx)
-                && &query[next_idx..next_idx + 1] == "-" =>
+                && query.as_bytes().len() > next_idx
+                // query.chars().nth(idx) hurts performance O(n) TO FIX?
+                && query.chars().nth(next_idx) == Some('-') =>
             {
                 // comment
                 is_comment_line = true;
                 previous_chars_are_whitespaces = false;
             }
+            // use grapheme instead of code points or bytes?
             b'-' if !is_statement_complete
-                && (query.len() > next_idx)
-                && &query[next_idx..next_idx + 1] == "-" =>
+                && query.as_bytes().len() > next_idx
+                // query.chars().nth(idx) hurts performance O(n) TO FIX?
+                && query.chars().nth(next_idx) == Some('-') =>
             {
                 // comment
                 is_partial_comment_line = true;

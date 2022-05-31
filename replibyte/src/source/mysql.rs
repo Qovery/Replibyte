@@ -395,6 +395,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
+    use crate::connector::Connector;
     use crate::source::SourceOptions;
     use crate::transformer::{transient::TransientTransformer, Transformer};
     use crate::Source;
@@ -411,7 +412,9 @@ mod tests {
 
     #[test]
     fn connect() {
-        let p = get_mysql();
+        let mut p = get_mysql();
+        assert!(p.init().is_ok());
+
         let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
         let transformers = vec![t1];
         let source_options = SourceOptions {
