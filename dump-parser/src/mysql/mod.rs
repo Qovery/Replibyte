@@ -631,6 +631,17 @@ pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&st
     None
 }
 
+pub fn get_single_quoted_string_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&str> {
+    if let Some(token) = tokens.get(pos) {
+        return match token {
+            Token::SingleQuotedString(quoted_string) => Some(quoted_string.as_str()),
+            _ => None,
+        };
+    }
+
+    None
+}
+
 pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str> {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
@@ -717,8 +728,24 @@ mod tests {
     use crate::mysql::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
         get_tokens_from_query_str, match_keyword_at_position, trim_pre_whitespaces, Token,
-        Tokenizer, Whitespace,
+        Tokenizer, Whitespace, get_single_quoted_string_value_at_position,
     };
+
+    #[test]
+    fn test_tokenize_single_quoted_string() {
+        // single quoted strings must end with a commar or a closing parenthese.
+        let q = "'People\'sRepublic',";
+        let tokenizer = Tokenizer::new(q);
+        let mut chars = q.chars().peekable();
+        let single_quoted_string = tokenizer.tokenize_single_quoted_string(&mut chars).unwrap();
+        assert_eq!(single_quoted_string, "People\'sRepublic".to_string());
+
+        let q = "'People\'sRepublic')";
+        let tokenizer = Tokenizer::new(q);
+        let mut chars = q.chars().peekable();
+        let single_quoted_string = tokenizer.tokenize_single_quoted_string(&mut chars).unwrap();
+        assert_eq!(single_quoted_string, "People\'sRepublic".to_string());
+    }
 
     #[test]
     fn tokenizer_for_create_table_query() {
@@ -841,51 +868,10 @@ CREATE TABLE `customer_store` (
     #[test]
     fn tokenize_insert_into_with_special_chars() {
         let q = "INSERT INTO `country` VALUES ('CHN','China','Asia','Eastern Asia',9572900.00,-1523,1277558000,71.4,982268.00,917719.00,'Zhongquo','People\'sRepublic','Jiang Zemin',1891,'CN');";
-        // let q = "INSERT INTO `country` VALUES ('People\'sRepublic','Another quoted\' string');";
-        // let q = "INSERT INTO `country` VALUES (-1523,1277558000);";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
         assert!(tokens_result.is_ok());
-
-        // let expected = vec![
-        //     Token::make_keyword("INSERT"),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::make_keyword("INTO"),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::Char('`'),
-        //     Token::make_keyword("country"),
-        //     Token::Char('`'),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::make_keyword("VALUES"),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::LParen,
-        //     Token::Minus,
-        //     Token::Number("1523".to_string(), false),
-        //     Token::Comma,
-        //     Token::Number("1277558000".to_string(), false),
-        //     Token::RParen,
-        //     Token::SemiColon,
-        // ];
-
-        // let expected = vec![
-        //     Token::make_keyword("INSERT"),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::make_keyword("INTO"),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::Char('`'),
-        //     Token::make_keyword("country"),
-        //     Token::Char('`'),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::make_keyword("VALUES"),
-        //     Token::Whitespace(Whitespace::Space),
-        //     Token::LParen,
-        //     Token::SingleQuotedString("People\'sRepublic".to_string()),
-        //     Token::Comma,
-        //     Token::SingleQuotedString("Another quoted\' string".to_string()),
-        //     Token::RParen,
-        //     Token::SemiColon,
-        // ];
 
         let expected = vec![
             Token::make_keyword("INSERT"),
@@ -964,16 +950,14 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,'2022-04-13
 
     #[test]
     fn test_get_column_values_from_insert_into_query() {
-        let q = r"
-INSERT INTO `customers` (`id`, `first_name`, `last_name`, `email`, `currency`, `accepts_marketing`, `birthdate`, `created_at`, `updated_at`)
-VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,NULL,'2022-04-13 20:29:23','2022-04-13 20:29:23');
-";
+        let q = "INSERT INTO `customers` (`id`, `first_name`, `last_name`, `email`, `currency`, `accepts_marketing`, `birthdate`, `created_at`, `updated_at`) VALUES (1,'Stanford','People\'sRepublic','alaina.moore@example.net','EUR',1,NULL,'2022-04-13 20:29:23','2022-04-13 20:29:23');";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
         assert_eq!(tokens_result.is_ok(), true);
 
-        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        let tokens = tokens_result.unwrap();
+        let tokens = trim_pre_whitespaces(tokens);
         let column_values = get_column_values_from_insert_into_query(&tokens);
 
         assert_eq!(
@@ -981,7 +965,7 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,NULL,'2022-
             vec![
                 &Token::Number("1".to_string(), false),
                 &Token::SingleQuotedString("Stanford".to_string()),
-                &Token::SingleQuotedString("Stiedemann".to_string()),
+                &Token::SingleQuotedString("People\'sRepublic".to_string()),
                 &Token::SingleQuotedString("alaina.moore@example.net".to_string()),
                 &Token::SingleQuotedString("EUR".to_string()),
                 &Token::Number("1".to_string(), false),
@@ -1032,5 +1016,21 @@ VALUES ('Romaric', true);
                 &Token::make_word("true", None),
             ]
         );
+    }
+
+    #[test]
+    fn test_get_single_quoted_string_value_at_position() {
+        let q = r"
+INSERT INTO `customers` (`first_name`, `is_valid`)
+VALUES ('Romaric', true);
+";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        assert_eq!("customers", get_single_quoted_string_value_at_position(&tokens, 4).unwrap());
+        assert!(get_single_quoted_string_value_at_position(&tokens, 0).is_none());
     }
 }
