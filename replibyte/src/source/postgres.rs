@@ -83,6 +83,7 @@ impl<'a> Source for Postgres<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
+        // TODO: as for mysql we can exclude tables directly here so we can remove the skip_tables_map checks
         let mut process = Command::new("pg_dump")
             .env("PGPASSWORD", self.password)
             .args([

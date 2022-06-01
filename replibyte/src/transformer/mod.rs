@@ -46,6 +46,7 @@ pub trait Transformer {
     fn database_and_table_name(&self) -> String {
         format!("{}.{}", self.database_name(), self.table_name())
     }
+
     fn database_and_table_and_column_name(&self) -> String {
         format!(
             "{}.{}.{}",
@@ -54,5 +55,14 @@ pub trait Transformer {
             self.column_name()
         )
     }
+
+    fn table_and_column_name(&self) -> String {
+        format!(
+            "{}.{}",
+            self.table_name(),
+            self.column_name()
+        )
+    }
+
     fn transform(&self, column: Column) -> Column;
 }
