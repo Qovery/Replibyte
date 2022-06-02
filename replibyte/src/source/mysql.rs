@@ -6,8 +6,8 @@ use std::process::{Command, Stdio};
 use dump_parser::mysql::Keyword::NoKeyword;
 use dump_parser::mysql::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-    get_tokens_from_query_str, match_keyword_at_position, Keyword,
-    Token, get_single_quoted_string_value_at_position,
+    get_single_quoted_string_value_at_position, get_tokens_from_query_str,
+    match_keyword_at_position, Keyword, Token,
 };
 use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
 
@@ -21,12 +21,8 @@ use super::SourceOptions;
 
 #[derive(Debug, PartialEq)]
 enum RowType {
-    InsertInto {
-        table_name: String,
-    },
-    CreateTable {
-        table_name: String,
-    },
+    InsertInto { table_name: String },
+    CreateTable { table_name: String },
     Others,
 }
 
@@ -80,17 +76,22 @@ impl<'a> Source for Mysql<'a> {
             self.username,
             password,
             "--add-drop-database", // add DROP DATABASE statement before each CREATE DATABASE statement
-            "--add-drop-table", // add DROP TABLE statement before each CREATE TABLE statement
+            "--add-drop-table",    // add DROP TABLE statement before each CREATE TABLE statement
             "--skip-extended-insert", // have a row by INSERT INTO statement
-            "--complete-insert", // have column names in INSERT INTO rows
+            "--complete-insert",   // have column names in INSERT INTO rows
             "--single-transaction", // https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html#option_mysqldump_single-transaction
             "--quick", // reads out large tables in a way that doesn't require having enough RAM to fit the full table in memory
             "--databases",
             self.database,
         ];
 
-        let ignore_tables_args: Vec<String> = options.skip_config.iter().map(|cfg| format!("--ignore-table={}.{}", cfg.database, cfg.table)).collect();
-        let mut ignore_tables_args: Vec<&str> = ignore_tables_args.iter().map(String::as_str).collect();
+        let ignore_tables_args: Vec<String> = options
+            .skip_config
+            .iter()
+            .map(|cfg| format!("--ignore-table={}.{}", cfg.database, cfg.table))
+            .collect();
+        let mut ignore_tables_args: Vec<&str> =
+            ignore_tables_args.iter().map(String::as_str).collect();
 
         dump_args.append(&mut ignore_tables_args);
 
@@ -123,26 +124,20 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
         HashMap::with_capacity(options.transformers.len());
 
     for transformer in options.transformers {
-        let _ = transformer_by_db_and_table_and_column_name.insert(
-            transformer.table_and_column_name(),
-            transformer,
-        );
+        let _ = transformer_by_db_and_table_and_column_name
+            .insert(transformer.table_and_column_name(), transformer);
     }
 
     match list_sql_queries_from_dump_reader(reader, |query| {
         let tokens = get_tokens_from_query_str(query);
 
         match get_row_type(&tokens) {
-            RowType::InsertInto {
-                table_name,
-            } => {
-                if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    let (original_columns, columns) = transform_columns(
-                        database_name.as_str(),
-                        table_name.as_str(),
-                        &tokens,
-                        &transformer_by_db_and_table_and_column_name,
-                    );
+            RowType::InsertInto { table_name } => {
+                let (original_columns, columns) = transform_columns(
+                    table_name.as_str(),
+                    &tokens,
+                    &transformer_by_db_and_table_and_column_name,
+                );
 
                 query_callback(
                     to_query(
@@ -161,9 +156,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                     ),
                 )
             }
-            RowType::CreateTable {
-                table_name: _,
-            } => {
+            RowType::CreateTable { table_name: _ } => {
                 no_change_query_callback(query_callback.borrow_mut(), query);
             }
             RowType::Others => {
@@ -247,15 +240,13 @@ fn transform_columns(
         // get the right transformer for the right column name
         let original_column = column.clone();
 
-        let table_and_column_name =
-            format!("{}.{}", table_name, *column_name);
+        let table_and_column_name = format!("{}.{}", table_name, *column_name);
 
-        let column = match transformer_by_db_and_table_and_column_name
-            .get(table_and_column_name.as_str())
-        {
-            Some(transformer) => transformer.transform(column), // apply transformation on the column
-            None => column,
-        };
+        let column =
+            match transformer_by_db_and_table_and_column_name.get(table_and_column_name.as_str()) {
+                Some(transformer) => transformer.transform(column), // apply transformation on the column
+                None => column,
+            };
 
         original_columns.push(original_column);
         columns.push(column);
@@ -338,7 +329,11 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
         "{} `{}` ({}) VALUES ({});",
         query_prefix,
         query.table_name.as_str(),
-        column_names.iter().map(|column_name| format!("`{}`", column_name)).collect::<Vec<String>>().join(", "),
+        column_names
+            .iter()
+            .map(|column_name| format!("`{}`", column_name))
+            .collect::<Vec<String>>()
+            .join(", "),
         values.join(", "),
     );
 
@@ -347,14 +342,14 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
-    use dump_parser::mysql::Tokenizer;
     use crate::connector::Connector;
+    use crate::source::mysql::{is_create_table_statement, is_insert_into_statement, RowType};
     use crate::source::SourceOptions;
-    use crate::source::mysql::{is_insert_into_statement, RowType, is_create_table_statement};
     use crate::transformer::{transient::TransientTransformer, Transformer};
     use crate::Source;
+    use dump_parser::mysql::Tokenizer;
 
-    use super::{Mysql, get_row_type};
+    use super::{get_row_type, Mysql};
 
     fn get_mysql() -> Mysql<'static> {
         Mysql::new("127.0.0.1", 3306, "world", "root", "password")
@@ -462,7 +457,9 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
 
-        let expected_row_type = RowType::InsertInto { table_name: "customers".to_string() };
+        let expected_row_type = RowType::InsertInto {
+            table_name: "customers".to_string(),
+        };
         assert_eq!(get_row_type(&tokens), expected_row_type);
 
         let q = "CREATE TABLE `city` (
@@ -479,7 +476,9 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
 
-        let expected_row_type = RowType::CreateTable { table_name: "city".to_string() };
+        let expected_row_type = RowType::CreateTable {
+            table_name: "city".to_string(),
+        };
         assert_eq!(get_row_type(&tokens), expected_row_type);
     }
 }

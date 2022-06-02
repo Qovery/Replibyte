@@ -2,6 +2,7 @@ version: '3'
 
 services:
   source-mysql:
+    platform: linux/x86_64
     image: mysql:8
     restart: always
     command: --default-authentication-plugin=mysql_native_password
@@ -17,6 +18,7 @@ services:
     ports:
       - 3306:3306
   dest-mysql:
+    platform: linux/x86_64
     image: mysql:8
     restart: always
     command: --default-authentication-plugin=mysql_native_password
