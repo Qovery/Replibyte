@@ -3,8 +3,8 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 use crate::postgres::Keyword::{
-    Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Insert, Into as KeywordInto,
-    Key, NoKeyword, Not, Null, Only, Primary, References, Table,
+    Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
+    Into as KeywordInto, Key, NoKeyword, Not, Null, Only, Primary, References, Replace, Table,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -127,6 +127,7 @@ impl Token {
                 match word_uppercase.as_str() {
                     "ALTER" => Alter,
                     "CREATE" => Create,
+                    "REPLACE" => Replace,
                     "INSERT" => Insert,
                     "ONLY" => Only,
                     "INTO" => KeywordInto,
@@ -142,6 +143,7 @@ impl Token {
                     "FOREIGN" => Foreign,
                     "REFERENCES" => References,
                     "KEY" => Key,
+                    "FUNCTION" => Function,
                     _ => NoKeyword,
                 }
             } else {
@@ -170,6 +172,7 @@ pub struct Word {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Keyword {
     Create,
+    Replace,
     Alter,
     Only,
     Insert,
@@ -186,6 +189,7 @@ pub enum Keyword {
     Foreign,
     References,
     Key,
+    Function,
     NoKeyword,
 }
 
