@@ -159,6 +159,26 @@ fn list_statements(query: &str) -> Vec<Statement> {
     let mut sql_statements = vec![];
     let mut stack = vec![];
 
+    let is_next_char_comment = if query.find("--").is_some() {
+        // it means there is comments in this query string
+        let x: Box<dyn Fn(usize) -> bool> = if query.len() == query.chars().count() {
+            Box::new(|next_idx: usize| {
+                query.len() > next_idx && &query[next_idx..next_idx + 1] == "-"
+            })
+        } else {
+            // very low performance ... chars().nth(idx) is O(n)
+            Box::new(|next_idx: usize| {
+                query.len() > next_idx && query.chars().nth(next_idx) == Some('-')
+            })
+        };
+
+        x
+    // check if query contains multiple bytes utf-8 chars
+    } else {
+        let x: Box<dyn Fn(usize) -> bool> = Box::new(|_: usize| false);
+        x
+    };
+
     let mut is_statement_complete = true;
     let mut is_comment_line = false;
     let mut is_partial_comment_line = false;
@@ -219,20 +239,14 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'-' if !is_comment_line
                 && previous_chars_are_whitespaces
                 && is_statement_complete
-                && query.as_bytes().len() > next_idx
-                // query.chars().nth(idx) hurts performance O(n) TO FIX?
-                && query.chars().nth(next_idx) == Some('-') =>
+                && is_next_char_comment(next_idx) =>
             {
                 // comment
                 is_comment_line = true;
                 previous_chars_are_whitespaces = false;
             }
             // use grapheme instead of code points or bytes?
-            b'-' if !is_statement_complete
-                && query.as_bytes().len() > next_idx
-                // query.chars().nth(idx) hurts performance O(n) TO FIX?
-                && query.chars().nth(next_idx) == Some('-') =>
-            {
+            b'-' if !is_statement_complete && is_next_char_comment(next_idx) => {
                 // comment
                 is_partial_comment_line = true;
                 previous_chars_are_whitespaces = false;
