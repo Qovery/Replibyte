@@ -6,8 +6,8 @@ use std::process::{Command, Stdio};
 use dump_parser::mysql::Keyword::NoKeyword;
 use dump_parser::mysql::{
     get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-    get_tokens_from_query_str, get_word_value_at_position, match_keyword_at_position, Keyword,
-    Token,
+    get_tokens_from_query_str, match_keyword_at_position, Keyword,
+    Token, get_single_quoted_string_value_at_position,
 };
 use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
 
@@ -19,17 +19,12 @@ use crate::utils::{binary_exists, wait_for_command};
 
 use super::SourceOptions;
 
+#[derive(Debug, PartialEq)]
 enum RowType {
     InsertInto {
-        database_name: String,
         table_name: String,
     },
     CreateTable {
-        database_name: String,
-        table_name: String,
-    },
-    AlterTable {
-        database_name: String,
         table_name: String,
     },
     Others,
@@ -74,25 +69,33 @@ impl<'a> Source for Mysql<'a> {
         query_callback: F,
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
+        let password = &format!("-p{}", self.password);
+
+        let mut dump_args = vec![
+            "-h",
+            self.host,
+            "-P",
+            s_port.as_str(),
+            "-u",
+            self.username,
+            password,
+            "--add-drop-database", // add DROP DATABASE statement before each CREATE DATABASE statement
+            "--add-drop-table", // add DROP TABLE statement before each CREATE TABLE statement
+            "--skip-extended-insert", // have a row by INSERT INTO statement
+            "--complete-insert", // have column names in INSERT INTO rows
+            "--single-transaction", // https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html#option_mysqldump_single-transaction
+            "--quick", // reads out large tables in a way that doesn't require having enough RAM to fit the full table in memory
+            "--databases",
+            self.database,
+        ];
+
+        let ignore_tables_args: Vec<String> = options.skip_config.iter().map(|cfg| format!("--ignore-table={}.{}", cfg.database, cfg.table)).collect();
+        let mut ignore_tables_args: Vec<&str> = ignore_tables_args.iter().map(String::as_str).collect();
+
+        dump_args.append(&mut ignore_tables_args);
 
         let mut process = Command::new("mysqldump")
-            .args([
-                "-h",
-                self.host,
-                "-P",
-                s_port.as_str(),
-                "-u",
-                self.username,
-                &format!("-p{}", self.password),
-                "--add-drop-database", // add DROP DATABASE statement before each CREATE DATABASE statement
-                "--add-drop-table", // add DROP TABLE statement before each CREATE TABLE statement
-                "--skip-extended-insert", // have a row by INSERT INTO statement
-                "--complete-insert", // have column names in INSERT INTO rows
-                "--single-transaction", // https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html#option_mysqldump_single-transaction
-                "--quick", // reads out large tables in a way that doesn't require having enough RAM to fit the full table in memory
-                "--databases",
-                self.database,
-            ])
+            .args(dump_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
@@ -121,15 +124,9 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
     for transformer in options.transformers {
         let _ = transformer_by_db_and_table_and_column_name.insert(
-            transformer.database_and_table_and_column_name(),
+            transformer.table_and_column_name(),
             transformer,
         );
-    }
-
-    let mut skip_tables_map: HashMap<String, bool> =
-        HashMap::with_capacity(options.skip_config.len());
-    for skip in options.skip_config {
-        let _ = skip_tables_map.insert(format!("{}.{}", skip.database, skip.table), true);
     }
 
     match list_sql_queries_from_dump_reader(reader, |query| {
@@ -137,7 +134,6 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
         match get_row_type(&tokens) {
             RowType::InsertInto {
-                database_name,
                 table_name,
             } => {
                 if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
@@ -148,39 +144,27 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                         &transformer_by_db_and_table_and_column_name,
                     );
 
-                    query_callback(
-                        to_query(
-                            Some(database_name.as_str()),
-                            InsertIntoQuery {
-                                table_name: table_name.to_string(),
-                                columns: original_columns,
-                            },
-                        ),
-                        to_query(
-                            Some(database_name.as_str()),
-                            InsertIntoQuery {
-                                table_name: table_name.to_string(),
-                                columns,
-                            },
-                        ),
-                    )
-                }
+                query_callback(
+                    to_query(
+                        None,
+                        InsertIntoQuery {
+                            table_name: table_name.to_string(),
+                            columns: original_columns,
+                        },
+                    ),
+                    to_query(
+                        None,
+                        InsertIntoQuery {
+                            table_name: table_name.to_string(),
+                            columns,
+                        },
+                    ),
+                )
             }
             RowType::CreateTable {
-                database_name,
-                table_name,
+                table_name: _,
             } => {
-                if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    no_change_query_callback(query_callback.borrow_mut(), query);
-                }
-            }
-            RowType::AlterTable {
-                database_name,
-                table_name,
-            } => {
-                if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    no_change_query_callback(query_callback.borrow_mut(), query);
-                }
+                no_change_query_callback(query_callback.borrow_mut(), query);
             }
             RowType::Others => {
                 // other rows than `INSERT INTO ...` and `CREATE TABLE ...`
@@ -204,16 +188,15 @@ fn no_change_query_callback<F: FnMut(OriginalQuery, Query)>(query_callback: &mut
 }
 
 fn transform_columns(
-    database_name: &str,
     table_name: &str,
     tokens: &Vec<Token>,
     transformer_by_db_and_table_and_column_name: &HashMap<String, &Box<dyn Transformer>>,
 ) -> (Vec<Column>, Vec<Column>) {
     // find database name by filtering out all queries starting with
-    // INSERT INTO <database>.<table> (...)
+    // INSERT INTO `<table>` (...)
     // INSERT       -> position 0
     // INTO         -> position 2
-    // <table>      -> position 6
+    // <table>      -> position 4
     // L Paren      -> position X?
     // R Paren      -> position X?
     let column_names = get_column_names_from_insert_into_query(&tokens);
@@ -264,10 +247,11 @@ fn transform_columns(
         // get the right transformer for the right column name
         let original_column = column.clone();
 
-        let db_and_table_and_column_name =
-            format!("{}.{}.{}", database_name, table_name, *column_name);
+        let table_and_column_name =
+            format!("{}.{}", table_name, *column_name);
+
         let column = match transformer_by_db_and_table_and_column_name
-            .get(db_and_table_and_column_name.as_str())
+            .get(table_and_column_name.as_str())
         {
             Some(transformer) => transformer.transform(column), // apply transformation on the column
             None => column,
@@ -290,54 +274,22 @@ fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
         && match_keyword_at_position(Keyword::Table, &tokens, 2)
 }
 
-fn is_alter_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Alter, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
-}
-
 fn get_row_type(tokens: &Vec<Token>) -> RowType {
     let mut row_type = RowType::Others;
 
     if is_insert_into_statement(&tokens) {
-        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
-                row_type = RowType::InsertInto {
-                    database_name: database_name.to_string(),
-                    table_name: table_name.to_string(),
-                };
-            }
+        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+            row_type = RowType::InsertInto {
+                table_name: table_name.to_string(),
+            };
         }
     }
 
     if is_create_table_statement(&tokens) {
-        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
-                row_type = RowType::CreateTable {
-                    database_name: database_name.to_string(),
-                    table_name: table_name.to_string(),
-                };
-            }
-        }
-    }
-
-    if is_alter_table_statement(&tokens) {
-        let database_name_pos = match get_word_value_at_position(&tokens, 4) {
-            Some(word) if word == "ONLY" => 6,
-            _ => 4,
-        };
-
-        let table_name_pos = match get_word_value_at_position(&tokens, 4) {
-            Some(word) if word == "ONLY" => 8,
-            _ => 6,
-        };
-
-        if let Some(database_name) = get_word_value_at_position(&tokens, database_name_pos) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, table_name_pos) {
-                row_type = RowType::AlterTable {
-                    database_name: database_name.to_string(),
-                    table_name: table_name.to_string(),
-                };
-            }
+        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+            row_type = RowType::CreateTable {
+                table_name: table_name.to_string(),
+            };
         }
     }
 
@@ -360,7 +312,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
             }
             Column::StringValue(column_name, value) => {
                 column_names.push(column_name);
-                values.push(format!("'{}'", value.replace("'", "''")));
+                values.push(format!("'{}'", value));
             }
             Column::CharValue(column_name, value) => {
                 column_names.push(column_name);
@@ -378,15 +330,15 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
     }
 
     let query_prefix = match database {
-        Some(database) => format!("INSERT INTO {}.", database),
-        None => "INSERT INTO ".to_string(),
+        Some(_database) => panic!("database should not be present in a MySQL dump"),
+        None => "INSERT INTO".to_string(),
     };
 
     let query_string = format!(
-        "{}{} ({}) VALUES ({});",
+        "{} `{}` ({}) VALUES ({});",
         query_prefix,
         query.table_name.as_str(),
-        column_names.join(", "),
+        column_names.iter().map(|column_name| format!("`{}`", column_name)).collect::<Vec<String>>().join(", "),
         values.join(", "),
     );
 
@@ -395,12 +347,14 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
 
 #[cfg(test)]
 mod tests {
+    use dump_parser::mysql::Tokenizer;
     use crate::connector::Connector;
     use crate::source::SourceOptions;
+    use crate::source::mysql::{is_insert_into_statement, RowType, is_create_table_statement};
     use crate::transformer::{transient::TransientTransformer, Transformer};
     use crate::Source;
 
-    use super::Mysql;
+    use super::{Mysql, get_row_type};
 
     fn get_mysql() -> Mysql<'static> {
         Mysql::new("127.0.0.1", 3306, "world", "root", "password")
@@ -452,5 +406,80 @@ mod tests {
             assert!(original_query.data().len() > 0);
             assert!(query.data().len() > 0);
         });
+    }
+
+    #[test]
+    fn test_is_insert_into_statement() {
+        let q = "INSERT INTO `customers` (`first_name`, `is_valid`) VALUES ('Romaric', true);";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+        assert_eq!(is_insert_into_statement(&tokens), true);
+
+        let q = "CREATE TABLE `city` (
+    `ID` int NOT NULL AUTO_INCREMENT,
+    `Name` char(35) NOT NULL DEFAULT '',
+    `CountryCode` char(3) NOT NULL DEFAULT '',
+    `District` char(20) NOT NULL DEFAULT '',
+    `Population` int NOT NULL DEFAULT '0',
+    PRIMARY KEY (`ID`),
+    KEY `CountryCode` (`CountryCode`),
+CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code`)
+) ENGINE=InnoDB AUTO_INCREMENT=4080 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+        assert_eq!(is_insert_into_statement(&tokens), false);
+    }
+
+    #[test]
+    fn test_is_create_table_statement() {
+        let q = "CREATE TABLE `city` (
+    `ID` int NOT NULL AUTO_INCREMENT,
+    `Name` char(35) NOT NULL DEFAULT '',
+    `CountryCode` char(3) NOT NULL DEFAULT '',
+    `District` char(20) NOT NULL DEFAULT '',
+    `Population` int NOT NULL DEFAULT '0',
+    PRIMARY KEY (`ID`),
+    KEY `CountryCode` (`CountryCode`),
+CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code`)
+) ENGINE=InnoDB AUTO_INCREMENT=4080 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+        assert_eq!(is_create_table_statement(&tokens), true);
+
+        let q = "INSERT INTO `customers` (`first_name`, `is_valid`) VALUES ('Romaric', true);";
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+        assert_eq!(is_create_table_statement(&tokens), false);
+    }
+
+    #[test]
+    fn test_get_row_type() {
+        let q = "INSERT INTO `customers` (`first_name`, `is_valid`) VALUES ('Romaric', true);";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+
+        let expected_row_type = RowType::InsertInto { table_name: "customers".to_string() };
+        assert_eq!(get_row_type(&tokens), expected_row_type);
+
+        let q = "CREATE TABLE `city` (
+    `ID` int NOT NULL AUTO_INCREMENT,
+    `Name` char(35) NOT NULL DEFAULT '',
+    `CountryCode` char(3) NOT NULL DEFAULT '',
+    `District` char(20) NOT NULL DEFAULT '',
+    `Population` int NOT NULL DEFAULT '0',
+    PRIMARY KEY (`ID`),
+    KEY `CountryCode` (`CountryCode`),
+CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code`)
+) ENGINE=InnoDB AUTO_INCREMENT=4080 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+
+        let expected_row_type = RowType::CreateTable { table_name: "city".to_string() };
+        assert_eq!(get_row_type(&tokens), expected_row_type);
     }
 }
