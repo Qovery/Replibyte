@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-version = "0.8.3"
+version = "0.8.4"
 name = "replibyte"
 authors = ["Qovery Team", "Fab", "Benny", "Contributos"]
 
