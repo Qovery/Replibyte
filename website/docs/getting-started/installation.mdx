@@ -70,17 +70,22 @@ sidebar_position: 2
 
   <summary>Run replibyte with Docker</summary>
 
+  This example assume you have a configuration file named replibyte.yaml in the directory you're running the docker command.
+
   ```shell
-  git clone https://github.com/Qovery/replibyte.git
-
-  # Build image with Docker
-  docker build -t replibyte -f Dockerfile .
-
-  # Run RepliByte
-  docker run -v $(pwd)/examples:/examples/ replibyte -c /examples/replibyte.yaml transformer list
+  docker run -it --rm --name replibyte \
+    -v "$(pwd)/replibyte.yaml:/replibyte.yaml:ro" \
+    ghcr.io/qovery/replibyte --config replibyte.yaml
   ```
 
-  Feel free to edit `./examples/replibyte.yaml` with your configuration.
+  If you're using the `local_disk` datastore, you must mount a volume by adding `-v "$(pwd)/my-datastore:/datastore"`.
+  This assumes that the "datastore" part of your config file is as follows:
+
+  ```yaml
+  datastore:
+    local_disk:
+      dir: ./my-datastore
+  ```
 
 </details>
 
