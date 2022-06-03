@@ -53,7 +53,7 @@ source:
 
 ```yaml
 source:
-  connection_uri: mongo://[user]:[password]@[host]:[port]/[database]
+  connection_uri: mongodb://[user]:[password]@[host]:[port]/[database]
 ```
 
 </details>

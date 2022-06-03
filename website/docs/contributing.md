@@ -16,7 +16,7 @@ For local development, you will need to:
 
 1. Install [Rust](https://www.rust-lang.org/).
 2. Install [Docker](https://www.docker.com).
-3. Run `docker compose -f ./docker-compose-dev.yml` to
+3. Run `docker compose -f ./docker-compose-dev.yml up` to
 start the local databases. At the moment, `docker-compose` includes 2 PostgreSQL database instances, 2 MySQL instances, 2 MongoDB instances
 and a [MinIO](https://min.io) datastore. One source, one destination by database and one datastore. In the future, we will provide more options.
 

@@ -139,19 +139,13 @@ where
                         task.run(progress_callback)?
                     }
                     ConnectionUri::MongoDB(
-                        host,
-                        port,
-                        username,
-                        password,
+                        uri,
                         database,
                         authentication_db,
                     ) => {
                         let mongodb = MongoDB::new(
-                            host.as_str(),
-                            port,
+                            uri.as_str(),
                             database.as_str(),
-                            username.as_str(),
-                            password.as_str(),
                             authentication_db.as_str(),
                         );
 
@@ -459,19 +453,13 @@ where
                     task.run(progress_callback)?;
                 }
                 ConnectionUri::MongoDB(
-                    host,
-                    port,
-                    username,
-                    password,
+                    uri,
                     database,
                     authentication_db,
                 ) => {
                     let mut mongodb = destination::mongodb::MongoDB::new(
-                        host.as_str(),
-                        port,
+                        uri.as_str(),
                         database.as_str(),
-                        username.as_str(),
-                        password.as_str(),
                         authentication_db.as_str(),
                     );
 

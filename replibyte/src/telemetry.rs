@@ -86,7 +86,7 @@ impl TelemetryClient {
                     match x.connection_uri()? {
                         ConnectionUri::Postgres(_, _, _, _, _) => "postgresql",
                         ConnectionUri::Mysql(_, _, _, _, _) => "mysql",
-                        ConnectionUri::MongoDB(_, _, _, _, _, _) => "mongodb",
+                        ConnectionUri::MongoDB(_, _, _) => "mongodb",
                     }
                     .to_string(),
                 );
