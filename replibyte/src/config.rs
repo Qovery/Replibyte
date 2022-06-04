@@ -376,19 +376,13 @@ type Username = String;
 type Password = String;
 type Database = String;
 type AuthenticationDatabase = String;
+type Uri = String;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnectionUri {
     Postgres(Host, Port, Username, Password, Database),
     Mysql(Host, Port, Username, Password, Database),
-    MongoDB(
-        Host,
-        Port,
-        Username,
-        Password,
-        Database,
-        AuthenticationDatabase,
-    ),
+    MongoDB(Uri, Database, AuthenticationDatabase),
 }
 
 fn get_host(url: &Url) -> Result<String, Error> {
@@ -465,7 +459,7 @@ fn get_mongodb_authentication_db(url: &Url) -> String {
     let hash_query: HashMap<String, String> = url.query_pairs().into_owned().collect();
 
     let authentication_database = match hash_query.get("authSource") {
-        Some(auth_source) => auth_source.to_string(),
+        Some(authentication_db) => authentication_db.to_string(),
         None => DEFAULT_MONGODB_AUTH_DB.to_string(),
     };
 
@@ -499,11 +493,8 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
         ),
         scheme if scheme.to_lowercase() == "mongodb" || scheme.to_lowercase() == "mongodb+srv" => {
             ConnectionUri::MongoDB(
-                get_host(&url)?,
-                get_port(&url, 27017)?,
-                get_username(&url)?,
-                get_password(&url)?,
-                get_database(&url, Some(DEFAULT_MONGODB_AUTH_DB))?,
+                url.to_string(),
+                get_database(&url, Some("test"))?,
                 get_mongodb_authentication_db(&url),
             )
         }
@@ -659,10 +650,7 @@ mod tests {
         assert_eq!(
             connection_uri,
             ConnectionUri::MongoDB(
-                "server.example.com".to_string(),
-                27017,
-                "root".to_string(),
-                "password".to_string(),
+                "mongodb+srv://root:password@server.example.com/my_db?authSource=other_db".to_string(),
                 "my_db".to_string(),
                 "other_db".to_string(),
             )

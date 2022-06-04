@@ -252,7 +252,8 @@ impl Datastore for LocalDisk {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::OpenOptions, path::Path};
+    use std::{fs::OpenOptions};
+    use std::path::Path;
 
     use chrono::{Duration, Utc};
     use serde_json::json;

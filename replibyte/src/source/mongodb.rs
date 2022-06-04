@@ -13,36 +13,28 @@ use bson::{Bson, Document};
 use dump_parser::mongodb::Archive;
 
 pub struct MongoDB<'a> {
-    host: &'a str,
-    port: u16,
+    uri: &'a str,
     database: &'a str,
-    username: &'a str,
-    password: &'a str,
-    authentication_database: &'a str,
+    authentication_db: &'a str,
 }
 
 impl<'a> MongoDB<'a> {
     pub fn new(
-        host: &'a str,
-        port: u16,
+        uri: &'a str,
         database: &'a str,
-        username: &'a str,
-        password: &'a str,
-        authentication_database: &'a str,
+        authentication_db: &'a str,
     ) -> Self {
         MongoDB {
-            host,
-            port,
+            uri,
             database,
-            username,
-            password,
-            authentication_database,
+            authentication_db
         }
     }
 }
 
 impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
+        let _ = binary_exists("mongosh")?;
         let _ = binary_exists("mongodump")?;
         let _ = check_connection_status(self)?;
 
@@ -56,26 +48,18 @@ impl<'a> Source for MongoDB<'a> {
         options: SourceOptions,
         query_callback: F,
     ) -> Result<(), Error> {
-        let s_port = self.port.to_string();
-
         if let Some(_database_subset) = &options.database_subset {
             todo!("database subset not supported yet for MongoDB source")
         }
 
         let mut process = Command::new("mongodump")
             .args([
-                "-h",
-                self.host,
-                "--port",
-                s_port.as_str(),
-                "--authenticationDatabase",
-                self.authentication_database,
+                "--uri",
+                self.uri,
                 "--db",
                 self.database,
-                "-u",
-                self.username,
-                "-p",
-                self.password,
+                "--authenticationDatabase",
+                self.authentication_db,
                 "--archive", // dump to stdin
             ])
             .stdout(Stdio::piped())
@@ -96,26 +80,17 @@ impl<'a> Source for MongoDB<'a> {
 }
 
 fn check_connection_status(db: &MongoDB) -> Result<(), Error> {
-    let s_port = db.port.to_string();
-
     let mut echo_process = Command::new("echo")
         .arg(r#"'db.runCommand("ping").ok'"#)
         .stdout(Stdio::piped())
         .spawn()?;
 
-    let mut mongo_process = Command::new("mongo")
+    let mut mongo_process = Command::new("mongosh")
         .args([
-            "--host",
-            db.host,
-            "--port",
-            s_port.as_str(),
+            db.uri,
             "--authenticationDatabase",
-            db.authentication_database,
-            "-u",
-            db.username,
-            "-p",
-            db.password,
-            "--quiet",
+            db.authentication_db,
+            "--quiet"
         ])
         .stdin(echo_process.stdout.take().unwrap())
         .stdout(Stdio::inherit())
@@ -324,11 +299,11 @@ mod tests {
     use super::recursively_transform_document;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27017, "test", "root", "password", "admin")
+        MongoDB::new("mongodb://root:password@localhost:27018/", "test", "admin")
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("localhost", 27017, "test", "root", "wrongpassword", "admin")
+        MongoDB::new("mongodb://root:wrongpassword@localhost:27018/", "test", "admin")
     }
 
     #[test]
