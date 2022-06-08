@@ -104,7 +104,7 @@ fn wipe_database_query(username: &str) -> String {
         "\
     DROP SCHEMA public CASCADE; \
     CREATE SCHEMA public; \
-    GRANT ALL ON SCHEMA public TO {}; \
+    GRANT ALL ON SCHEMA public TO \"{}\"; \
     GRANT ALL ON SCHEMA public TO public;\
     ",
         username
