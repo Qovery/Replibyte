@@ -223,6 +223,7 @@ impl SourceConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DestinationConfig {
     pub connection_uri: String,
+    pub wipe_database: Option<bool>
 }
 
 impl DestinationConfig {

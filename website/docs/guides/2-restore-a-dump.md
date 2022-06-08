@@ -80,6 +80,8 @@ To restore on a remote database, you need to specify the destination connection 
 ```yaml title="conf.yaml"
 destination:
   connection_uri: postgres://user:password@host:port/db
+  # Disable public's schema wipe
+  # wipe_database: false (default: true)
 ```
 
 and run the following command:

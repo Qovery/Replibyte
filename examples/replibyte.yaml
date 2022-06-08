@@ -11,6 +11,8 @@ source:
           transformer_name: random # TO CHANGE
 destination:
   connection_uri: $DESTINATION_CONNECTION_URI
+  # Wipe the public schema
+  # wipe_database: false (default: true)
 datastore:
   aws:
     bucket: $S3_BUCKET
