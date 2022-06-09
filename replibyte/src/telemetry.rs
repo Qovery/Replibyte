@@ -36,7 +36,7 @@ pub struct TelemetryClient {
 impl TelemetryClient {
     pub fn new<C: Into<ClientOptions>>(options: C) -> Self {
         let client = HttpClient::builder()
-            .timeout(Some(TIMEOUT.clone()))
+            .timeout(Some(*TIMEOUT))
             .build()
             .unwrap(); // Unwrap here is as safe as `HttpClient::new`
         TelemetryClient {
@@ -68,11 +68,11 @@ impl TelemetryClient {
         &self,
         config: &Config,
         sub_command: &SubCommand,
-        args: &Vec<String>,
+        args: &[String],
         execution_time_in_millis: Option<u128>,
     ) -> Result<(), Error> {
         let mut props = HashMap::new();
-        let _ = props.insert("args".to_string(), args.join(" ").to_string());
+        let _ = props.insert("args".to_string(), args.join(" "));
 
         props.insert(
             "encryption_used".to_string(),

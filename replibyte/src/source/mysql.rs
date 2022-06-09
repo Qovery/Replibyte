@@ -277,7 +277,7 @@ fn get_row_type(tokens: &Vec<Token>) -> RowType {
     }
 
     if is_create_table_statement(&tokens) {
-        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+        if let Some(table_name) = get_single_quoted_string_value_at_position(tokens, 4) {
             row_type = RowType::CreateTable {
                 table_name: table_name.to_string(),
             };

@@ -133,7 +133,7 @@ impl<'a> PostgresSubset<'a> {
         // find the subset table from this row
         let row_subset_table = self
             .subset_table_by_database_and_table_name
-            .get(&(row_database.to_string(), row_table.to_string()))
+            .get(&(row_database, row_table))
             .unwrap();
 
         let row_column_names = get_column_names_from_insert_into_query(&row_tokens);

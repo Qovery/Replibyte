@@ -222,7 +222,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                         to_query(
                             Some(database_name.as_str()),
                             InsertIntoQuery {
-                                table_name: table_name.to_string(),
+                                table_name,
                                 columns,
                             },
                         ),
@@ -279,8 +279,8 @@ fn transform_columns(
     // <table>      -> position 6
     // L Paren      -> position X?
     // R Paren      -> position X?
-    let column_names = get_column_names_from_insert_into_query(&tokens);
-    let column_values = get_column_values_from_insert_into_query(&tokens);
+    let column_names = get_column_names_from_insert_into_query(tokens);
+    let column_values = get_column_values_from_insert_into_query(tokens);
 
     let mut original_columns = vec![];
     let mut columns = vec![];
@@ -290,7 +290,7 @@ fn transform_columns(
 
         let column = match value_token {
             Token::Number(column_value, _) => {
-                if column_value.contains(".") {
+                if column_value.contains('.') {
                     Column::FloatNumberValue(
                         column_name.to_string(),
                         column_value.parse::<f64>().unwrap(),
@@ -302,9 +302,7 @@ fn transform_columns(
                     )
                 }
             }
-            Token::Char(column_value) => {
-                Column::CharValue(column_name.to_string(), column_value.clone())
-            }
+            Token::Char(column_value) => Column::CharValue(column_name.to_string(), *column_value),
             Token::SingleQuotedString(column_value) => {
                 Column::StringValue(column_name.to_string(), column_value.clone())
             }
@@ -344,26 +342,26 @@ fn transform_columns(
 }
 
 fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        && match_keyword_at_position(Keyword::Into, &tokens, 2)
+    match_keyword_at_position(Keyword::Insert, tokens, 0)
+        && match_keyword_at_position(Keyword::Into, tokens, 2)
 }
 
 fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Create, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    match_keyword_at_position(Keyword::Create, tokens, 0)
+        && match_keyword_at_position(Keyword::Table, tokens, 2)
 }
 
 fn is_alter_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Alter, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    match_keyword_at_position(Keyword::Alter, tokens, 0)
+        && match_keyword_at_position(Keyword::Table, tokens, 2)
 }
 
 fn get_row_type(tokens: &Vec<Token>) -> RowType {
     let mut row_type = RowType::Others;
 
-    if is_insert_into_statement(&tokens) {
-        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+    if is_insert_into_statement(tokens) {
+        if let Some(database_name) = get_word_value_at_position(tokens, 4) {
+            if let Some(table_name) = get_word_value_at_position(tokens, 6) {
                 row_type = RowType::InsertInto {
                     database_name: database_name.to_string(),
                     table_name: table_name.to_string(),
@@ -372,9 +370,9 @@ fn get_row_type(tokens: &Vec<Token>) -> RowType {
         }
     }
 
-    if is_create_table_statement(&tokens) {
-        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+    if is_create_table_statement(tokens) {
+        if let Some(database_name) = get_word_value_at_position(tokens, 4) {
+            if let Some(table_name) = get_word_value_at_position(tokens, 6) {
                 row_type = RowType::CreateTable {
                     database_name: database_name.to_string(),
                     table_name: table_name.to_string(),
@@ -383,21 +381,21 @@ fn get_row_type(tokens: &Vec<Token>) -> RowType {
         }
     }
 
-    if is_alter_table_statement(&tokens) {
-        let database_name_pos = if match_keyword_at_position(Keyword::Only, &tokens, 4) {
+    if is_alter_table_statement(tokens) {
+        let database_name_pos = if match_keyword_at_position(Keyword::Only, tokens, 4) {
             6
         } else {
             4
         };
 
-        let table_name_pos = if match_keyword_at_position(Keyword::Only, &tokens, 4) {
+        let table_name_pos = if match_keyword_at_position(Keyword::Only, tokens, 4) {
             8
         } else {
             6
         };
 
-        if let Some(database_name) = get_word_value_at_position(&tokens, database_name_pos) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, table_name_pos) {
+        if let Some(database_name) = get_word_value_at_position(tokens, database_name_pos) {
+            if let Some(table_name) = get_word_value_at_position(tokens, table_name_pos) {
                 row_type = RowType::AlterTable {
                     database_name: database_name.to_string(),
                     table_name: table_name.to_string(),
@@ -425,7 +423,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
             }
             Column::StringValue(column_name, value) => {
                 column_names.push(column_name);
-                values.push(format!("'{}'", value.replace("'", "''")));
+                values.push(format!("'{}'", value.replace('\'', "''")));
             }
             Column::CharValue(column_name, value) => {
                 column_names.push(column_name);

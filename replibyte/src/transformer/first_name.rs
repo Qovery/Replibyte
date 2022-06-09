@@ -62,7 +62,7 @@ impl Transformer for FirstNameTransformer {
                 Column::FloatNumberValue(column_name, value)
             }
             Column::StringValue(column_name, value) => {
-                let new_value = if value == "" {
+                let new_value = if value.is_empty() {
                     "".to_string()
                 } else {
                     FirstName(EN).fake()

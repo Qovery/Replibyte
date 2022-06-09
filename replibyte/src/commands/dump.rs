@@ -138,11 +138,7 @@ where
                         let task = FullDumpTask::new(mysql, datastore, options);
                         task.run(progress_callback)?
                     }
-                    ConnectionUri::MongoDB(
-                        uri,
-                        database,
-                        authentication_db,
-                    ) => {
+                    ConnectionUri::MongoDB(uri, database, authentication_db) => {
                         let mongodb = MongoDB::new(
                             uri.as_str(),
                             database.as_str(),
@@ -405,7 +401,7 @@ pub fn restore_remote<F>(
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
-    F: Fn(usize, usize) -> (),
+    F: Fn(usize, usize),
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key);
@@ -452,11 +448,7 @@ where
                     let task = FullRestoreTask::new(&mut mysql, datastore, options);
                     task.run(progress_callback)?;
                 }
-                ConnectionUri::MongoDB(
-                    uri,
-                    database,
-                    authentication_db,
-                ) => {
+                ConnectionUri::MongoDB(uri, database, authentication_db) => {
                     let mut mongodb = destination::mongodb::MongoDB::new(
                         uri.as_str(),
                         database.as_str(),
