@@ -150,7 +150,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                     to_query(
                         None,
                         InsertIntoQuery {
-                            table_name: table_name.to_string(),
+                            table_name,
                             columns,
                         },
                     ),
@@ -192,8 +192,8 @@ fn transform_columns(
     // <table>      -> position 4
     // L Paren      -> position X?
     // R Paren      -> position X?
-    let column_names = get_column_names_from_insert_into_query(&tokens);
-    let column_values = get_column_values_from_insert_into_query(&tokens);
+    let column_names = get_column_names_from_insert_into_query(tokens);
+    let column_values = get_column_values_from_insert_into_query(tokens);
 
     let mut original_columns = vec![];
     let mut columns = vec![];
@@ -203,7 +203,7 @@ fn transform_columns(
 
         let column = match value_token {
             Token::Number(column_value, _) => {
-                if column_value.contains(".") {
+                if column_value.contains('.') {
                     Column::FloatNumberValue(
                         column_name.to_string(),
                         column_value.parse::<f64>().unwrap(),
@@ -216,7 +216,7 @@ fn transform_columns(
                 }
             }
             Token::Char(column_value) => {
-                Column::CharValue(column_name.to_string(), column_value.clone())
+                Column::CharValue(column_name.to_string(), *column_value)
             }
             Token::SingleQuotedString(column_value) => {
                 Column::StringValue(column_name.to_string(), column_value.clone())
@@ -256,28 +256,28 @@ fn transform_columns(
 }
 
 fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        && match_keyword_at_position(Keyword::Into, &tokens, 2)
+    match_keyword_at_position(Keyword::Insert, tokens, 0)
+        && match_keyword_at_position(Keyword::Into, tokens, 2)
 }
 
 fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Create, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    match_keyword_at_position(Keyword::Create, tokens, 0)
+        && match_keyword_at_position(Keyword::Table, tokens, 2)
 }
 
 fn get_row_type(tokens: &Vec<Token>) -> RowType {
     let mut row_type = RowType::Others;
 
-    if is_insert_into_statement(&tokens) {
-        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+    if is_insert_into_statement(tokens) {
+        if let Some(table_name) = get_single_quoted_string_value_at_position(tokens, 4) {
             row_type = RowType::InsertInto {
                 table_name: table_name.to_string(),
             };
         }
     }
 
-    if is_create_table_statement(&tokens) {
-        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+    if is_create_table_statement(tokens) {
+        if let Some(table_name) = get_single_quoted_string_value_at_position(tokens, 4) {
             row_type = RowType::CreateTable {
                 table_name: table_name.to_string(),
             };
@@ -398,8 +398,8 @@ mod tests {
             database_subset: &None,
         };
         let _ = p.read(source_options, |original_query, query| {
-            assert!(original_query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!original_query.data().is_empty());
+            assert!(!query.data().is_empty());
         });
     }
 

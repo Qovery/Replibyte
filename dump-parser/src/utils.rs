@@ -63,7 +63,7 @@ where
             None => false,
         };
 
-        let mut query_res = ListQueryResult::Continue;
+        let query_res = ListQueryResult::Continue;
 
         buf_bytes.append(&mut line_buf_bytes);
 
@@ -159,7 +159,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
     let mut sql_statements = vec![];
     let mut stack = vec![];
 
-    let is_next_char_comment = if query.find("--").is_some() {
+    let is_next_char_comment = if query.contains("--") {
         // it means there is comments in this query string
         let x: Box<dyn Fn(usize) -> bool> = if query.len() == query.chars().count() {
             Box::new(|next_idx: usize| {
@@ -334,9 +334,10 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
         list_sql_queries_from_dump_reader(reader, |query| {
             queries.push(query.to_string());
             ListQueryResult::Continue
-        });
+        })
+        .unwrap();
 
-        assert!(queries.len() > 0);
+        assert!(!queries.is_empty());
     }
 
     #[test]

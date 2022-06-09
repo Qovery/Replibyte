@@ -2,20 +2,11 @@ use crate::transformer::Transformer;
 use crate::types::Column;
 
 /// This transformer will not make any changes.
+#[derive(Default)]
 pub struct TransientTransformer {
     database_name: String,
     table_name: String,
     column_name: String,
-}
-
-impl Default for TransientTransformer {
-    fn default() -> Self {
-        TransientTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-        }
-    }
 }
 
 impl TransientTransformer {

@@ -24,10 +24,10 @@ pub fn table() -> Table {
 pub fn to_human_readable_unit(bytes: usize) -> String {
     match bytes {
         0..=1023 => format!("{} Bytes", bytes),
-        1024..=1023_999 => format!("{:.2} kB", bytes / 1000),
-        1024_000..=1023_999_999 => format!("{:.2} MB", bytes / 1_000_000),
-        1024_000_000..=1023_999_999_999 => format!("{:.2} MB", bytes / 1_000_000_000),
-        1024_000_000_000..=1023_999_999_999_999 => format!("{:.2} GB", bytes / 1_000_000_000_000),
+        1024..=1_023_999 => format!("{:.2} kB", bytes / 1000),
+        1_024_000..=1_023_999_999 => format!("{:.2} MB", bytes / 1_000_000),
+        1_024_000_000..=1_023_999_999_999 => format!("{:.2} MB", bytes / 1_000_000_000),
+        1_024_000_000_000..=1_023_999_999_999_999 => format!("{:.2} GB", bytes / 1_000_000_000_000),
         _ => format!("{:.2} TB", bytes / 1_000_000_000_000_000),
     }
 }
@@ -52,8 +52,8 @@ pub fn wait_for_command(process: &mut Child) -> Result<(), Error> {
                 if let Some(stderr) = process.stderr.take().as_mut() {
                     let mut buffer = String::new();
                     let error = match stderr.read_to_string(&mut buffer) {
-                        Ok(_) => Error::new(ErrorKind::Other, format!("{}", buffer)),
-                        Err(err) => Error::new(ErrorKind::Other, format!("{}", err)),
+                        Ok(_) => Error::new(ErrorKind::Other, buffer.to_string()),
+                        Err(err) => Error::new(ErrorKind::Other, err),
                     };
 
                     return Err(Error::new(
@@ -64,7 +64,7 @@ pub fn wait_for_command(process: &mut Child) -> Result<(), Error> {
 
                 return Err(Error::new(
                     ErrorKind::Other,
-                    format!("command error: {}", exit_status.to_string()),
+                    format!("command error: {}", exit_status),
                 ));
             }
 

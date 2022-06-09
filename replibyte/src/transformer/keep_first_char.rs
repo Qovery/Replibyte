@@ -68,12 +68,13 @@ impl Transformer for KeepFirstCharTransformer {
             Column::StringValue(column_name, value) => {
                 let new_value = match value.len() {
                     len if len > 1 => {
-                        if let Some(first_char) = value.chars().nth(0) {
+                        if let Some(first_char) = value.chars().next() {
                             first_char.to_string()
                         } else {
                             "".to_string()
                         }
                     }
+
                     _ => value,
                 };
 

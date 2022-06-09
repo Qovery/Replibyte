@@ -518,7 +518,7 @@ impl<'a> Tokenizer<'a> {
     /// Tokenize an identifier or keyword, after the first char is already consumed.
     fn tokenize_word(&self, first_char: char, chars: &mut Peekable<Chars<'_>>) -> String {
         let mut s = first_char.to_string();
-        s.push_str(&peeking_take_while(chars, |ch| is_identifier_part(ch)));
+        s.push_str(&peeking_take_while(chars, is_identifier_part));
         s
     }
 
@@ -673,8 +673,8 @@ pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&st
 }
 
 pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
-    if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        || !match_keyword_at_position(Keyword::Into, &tokens, 2)
+    if !match_keyword_at_position(Keyword::Insert, tokens, 0)
+        || !match_keyword_at_position(Keyword::Into, tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
         return Vec::new();
@@ -707,8 +707,8 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<Strin
 }
 
 pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Token> {
-    if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        || !match_keyword_at_position(Keyword::Into, &tokens, 2)
+    if !match_keyword_at_position(Keyword::Insert, tokens, 0)
+        || !match_keyword_at_position(Keyword::Into, tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
         return Vec::new();
@@ -736,7 +736,7 @@ pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Tok
 }
 
 pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
-    get_column_values_from_insert_into_query(&tokens)
+    get_column_values_from_insert_into_query(tokens)
         .iter()
         .filter_map(|x| match *x {
             Token::Word(word) => Some(word.value.clone()),

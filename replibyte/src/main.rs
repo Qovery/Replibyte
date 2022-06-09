@@ -99,7 +99,7 @@ fn main() {
         let _ = telemetry_client.capture_command(&telemetry_config, sub_commands, &env_args, None);
     }
 
-    if let Err(err) = run(config, &sub_commands) {
+    if let Err(err) = run(config, sub_commands) {
         eprintln!("{}", err);
     }
 

@@ -195,7 +195,7 @@ impl Datastore for S3 {
             INDEX_FILE_NAME,
             index_file_json,
         )
-        .map_err(|err| Error::from(err))
+        .map_err(Error::from)
     }
 
     fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error> {
@@ -207,7 +207,7 @@ impl Datastore for S3 {
             INDEX_FILE_NAME,
             index_file_json,
         )
-        .map_err(|err| Error::from(err))
+        .map_err(Error::from)
     }
 
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
@@ -224,7 +224,7 @@ impl Datastore for S3 {
     fn read(
         &self,
         options: &ReadOptions,
-        mut data_callback: &mut dyn FnMut(Bytes),
+        data_callback: &mut dyn FnMut(Bytes),
     ) -> Result<(), Error> {
         let mut index_file = self.index_file()?;
         let dump = index_file.find_dump(options)?;
@@ -284,7 +284,7 @@ impl Datastore for S3 {
 
         let bucket = &self.bucket;
 
-        let _ = delete_directory(&self.client, bucket, &name).map_err(|err| Error::from(err))?;
+        let _ = delete_directory(&self.client, bucket, &name).map_err(Error::from)?;
 
         index_file.dumps.retain(|b| b.directory_name != name);
 
@@ -345,7 +345,7 @@ fn write_objects<B: Datastore>(
         index_file.dumps.push(new_dump);
     } else {
         // update total dump size
-        dump.size = dump.size + data_size;
+        dump.size += data_size;
     }
 
     // save index file
@@ -532,7 +532,7 @@ fn list_objects<'a>(
 
     // FIXME max objects listed is 1000 -> pagination?
 
-    let objects = objects.contents.unwrap_or(Vec::new());
+    let objects = objects.contents.unwrap_or_default();
     if path.is_none() {
         return Ok(objects);
     }
