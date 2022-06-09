@@ -283,11 +283,17 @@ mod tests {
     use super::recursively_transform_document;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("mongodb://root:password@localhost:27018/", "test")
+        MongoDB::new(
+            "mongodb://root:password@localhost:27018/test?authSource=admin",
+            "test",
+        )
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("mongodb://root:wrongpassword@localhost:27018/", "test")
+        MongoDB::new(
+            "mongodb://root:wrongpassword@localhost:27018/test?authSource=admin",
+            "test",
+        )
     }
 
     #[test]
