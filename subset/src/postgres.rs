@@ -439,7 +439,7 @@ fn last_header_row_idx(table_stats_values: &Vec<&TableStats>) -> usize {
 }
 
 /// return the first row index from dump header (with generated table stats)
-fn first_footer_row_idx(table_stats_values: &Vec<&TableStats>) -> usize {
+fn first_footer_row_idx(table_stats_values: &[&TableStats]) -> usize {
     table_stats_values
         .iter()
         .max_by_key(|ts| ts.last_insert_into_row_index)
@@ -569,7 +569,7 @@ fn table_stats_by_database_and_table_name<R: Read>(
     Ok(table_stats_by_database_and_table_name)
 }
 
-fn trim_tokens(tokens: &Vec<Token>, keyword: Keyword) -> Vec<Token> {
+fn trim_tokens(tokens: &[Token], keyword: Keyword) -> Vec<Token> {
     tokens
         .iter()
         .skip_while(|token| match *token {
@@ -694,10 +694,7 @@ fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
 
     let next_foreign_tokens = tokens
         .iter()
-        .skip_while(|token| match token {
-            Token::Word(word) if word.keyword == Keyword::Foreign => false,
-            _ => true,
-        })
+        .skip_while(|token| !matches!(token, Token::Word(word) if word.keyword == Keyword::Foreign))
         .cloned()
         .collect::<Vec<_>>();
 
