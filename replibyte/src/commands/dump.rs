@@ -72,7 +72,7 @@ pub fn run<F>(
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
-    F: Fn(usize, usize) -> (),
+    F: Fn(usize, usize),
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key)
@@ -108,11 +108,11 @@ where
 
             let options = SourceOptions {
                 transformers: &transformers,
-                skip_config: &skip_config,
+                skip_config,
                 database_subset: &source.database_subset,
             };
 
-            match args.source_type.as_ref().map(|x| x.as_str()) {
+            match args.source_type.as_deref() {
                 None => match source.connection_uri()? {
                     ConnectionUri::Postgres(host, port, username, password, database) => {
                         let postgres = Postgres::new(
@@ -198,10 +198,10 @@ where
             Ok(())
         }
         None => {
-            return Err(anyhow::Error::from(Error::new(
+            Err(anyhow::Error::from(Error::new(
                 ErrorKind::Other,
                 "missing <source> object in the configuration file",
-            )));
+            )))
         }
     }
 }
@@ -220,7 +220,7 @@ pub fn restore_local<F>(
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
-    F: Fn(usize, usize) -> (),
+    F: Fn(usize, usize),
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key);
@@ -464,10 +464,10 @@ where
             Ok(())
         }
         None => {
-            return Err(anyhow::Error::from(Error::new(
+            Err(anyhow::Error::from(Error::new(
                 ErrorKind::Other,
                 "missing <destination> object in the configuration file",
-            )));
+            )))
         }
     }
 }

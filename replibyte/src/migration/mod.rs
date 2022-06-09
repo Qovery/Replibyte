@@ -85,7 +85,7 @@ impl<'a> Migrator<'a> {
             Ok(_) => {
                 for migration in &self.migrations {
                     if self.should_run_migration(migration) {
-                        let _ = migration.run(&self.datastore)?;
+                        let _ = migration.run(self.datastore)?;
                     }
                 }
                 Ok(())

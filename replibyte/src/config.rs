@@ -9,7 +9,7 @@ use crate::transformer::redacted::{RedactedTransformer, RedactedTransformerOptio
 use crate::transformer::transient::TransientTransformer;
 use crate::transformer::Transformer;
 use percent_encoding::percent_decode_str;
-use serde;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
@@ -50,7 +50,7 @@ impl Config {
 
     pub fn encryption_key(&self) -> Result<Option<String>, Error> {
         match &self.encryption_key {
-            Some(key) => substitute_env_var(key.as_str()).map(|x| Some(x)),
+            Some(key) => substitute_env_var(key.as_str()).map(Some),
             None => Ok(None),
         }
     }
@@ -214,7 +214,7 @@ impl SourceConfig {
             Some(connection_uri) => parse_connection_uri(connection_uri.as_str()),
             None => Err(Error::new(
                 ErrorKind::Other,
-                format!("missing <source.connection_uri> in the configuration file"),
+                "missing <source.connection_uri> in the configuration file".to_string(),
             )),
         }
     }
@@ -223,7 +223,7 @@ impl SourceConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DestinationConfig {
     pub connection_uri: String,
-    pub wipe_database: Option<bool>
+    pub wipe_database: Option<bool>,
 }
 
 impl DestinationConfig {
@@ -408,15 +408,16 @@ fn get_port(url: &Url, default_port: u16) -> Result<u16, Error> {
 }
 
 fn get_username(url: &Url) -> Result<String, Error> {
-    match url.username() {
-        username if username != "" => Ok(percent_decode_str(&username)
+    if !url.username().is_empty() {
+        return Ok(percent_decode_str(url.username())
             .decode_utf8_lossy()
-            .to_string()),
-        _ => Err(Error::new(
-            ErrorKind::Other,
-            "missing <username> property from connection uri",
-        )),
+            .to_string());
     }
+
+    Err(Error::new(
+        ErrorKind::Other,
+        "missing <username> property from connection uri",
+    ))
 }
 
 fn get_password(url: &Url) -> Result<String, Error> {
@@ -428,7 +429,7 @@ fn get_password(url: &Url) -> Result<String, Error> {
 
 fn get_database(url: &Url, default: Option<&str>) -> Result<String, Error> {
     let path = url.path().to_string();
-    let database = path.split("/").collect::<Vec<&str>>();
+    let database = path.split('/').collect::<Vec<&str>>();
 
     if database.is_empty() {
         return match default {
@@ -523,7 +524,7 @@ pub enum Endpoint {
 fn substitute_env_var(env_var: &str) -> Result<String, Error> {
     match env_var {
         "" => Ok(String::new()),
-        env_var if env_var.starts_with("$") && env_var.len() > 1 => {
+        env_var if env_var.starts_with('$') && env_var.len() > 1 => {
             let key = &env_var[1..env_var.len()];
             match std::env::var(key) {
                 Ok(value) => Ok(value),
@@ -651,7 +652,8 @@ mod tests {
         assert_eq!(
             connection_uri,
             ConnectionUri::MongoDB(
-                "mongodb+srv://root:password@server.example.com/my_db?authSource=other_db".to_string(),
+                "mongodb+srv://root:password@server.example.com/my_db?authSource=other_db"
+                    .to_string(),
                 "my_db".to_string(),
                 "other_db".to_string(),
             )
