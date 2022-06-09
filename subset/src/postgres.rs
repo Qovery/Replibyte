@@ -185,7 +185,7 @@ impl<'a> Subset for PostgresSubset<'a> {
     fn read<F: FnMut(String), P: FnMut(Progress)>(
         &self,
         mut data: F,
-        mut progress: P,
+        progress: P,
     ) -> Result<(), Error> {
         let temp_dir = tempfile::tempdir()?;
 
@@ -351,7 +351,7 @@ fn list_insert_into_rows<R: Read, F: FnMut(&str)>(
                 && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
                 && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
             {
-                rows(query.as_ref());
+                rows(query);
             }
         }
 
@@ -576,7 +576,7 @@ fn trim_tokens(tokens: &Vec<Token>, keyword: Keyword) -> Vec<Token> {
             Token::Word(word) if word.keyword == keyword => false,
             _ => true,
         })
-        .map(|token| token.clone()) // FIXME - do not clone token
+        .cloned() // FIXME - do not clone token
         .collect::<Vec<_>>()
 }
 
@@ -620,8 +620,7 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
 }
 
 fn get_create_table_database_and_table_name(tokens: &Vec<Token>) -> Option<(Database, Table)> {
-    let tokens = trim_tokens(&tokens, Keyword::Create);
-
+    let tokens = trim_tokens(tokens, Keyword::Create);
     if tokens.is_empty() {
         return None;
     }
@@ -640,7 +639,7 @@ fn get_create_table_database_and_table_name(tokens: &Vec<Token>) -> Option<(Data
 }
 
 fn get_insert_into_database_and_table_name(tokens: &Vec<Token>) -> Option<(Database, Table)> {
-    let tokens = trim_tokens(&tokens, Keyword::Insert);
+    let tokens = trim_tokens(tokens, Keyword::Insert);
 
     if tokens.is_empty() {
         return None;
@@ -660,8 +659,7 @@ fn get_insert_into_database_and_table_name(tokens: &Vec<Token>) -> Option<(Datab
 }
 
 fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
-    let tokens = trim_tokens(&tokens, Keyword::Alter);
-
+    let tokens = trim_tokens(tokens, Keyword::Alter);
     if tokens.is_empty() {
         return None;
     }
@@ -700,7 +698,7 @@ fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
             Token::Word(word) if word.keyword == Keyword::Foreign => false,
             _ => true,
         })
-        .map(|token| token.clone())
+        .cloned()
         .collect::<Vec<_>>();
 
     let from_property = match get_word_value_at_position(&next_foreign_tokens, 5) {
@@ -803,7 +801,7 @@ ALTER TABLE ONLY public.territories
     #[test]
     fn check_subset_table() {
         let m = get_subset_table_by_database_and_table_name(dump_reader()).unwrap();
-        assert!(m.len() > 0);
+        assert!(!m.is_empty());
 
         let t = m
             .get(&("public".to_string(), "customer_demographics".to_string()))
@@ -834,7 +832,7 @@ ALTER TABLE ONLY public.territories
     #[test]
     fn check_table_stats() {
         let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
-        assert!(table_stats.len() > 0);
+        assert!(!table_stats.is_empty());
         // TODO add more tests to check table.rows size
     }
 

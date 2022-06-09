@@ -519,8 +519,8 @@ mod tests {
         };
 
         let _ = p.read(source_options, |original_query, query| {
-            assert!(original_query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!original_query.data().is_empty());
+            assert!(!query.data().is_empty());
         });
     }
 
@@ -644,8 +644,8 @@ mod tests {
         };
 
         let _ = p.read(source_options, |original_query, query| {
-            assert!(query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
+            assert!(!query.data().is_empty());
 
             let query_str = str::from_utf8(query.data()).unwrap();
 
@@ -684,8 +684,8 @@ mod tests {
         };
 
         let _ = p.read(source_options, |_original_query, query| {
-            assert!(query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
+            assert!(!query.data().is_empty());
 
             let query_str = str::from_utf8(query.data()).unwrap();
             let unexpected_insert_into = format!("INSERT INTO {}.{}", database_name, table_name);
@@ -735,7 +735,7 @@ mod tests {
 
         let mut rows_percent_50 = vec![];
         let _ = p.read(source_options, |_original_query, query| {
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
             rows_percent_50.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
 
@@ -771,7 +771,7 @@ mod tests {
 
         let mut rows_percent_30 = vec![];
         let _ = p.read(source_options, |_original_query, query| {
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
             rows_percent_30.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
 

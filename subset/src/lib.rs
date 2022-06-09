@@ -93,8 +93,7 @@ impl SubsetTable {
 
         subset_tables
             .iter()
-            .filter(|subset_table| related_tables.contains(subset_table.table.as_str()))
-            .map(|subset_table| *subset_table)
+            .filter(|subset_table| related_tables.contains(subset_table.table.as_str())).copied()
             .collect::<Vec<_>>()
     }
 }
