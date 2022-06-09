@@ -39,7 +39,7 @@ where
     D: Destination,
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
-        mut self,
+        self,
         mut progress_callback: F,
     ) -> Result<(), Error> {
         // initialize the destination

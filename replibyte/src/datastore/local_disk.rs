@@ -58,7 +58,7 @@ impl Datastore for LocalDisk {
         let reader = BufReader::new(file);
 
         let index_file: IndexFile =
-            serde_json::from_reader(reader).map_err(|err| Error::from(err))?;
+            serde_json::from_reader(reader).map_err(Error::from)?;
 
         Ok(index_file)
     }
@@ -72,7 +72,7 @@ impl Datastore for LocalDisk {
 
         let reader = BufReader::new(file);
 
-        let raw_index_file = serde_json::from_reader(reader).map_err(|err| Error::from(err))?;
+        let raw_index_file = serde_json::from_reader(reader).map_err(Error::from)?;
 
         Ok(raw_index_file)
     }
@@ -89,7 +89,7 @@ impl Datastore for LocalDisk {
             .open(&index_file_path)?;
 
         debug!("writing index_file at {}", index_file_path.as_str());
-        serde_json::to_writer(file, index_file).map_err(|err| Error::from(err))
+        serde_json::to_writer(file, index_file).map_err(Error::from)
     }
 
     fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error> {
@@ -104,7 +104,7 @@ impl Datastore for LocalDisk {
             .open(&index_file_path)?;
 
         debug!("writing raw index_file at {}", index_file_path.as_str());
-        serde_json::to_writer(file, raw_index_file).map_err(|err| Error::from(err))
+        serde_json::to_writer(file, raw_index_file).map_err(Error::from)
     }
 
     fn write(&self, file_part: u16, data: types::Bytes) -> Result<(), Error> {
@@ -165,7 +165,7 @@ impl Datastore for LocalDisk {
             index_file.dumps.push(new_dump);
         } else {
             // update total dump size
-            dump.size = dump.size + data_size;
+            dump.size += data_size;
         }
 
         // save index file
