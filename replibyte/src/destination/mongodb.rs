@@ -9,20 +9,11 @@ use crate::utils::{binary_exists, wait_for_command};
 pub struct MongoDB<'a> {
     uri: &'a str,
     database: &'a str,
-    authentication_db: &'a str,
 }
 
 impl<'a> MongoDB<'a> {
-    pub fn new(
-        uri: &'a str,
-        database: &'a str,
-        authentication_db: &'a str,
-    ) -> Self {
-        MongoDB {
-            uri,
-            database,
-            authentication_db,
-        }
+    pub fn new(uri: &'a str, database: &'a str) -> Self {
+        MongoDB { uri, database }
     }
 }
 
@@ -38,13 +29,10 @@ impl<'a> Connector for MongoDB<'a> {
 
 impl<'a> Destination for MongoDB<'a> {
     fn write(&self, data: Bytes) -> Result<(), Error> {
-
         let mut process = Command::new("mongorestore")
             .args([
                 "--uri",
                 self.uri,
-                "--authenticationDatabase",
-                self.authentication_db,
                 format!("--nsFrom='{}.*'", self.database).as_str(),
                 format!("--nsTo='{}.*'", self.database).as_str(),
                 "--archive",
@@ -64,19 +52,13 @@ impl<'a> Destination for MongoDB<'a> {
 }
 
 fn check_connection_status(db: &MongoDB) -> Result<(), Error> {
-
     let mut echo_process = Command::new("echo")
         .arg(r#"'db.runCommand("ping").ok'"#)
         .stdout(Stdio::piped())
         .spawn()?;
 
     let mut mongo_process = Command::new("mongosh")
-        .args([
-            db.uri,
-            "--authenticationDatabase",
-            db.authentication_db,
-            "--quiet",
-        ])
+        .args([db.uri, "--quiet"])
         .stdin(echo_process.stdout.take().unwrap())
         .stdout(Stdio::inherit())
         .spawn()?;
@@ -93,11 +75,11 @@ mod tests {
     use crate::destination::Destination;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("mongodb://root:password@localhost:27018", "test", "admin")
+        MongoDB::new("mongodb://root:password@localhost:27018", "test")
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("mongodb://root:wrongpassword@localhost:27018", "test", "admin")
+        MongoDB::new("mongodb://root:wrongpassword@localhost:27018", "test")
     }
 
     #[test]

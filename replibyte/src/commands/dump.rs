@@ -138,16 +138,8 @@ where
                         let task = FullDumpTask::new(mysql, datastore, options);
                         task.run(progress_callback)?
                     }
-                    ConnectionUri::MongoDB(
-                        uri,
-                        database,
-                        authentication_db,
-                    ) => {
-                        let mongodb = MongoDB::new(
-                            uri.as_str(),
-                            database.as_str(),
-                            authentication_db.as_str(),
-                        );
+                    ConnectionUri::MongoDB(uri, database) => {
+                        let mongodb = MongoDB::new(uri.as_str(), database.as_str());
 
                         let task = FullDumpTask::new(mongodb, datastore, options);
                         task.run(progress_callback)?
@@ -452,16 +444,9 @@ where
                     let task = FullRestoreTask::new(&mut mysql, datastore, options);
                     task.run(progress_callback)?;
                 }
-                ConnectionUri::MongoDB(
-                    uri,
-                    database,
-                    authentication_db,
-                ) => {
-                    let mut mongodb = destination::mongodb::MongoDB::new(
-                        uri.as_str(),
-                        database.as_str(),
-                        authentication_db.as_str(),
-                    );
+                ConnectionUri::MongoDB(uri, database) => {
+                    let mut mongodb =
+                        destination::mongodb::MongoDB::new(uri.as_str(), database.as_str());
 
                     let task = FullRestoreTask::new(&mut mongodb, datastore, options);
                     task.run(progress_callback)?

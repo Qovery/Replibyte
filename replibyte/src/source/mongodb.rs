@@ -15,20 +15,11 @@ use dump_parser::mongodb::Archive;
 pub struct MongoDB<'a> {
     uri: &'a str,
     database: &'a str,
-    authentication_db: &'a str,
 }
 
 impl<'a> MongoDB<'a> {
-    pub fn new(
-        uri: &'a str,
-        database: &'a str,
-        authentication_db: &'a str,
-    ) -> Self {
-        MongoDB {
-            uri,
-            database,
-            authentication_db
-        }
+    pub fn new(uri: &'a str, database: &'a str) -> Self {
+        MongoDB { uri, database }
     }
 }
 
@@ -58,8 +49,6 @@ impl<'a> Source for MongoDB<'a> {
                 self.uri,
                 "--db",
                 self.database,
-                "--authenticationDatabase",
-                self.authentication_db,
                 "--archive", // dump to stdin
             ])
             .stdout(Stdio::piped())
@@ -86,12 +75,7 @@ fn check_connection_status(db: &MongoDB) -> Result<(), Error> {
         .spawn()?;
 
     let mut mongo_process = Command::new("mongosh")
-        .args([
-            db.uri,
-            "--authenticationDatabase",
-            db.authentication_db,
-            "--quiet"
-        ])
+        .args([db.uri, "--quiet"])
         .stdin(echo_process.stdout.take().unwrap())
         .stdout(Stdio::inherit())
         .spawn()?;
@@ -299,11 +283,17 @@ mod tests {
     use super::recursively_transform_document;
 
     fn get_mongodb() -> MongoDB<'static> {
-        MongoDB::new("mongodb://root:password@localhost:27018/", "test", "admin")
+        MongoDB::new(
+            "mongodb://root:password@localhost:27018/test?authSource=admin",
+            "test",
+        )
     }
 
     fn get_invalid_mongodb() -> MongoDB<'static> {
-        MongoDB::new("mongodb://root:wrongpassword@localhost:27018/", "test", "admin")
+        MongoDB::new(
+            "mongodb://root:wrongpassword@localhost:27018/test?authSource=admin",
+            "test",
+        )
     }
 
     #[test]

@@ -11,11 +11,8 @@ use crate::transformer::Transformer;
 use percent_encoding::percent_decode_str;
 use serde;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use url::Url;
-
-const DEFAULT_MONGODB_AUTH_DB: &str = "admin";
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -223,7 +220,7 @@ impl SourceConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct DestinationConfig {
     pub connection_uri: String,
-    pub wipe_database: Option<bool>
+    pub wipe_database: Option<bool>,
 }
 
 impl DestinationConfig {
@@ -376,14 +373,13 @@ type Port = u16;
 type Username = String;
 type Password = String;
 type Database = String;
-type AuthenticationDatabase = String;
 type Uri = String;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnectionUri {
     Postgres(Host, Port, Username, Password, Database),
     Mysql(Host, Port, Username, Password, Database),
-    MongoDB(Uri, Database, AuthenticationDatabase),
+    MongoDB(Uri, Database),
 }
 
 fn get_host(url: &Url) -> Result<String, Error> {
@@ -456,17 +452,6 @@ fn get_database(url: &Url, default: Option<&str>) -> Result<String, Error> {
     Ok(database.to_string())
 }
 
-fn get_mongodb_authentication_db(url: &Url) -> String {
-    let hash_query: HashMap<String, String> = url.query_pairs().into_owned().collect();
-
-    let authentication_database = match hash_query.get("authSource") {
-        Some(authentication_db) => authentication_db.to_string(),
-        None => DEFAULT_MONGODB_AUTH_DB.to_string(),
-    };
-
-    authentication_database
-}
-
 fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
     let uri = substitute_env_var(uri)?;
 
@@ -493,11 +478,7 @@ fn parse_connection_uri(uri: &str) -> Result<ConnectionUri, Error> {
             get_database(&url, None)?,
         ),
         scheme if scheme.to_lowercase() == "mongodb" || scheme.to_lowercase() == "mongodb+srv" => {
-            ConnectionUri::MongoDB(
-                url.to_string(),
-                get_database(&url, Some("test"))?,
-                get_mongodb_authentication_db(&url),
-            )
+            ConnectionUri::MongoDB(url.to_string(), get_database(&url, Some("test"))?)
         }
         scheme => {
             return Err(Error::new(
@@ -651,9 +632,9 @@ mod tests {
         assert_eq!(
             connection_uri,
             ConnectionUri::MongoDB(
-                "mongodb+srv://root:password@server.example.com/my_db?authSource=other_db".to_string(),
+                "mongodb+srv://root:password@server.example.com/my_db?authSource=other_db"
+                    .to_string(),
                 "my_db".to_string(),
-                "other_db".to_string(),
             )
         )
     }
