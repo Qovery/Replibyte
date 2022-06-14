@@ -199,42 +199,44 @@ fn transform_columns(
     let mut columns = vec![];
 
     for (i, column_name) in column_names.iter().enumerate() {
-        let value_token = column_values.get(i).unwrap();
-
-        let column = match value_token {
-            Token::Number(column_value, _) => {
-                if column_value.contains(".") {
-                    Column::FloatNumberValue(
-                        column_name.to_string(),
-                        column_value.parse::<f64>().unwrap(),
-                    )
-                } else {
-                    Column::NumberValue(
-                        column_name.to_string(),
-                        column_value.parse::<i128>().unwrap(),
-                    )
+        let column = if let Some(value_token) = column_values.get(i) {
+            match value_token {
+                Token::Number(column_value, _) => {
+                    if column_value.contains(".") {
+                        Column::FloatNumberValue(
+                            column_name.to_string(),
+                            column_value.parse::<f64>().unwrap(),
+                        )
+                    } else {
+                        Column::NumberValue(
+                            column_name.to_string(),
+                            column_value.parse::<i128>().unwrap(),
+                        )
+                    }
                 }
+                Token::Char(column_value) => {
+                    Column::CharValue(column_name.to_string(), column_value.clone())
+                }
+                Token::SingleQuotedString(column_value) => {
+                    Column::StringValue(column_name.to_string(), column_value.clone())
+                }
+                Token::NationalStringLiteral(column_value) => {
+                    Column::StringValue(column_name.to_string(), column_value.clone())
+                }
+                Token::HexStringLiteral(column_value) => {
+                    Column::StringValue(column_name.to_string(), column_value.clone())
+                }
+                Token::Word(w)
+                    if (w.value == "true" || w.value == "false")
+                        && w.quote_style == None
+                        && w.keyword == NoKeyword =>
+                {
+                    Column::BooleanValue(column_name.to_string(), w.value.parse::<bool>().unwrap())
+                }
+                _ => Column::None(column_name.to_string()),
             }
-            Token::Char(column_value) => {
-                Column::CharValue(column_name.to_string(), column_value.clone())
-            }
-            Token::SingleQuotedString(column_value) => {
-                Column::StringValue(column_name.to_string(), column_value.clone())
-            }
-            Token::NationalStringLiteral(column_value) => {
-                Column::StringValue(column_name.to_string(), column_value.clone())
-            }
-            Token::HexStringLiteral(column_value) => {
-                Column::StringValue(column_name.to_string(), column_value.clone())
-            }
-            Token::Word(w)
-                if (w.value == "true" || w.value == "false")
-                    && w.quote_style == None
-                    && w.keyword == NoKeyword =>
-            {
-                Column::BooleanValue(column_name.to_string(), w.value.parse::<bool>().unwrap())
-            }
-            _ => Column::None(column_name.to_string()),
+        } else {
+            Column::None(column_name.to_string())
         };
 
         // get the right transformer for the right column name
