@@ -34,6 +34,28 @@ Restrict access as much as possible. Replibyte just need write/read access withi
 6. Set the permissions you need for this user.
 ![](/img/datastore/aws/03.png)
 
+Here's an example IAM Policy for a user to be able to read/write to a specific bucket.
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "s3:Get*",
+                "s3:List*",
+                "s3:Put*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::your-bucket-name-here",
+                "arn:aws:s3:::your-bucket-name-here/*"
+            ]
+        }
+    ]
+}
+```
+
 7. Copy the **Access key** and the **Secret**
 
 ### Replibyte configuration
