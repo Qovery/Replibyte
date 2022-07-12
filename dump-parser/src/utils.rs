@@ -204,7 +204,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
             }
             b'\'' if !is_comment_line && !is_partial_comment_line => {
                 if stack.get(0) == Some(&b'\'') {
-                    if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
+                    if idx > 0 && &query[idx-1..idx] == "\\" {
                         // do nothing because the ' char is escaped
                     } else {
                         let _ = stack.remove(0);
