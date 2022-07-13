@@ -106,10 +106,32 @@ where
                 None => &empty_config,
             };
 
+            let empty_config = vec![];
+            let only_tables_config = match &source.only_tables {
+                Some(config) => config,
+                None => &empty_config,
+            };
+
+            for only_table in only_tables_config {
+                for skip in skip_config {
+                    if only_table.database == skip.database && only_table.table == skip.table {
+                        return Err(anyhow::Error::from(Error::new(
+                            ErrorKind::Other,
+                            format!(
+                                "Table \"{}.{}\" cannot be both in \"only_table\" and in \"skip_table\" at the same time",
+                                only_table.database,
+                                only_table.table
+                            )
+                        )));
+                    }
+                }
+            }
+
             let options = SourceOptions {
                 transformers: &transformers,
                 skip_config: &skip_config,
                 database_subset: &source.database_subset,
+                only_tables: &only_tables_config,
             };
 
             match args.source_type.as_ref().map(|x| x.as_str()) {

@@ -112,6 +112,11 @@ source:
       columns:
         - name: phone
           transformer_name: phone-number
+  only_tables: # optional - dumps only specified tables.
+    - database: public
+      table: orders
+    - database: public
+      table: customers
 datastore:
   aws:
     bucket: $BUCKET_NAME
