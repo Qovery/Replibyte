@@ -306,6 +306,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         assert!(p.read(source_options, |_, _| {}).is_ok());
@@ -317,6 +318,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         assert!(p.read(source_options, |_, _| {}).is_err());
@@ -331,6 +333,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         p.read(source_options, |original_query, query| {
