@@ -83,20 +83,35 @@ impl<'a> Source for Postgres<'a> {
     ) -> Result<(), Error> {
         let s_port = self.port.to_string();
 
+        let mut dump_args = vec![
+            "--column-inserts", // dump data as INSERT commands with column names
+            "--no-owner",       // skip restoration of object ownership
+            "-h",
+            self.host,
+            "-p",
+            s_port.as_str(),
+            "-U",
+            self.username,
+        ];
+
+        let only_tables_args: Vec<String> = options
+            .only_tables
+            .iter()
+            .map(|cfg| format!("--table={}.{}", cfg.database, cfg.table))
+            .collect();
+        let mut only_tables_args: Vec<&str> = only_tables_args
+            .iter()
+            .map(String::as_str)
+            .collect();
+
+        dump_args.append(&mut only_tables_args);
+
+        dump_args.push(self.database);
+
         // TODO: as for mysql we can exclude tables directly here so we can remove the skip_tables_map checks
         let mut process = Command::new("pg_dump")
             .env("PGPASSWORD", self.password)
-            .args([
-                "--column-inserts", // dump data as INSERT commands with column names
-                "--no-owner",       // skip restoration of object ownership
-                "-h",
-                self.host,
-                "-p",
-                s_port.as_str(),
-                "-U",
-                self.username,
-                self.database,
-            ])
+            .args(dump_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
@@ -493,6 +508,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         assert!(p.read(source_options, |original_query, query| {}).is_ok());
@@ -504,6 +520,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         assert!(p.read(source_options, |original_query, query| {}).is_err());
@@ -518,6 +535,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         let _ = p.read(source_options, |original_query, query| {
@@ -643,6 +661,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         let _ = p.read(source_options, |original_query, query| {
@@ -683,6 +702,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &skip_config,
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         let _ = p.read(source_options, |_original_query, query| {
@@ -733,6 +753,7 @@ mod tests {
                 ),
                 passthrough_tables: None,
             }),
+            only_tables: &vec![],
         };
 
         let mut rows_percent_50 = vec![];
@@ -769,6 +790,7 @@ mod tests {
                 ),
                 passthrough_tables: None,
             }),
+            only_tables: &vec![],
         };
 
         let mut rows_percent_30 = vec![];

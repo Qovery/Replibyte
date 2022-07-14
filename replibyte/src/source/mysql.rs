@@ -82,7 +82,6 @@ impl<'a> Source for Mysql<'a> {
             "--single-transaction", // https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html#option_mysqldump_single-transaction
             "--quick", // reads out large tables in a way that doesn't require having enough RAM to fit the full table in memory
             "--hex-blob",
-            "--databases",
             self.database,
         ];
 
@@ -95,6 +94,14 @@ impl<'a> Source for Mysql<'a> {
             ignore_tables_args.iter().map(String::as_str).collect();
 
         dump_args.append(&mut ignore_tables_args);
+
+        let mut only_tables_args: Vec<&str> = options
+            .only_tables
+            .iter()
+            .map(|cfg| String::as_str(&cfg.table))
+            .collect();
+
+        dump_args.append(&mut only_tables_args);
 
         let mut process = Command::new("mysqldump")
             .args(dump_args)
@@ -371,6 +378,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
 
         assert!(p.read(source_options, |_original_query, _query| {}).is_ok());
@@ -382,6 +390,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
         assert!(p
             .read(source_options, |_original_query, _query| {})
@@ -397,6 +406,7 @@ mod tests {
             transformers: &transformers,
             skip_config: &vec![],
             database_subset: &None,
+            only_tables: &vec![],
         };
         let _ = p.read(source_options, |original_query, query| {
             assert!(original_query.data().len() > 0);

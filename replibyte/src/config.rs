@@ -203,6 +203,7 @@ pub struct SourceConfig {
     pub transformers: Option<Vec<TransformerConfig>>,
     pub skip: Option<Vec<SkipConfig>>,
     pub database_subset: Option<DatabaseSubsetConfig>,
+    pub only_tables: Option<Vec<OnlyTablesConfig>>,
 }
 
 impl SourceConfig {
@@ -243,6 +244,12 @@ pub struct DatabaseSubsetConfig {
     pub strategy: DatabaseSubsetConfigStrategy,
     // copy the entire table - not affected by the subset algorithm
     pub passthrough_tables: Option<Vec<String>>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct OnlyTablesConfig {
+    pub database: String,
+    pub table: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
