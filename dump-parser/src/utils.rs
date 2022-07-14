@@ -506,6 +506,23 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
         }
 
         let s = list_statements(
+            "INSERT INTO public.toto (first_name, last_name) VALUES ('jo\\'hn', 'doe');",
+        );
+        assert_eq!(s.len(), 1);
+
+        match s.get(0).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(s) => {
+                assert!(s.valid);
+            }
+        }
+
+        let s = list_statements(
             "INSERT INTO public.toto (first_name, last_name, description) VALUES\
                 ('jo''hn', 'doe', 'wadawdw'';awdawd; awd;awdawdaw rm -rf ;dawd;');",
         );
