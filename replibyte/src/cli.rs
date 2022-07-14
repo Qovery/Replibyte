@@ -15,6 +15,15 @@ pub struct CLI {
     /// disable telemetry
     #[clap(short, long)]
     pub no_telemetry: bool,
+    /// choose log output format
+    #[clap(short, long)]
+    pub log_output_format: LogOutputFormat,
+}
+
+#[derive(Debug)]
+pub enum LogOutputFormat {
+    Interactive,
+    Stream,
 }
 
 /// sub commands
