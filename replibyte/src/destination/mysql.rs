@@ -67,6 +67,7 @@ impl<'a> Destination for Mysql<'a> {
                 "-u",
                 self.username,
                 &format!("-p{}", self.password),
+                self.database,
             ])
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
