@@ -67,6 +67,7 @@ impl<'a> Destination for Mysql<'a> {
                 "-u",
                 self.username,
                 &format!("-p{}", self.password),
+                self.database,
             ])
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -85,11 +86,11 @@ mod tests {
     use crate::destination::Destination;
 
     fn get_mysql() -> Mysql<'static> {
-        Mysql::new("127.0.0.1", 3306, "root", "root", "password")
+        Mysql::new("127.0.0.1", 3306, "mysql", "root", "password")
     }
 
     fn get_invalid_mysql() -> Mysql<'static> {
-        Mysql::new("127.0.0.1", 3306, "root", "root", "wrong_password")
+        Mysql::new("127.0.0.1", 3306, "mysql", "root", "wrong_password")
     }
 
     #[test]
