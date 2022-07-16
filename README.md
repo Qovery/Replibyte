@@ -95,4 +95,4 @@ a great product and a trustworthy source of inspiration for this project.
 
 ---
 
-Replibyte is initiated and maintained by [Qovery](https://www.qovery.com?ref=replibyte-readme)
+Replibyte is initiated and maintained by [Qovery](https://www.qovery.com?ref=replibyte-readme). 
