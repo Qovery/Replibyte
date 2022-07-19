@@ -43,6 +43,16 @@ pub trait Transformer {
     fn database_name(&self) -> &str;
     fn table_name(&self) -> &str;
     fn column_name(&self) -> &str;
+    fn quoted_table_name(&self) -> String {
+        let table_name = self.table_name();
+
+        if table_name.to_lowercase() != table_name {
+            return format!("\"{}\"", table_name);
+        }
+
+        String::from(table_name)
+    }
+
     fn database_and_table_name(&self) -> String {
         format!("{}.{}", self.database_name(), self.table_name())
     }
@@ -52,6 +62,15 @@ pub trait Transformer {
             "{}.{}.{}",
             self.database_name(),
             self.table_name(),
+            self.column_name()
+        )
+    }
+
+    fn database_and_quoted_table_and_column_name(&self) -> String {
+        format!(
+            "{}.{}.{}",
+            self.database_name(),
+            self.quoted_table_name(),
             self.column_name()
         )
     }

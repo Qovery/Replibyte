@@ -199,7 +199,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
     for transformer in options.transformers {
         let _ = transformer_by_db_and_table_and_column_name.insert(
-            transformer.database_and_table_and_column_name(),
+            transformer.database_and_quoted_table_and_column_name(),
             transformer,
         );
     }
