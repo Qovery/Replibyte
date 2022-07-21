@@ -492,4 +492,25 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
         };
         assert_eq!(get_row_type(&tokens), expected_row_type);
     }
+
+    #[test]
+    fn test_create_table_without_comma_at_the_end_of_the_last_property() {
+        let q = "CREATE TABLE `test` (
+ `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+ `withDefault` tinyint(1) NOT NULL DEFAULT '0',
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+        assert_eq!(is_create_table_statement(&tokens), true);
+
+        let q = "CREATE TABLE `test` (
+ `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+ `withDefault` tinyint(1) NOT NULL DEFAULT '0'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens = tokenizer.tokenize().unwrap();
+        assert_eq!(is_create_table_statement(&tokens), true);
+    }
 }
