@@ -513,7 +513,8 @@ impl<'a> Tokenizer<'a> {
                     chars.next(); // consume
 
                     if let Some(next_char) = chars.peek() {
-                        if ch != '`' && *next_char != ')' && *next_char != ',' {
+                        if ch != '`' && *next_char != ')' && *next_char != ',' && *next_char != '\n'
+                        {
                             is_escaped = true;
                             s.push(ch);
                         } else {
@@ -727,8 +728,8 @@ pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
 mod tests {
     use crate::mysql::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-        get_tokens_from_query_str, match_keyword_at_position, trim_pre_whitespaces, Token,
-        Tokenizer, Whitespace, get_single_quoted_string_value_at_position,
+        get_single_quoted_string_value_at_position, get_tokens_from_query_str,
+        match_keyword_at_position, trim_pre_whitespaces, Token, Tokenizer, Whitespace,
     };
 
     #[test]
@@ -1030,7 +1031,10 @@ VALUES ('Romaric', true);
         assert_eq!(tokens_result.is_ok(), true);
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
-        assert_eq!("customers", get_single_quoted_string_value_at_position(&tokens, 4).unwrap());
+        assert_eq!(
+            "customers",
+            get_single_quoted_string_value_at_position(&tokens, 4).unwrap()
+        );
         assert!(get_single_quoted_string_value_at_position(&tokens, 0).is_none());
     }
 }
