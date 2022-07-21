@@ -513,7 +513,8 @@ impl<'a> Tokenizer<'a> {
                     chars.next(); // consume
 
                     if let Some(next_char) = chars.peek() {
-                        if ch != '`' && *next_char != ')' && *next_char != ',' {
+                        if ch != '`' && *next_char != ')' && *next_char != ',' && *next_char != ';'
+                        {
                             is_escaped = true;
                             s.push(ch);
                         } else {
@@ -751,10 +752,10 @@ mod tests {
     fn tokenizer_for_create_table_query() {
         let q = r"
 CREATE TABLE `customer_store` (
-  `store_id` int NOT NULL,
+  `store_id` int NOT NULL COMMENT 'Field sample comment',
   `customer_id` int NOT NULL,
   KEY `customer_store_store_id_customer_id_index` (`store_id`,`customer_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table sample comment';";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
@@ -779,6 +780,10 @@ CREATE TABLE `customer_store` (
             Token::make_word("NOT", None),
             Token::Whitespace(Whitespace::Space),
             Token::make_keyword("NULL"),
+            Token::Whitespace(Whitespace::Space),
+            Token::make_keyword("COMMENT"),
+            Token::Whitespace(Whitespace::Space),
+            Token::SingleQuotedString("Field sample comment".to_string()),
             Token::Comma,
             Token::Whitespace(Whitespace::Newline),
             Token::Whitespace(Whitespace::Space),
@@ -819,6 +824,10 @@ CREATE TABLE `customer_store` (
             Token::make_keyword("COLLATE"),
             Token::Eq,
             Token::make_keyword("utf8mb4_unicode_ci"),
+            Token::Whitespace(Whitespace::Space),
+            Token::make_keyword("COMMENT"),
+            Token::Eq,
+            Token::SingleQuotedString("Table sample comment".to_string()),
             Token::SemiColon,
         ];
 
