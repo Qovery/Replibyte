@@ -909,7 +909,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
 name = "dump-parser"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "bson",
  "crc",
@@ -2205,7 +2205,7 @@ dependencies = [
 
 [[package]]
 name = "replibyte"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2693,7 +2693,7 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "subset"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "dump-parser",
  "md5",
