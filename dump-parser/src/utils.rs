@@ -205,7 +205,9 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'\'' if !is_comment_line && !is_partial_comment_line => {
                 if stack.get(0) == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
-                        // do nothing because the ' char is escaped
+                        // do nothing because the ' char is escaped via a double ''
+                    } else if idx > 0 && query.is_char_boundary(idx-1) && &query[idx-1..idx] == "\\" {
+                        // do nothing because the ' char is escaped via a backslash
                     } else {
                         let _ = stack.remove(0);
                     }
@@ -490,6 +492,23 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
         let s = list_statements(
             "INSERT INTO public.toto (first_name, last_name) VALUES\
                 ('jo''hn', 'doe');",
+        );
+        assert_eq!(s.len(), 1);
+
+        match s.get(0).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(s) => {
+                assert!(s.valid);
+            }
+        }
+
+        let s = list_statements(
+            "INSERT INTO public.toto (first_name, last_name) VALUES ('jo\\'hn', 'doe');",
         );
         assert_eq!(s.len(), 1);
 
