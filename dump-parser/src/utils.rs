@@ -159,31 +159,12 @@ fn list_statements(query: &str) -> Vec<Statement> {
     let mut sql_statements = vec![];
     let mut stack = vec![];
 
-    let is_next_char_comment = if query.find("--").is_some() {
-        // it means there is comments in this query string
-        let x: Box<dyn Fn(usize) -> bool> = if query.len() == query.chars().count() {
-            Box::new(|next_idx: usize| {
-                query.len() > next_idx && &query[next_idx..next_idx + 1] == "-"
-            })
-        } else {
-            // very low performance ... chars().nth(idx) is O(n)
-            Box::new(|next_idx: usize| {
-                query.len() > next_idx && query.chars().nth(next_idx) == Some('-')
-            })
-        };
-
-        x
-    // check if query contains multiple bytes utf-8 chars
-    } else {
-        let x: Box<dyn Fn(usize) -> bool> = Box::new(|_: usize| false);
-        x
-    };
-
     let mut is_statement_complete = true;
     let mut is_comment_line = false;
     let mut is_partial_comment_line = false;
     let mut start_index = 0usize;
     let mut previous_chars_are_whitespaces = true;
+    let query_bytes = query.as_bytes();
     for (idx, byte_char) in query.bytes().enumerate() {
         let next_idx = idx + 1;
 
@@ -241,7 +222,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'-' if !is_comment_line
                 && previous_chars_are_whitespaces
                 && is_statement_complete
-                && is_next_char_comment(next_idx) =>
+                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-' =>
             {
                 // comment
                 is_comment_line = true;
@@ -249,7 +230,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
             }
             // use grapheme instead of code points or bytes?
             b'-' if !is_statement_complete 
-                && is_next_char_comment(next_idx)
+                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-'
                 && stack.get(0) != Some(&b'\'') =>
             {
                 // comment
