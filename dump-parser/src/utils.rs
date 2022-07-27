@@ -248,7 +248,10 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 previous_chars_are_whitespaces = false;
             }
             // use grapheme instead of code points or bytes?
-            b'-' if !is_statement_complete && is_next_char_comment(next_idx) => {
+            b'-' if !is_statement_complete 
+                && is_next_char_comment(next_idx)
+                && stack.get(0) != Some(&b'\'') =>
+            {
                 // comment
                 is_partial_comment_line = true;
                 previous_chars_are_whitespaces = false;
@@ -388,6 +391,23 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
 
         let s = list_statements(
             "INSERT INTO public.toto (first_name, last_name) VALUES ('jo)hn', 'd(oe');",
+        );
+        assert_eq!(s.len(), 1);
+
+        match s.get(0).unwrap() {
+            Statement::NewLine => {
+                assert!(false);
+            }
+            Statement::CommentLine(_) => {
+                assert!(false);
+            }
+            Statement::Query(s) => {
+                assert!(s.valid);
+            }
+        }
+
+        let s = list_statements(
+            "INSERT INTO public.toto (first_name, last_name) VALUES ('jo--hn', 'd;--oe');",
         );
         assert_eq!(s.len(), 1);
 
