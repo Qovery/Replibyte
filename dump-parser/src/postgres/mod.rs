@@ -11,7 +11,7 @@ use crate::postgres::Keyword::{
 pub enum Token {
     /// An end-of-file marker, not a real token
     EOF,
-    /// An unsigned numeric literal
+    /// An unsigned numeric literal (numeric string, is_long)
     Number(String, bool),
     /// TABLE instruction
     Word(Word),
@@ -743,9 +743,13 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<
         .filter_map(|x| match *x {
             Token::Word(word) => Some(word.value.clone()),
             Token::SingleQuotedString(word) => Some(word.clone()),
-            Token::Number(value, is_negative) => Some(match is_negative {
+            Token::Number(value, is_long) => Some(match is_long {
                 false => value.clone(),
-                true => format!("-{}", value),
+                true => {
+                    let mut long_value = value.to_owned();
+                    long_value.push('L');
+                    long_value
+                },
             }),
             _ => None,
         })
