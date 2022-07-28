@@ -503,33 +503,23 @@ impl<'a> Tokenizer<'a> {
         chars: &mut Peekable<Chars<'_>>,
     ) -> Result<String, TokenizerError> {
         let mut s = String::new();
-        chars.next(); // consume the opening quote
+        let quote_char = chars.next().expect("opening quote character"); // consume the opening quote
 
+        // MySQL escape sequances - https://dev.mysql.com/doc/refman/5.6/en/string-literals.html#character-escape-sequences
         // slash escaping is specific to some dialect
-        let mut is_escaped = false;
         while let Some(&ch) = chars.peek() {
             match ch {
-                '\'' | '`' => {
+                '\\' => {
+                    // next char is escaped
                     chars.next(); // consume
-
-                    if let Some(next_char) = chars.peek() {
-                        if ch != '`'
-                            && *next_char != ')'
-                            && *next_char != ','
-                            && *next_char != ';'
-                            && *next_char != '\n'
-                        {
-                            is_escaped = true;
-                            s.push(ch);
-                        } else {
-                            return Ok(s);
-                        }
+                    s.push(ch);
+                    if let Some(next_char) = chars.next() {
+                        s.push(next_char);
                     }
-
-                    if !is_escaped {
-                        chars.next(); // consume
-                        s.push(ch);
-                    }
+                }
+                b if b == quote_char => {
+                    chars.next(); // consume
+                    return Ok(s);
                 }
                 _ => {
                     chars.next(); // consume
@@ -739,17 +729,17 @@ mod tests {
     #[test]
     fn test_tokenize_single_quoted_string() {
         // single quoted strings must end with a commar or a closing parenthese.
-        let q = "'People\'sRepublic',";
+        let q = "'People\\'sRepublic',";
         let tokenizer = Tokenizer::new(q);
         let mut chars = q.chars().peekable();
         let single_quoted_string = tokenizer.tokenize_single_quoted_string(&mut chars).unwrap();
-        assert_eq!(single_quoted_string, "People\'sRepublic".to_string());
+        assert_eq!(single_quoted_string, "People\\'sRepublic".to_string());
 
-        let q = "'People\'sRepublic')";
+        let q = "'People\\'sRepublic')";
         let tokenizer = Tokenizer::new(q);
         let mut chars = q.chars().peekable();
         let single_quoted_string = tokenizer.tokenize_single_quoted_string(&mut chars).unwrap();
-        assert_eq!(single_quoted_string, "People\'sRepublic".to_string());
+        assert_eq!(single_quoted_string, "People\\'sRepublic".to_string());
     }
 
     #[test]
@@ -880,7 +870,7 @@ CREATE TABLE `customer_store` (
 
     #[test]
     fn tokenize_insert_into_with_special_chars() {
-        let q = "INSERT INTO `country` VALUES ('CHN','China','Asia','Eastern Asia',9572900.00,-1523,1277558000,71.4,982268.00,917719.00,'Zhongquo','People\'sRepublic','Jiang Zemin',1891,'CN');";
+        let q = "INSERT INTO `country` VALUES ('CHN','China','Asia','Eastern Asia',9572900.00,-1523,1277558000,71.4,982268.00,917719.00,'Zhongquo','People\\'sRepublic','Jiang Zemin',1891,'CN');";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
@@ -919,7 +909,7 @@ CREATE TABLE `customer_store` (
             Token::Comma,
             Token::SingleQuotedString("Zhongquo".to_string()),
             Token::Comma,
-            Token::SingleQuotedString("People\'sRepublic".to_string()),
+            Token::SingleQuotedString("People\\'sRepublic".to_string()),
             Token::Comma,
             Token::SingleQuotedString("Jiang Zemin".to_string()),
             Token::Comma,
@@ -963,7 +953,7 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,'2022-04-13
 
     #[test]
     fn test_get_column_values_from_insert_into_query() {
-        let q = "INSERT INTO `customers` (`id`, `first_name`, `last_name`, `email`, `currency`, `accepts_marketing`, `birthdate`, `created_at`, `updated_at`) VALUES (1,'Stanford','People\'sRepublic','alaina.moore@example.net','EUR',1,NULL,'2022-04-13 20:29:23','2022-04-13 20:29:23');";
+        let q = "INSERT INTO `customers` (`id`, `first_name`, `last_name`, `email`, `currency`, `accepts_marketing`, `birthdate`, `created_at`, `updated_at`) VALUES (1,'Stanford','People\\'sRepublic','alaina.moore@example.net','EUR',1,NULL,'2022-04-13 20:29:23','2022-04-13 20:29:23');";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
@@ -978,7 +968,7 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,'2022-04-13
             vec![
                 &Token::Number("1".to_string(), false),
                 &Token::SingleQuotedString("Stanford".to_string()),
-                &Token::SingleQuotedString("People\'sRepublic".to_string()),
+                &Token::SingleQuotedString("People\\'sRepublic".to_string()),
                 &Token::SingleQuotedString("alaina.moore@example.net".to_string()),
                 &Token::SingleQuotedString("EUR".to_string()),
                 &Token::Number("1".to_string(), false),

@@ -530,20 +530,22 @@ impl<'a> Tokenizer<'a> {
         let mut s = String::new();
         chars.next(); // consume the opening quote
 
-        // slash escaping is specific to some dialect
-        let mut is_escaped = false;
+        // PostgreSQL - https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-BACKSLASH-TABLE
+        // in postgres quotes are escaped with ''
         while let Some(&ch) = chars.peek() {
             match ch {
                 '\'' => {
-                    chars.next(); // consume
-                    if is_escaped {
-                        s.push(ch);
-                        is_escaped = false;
-                    } else if chars.peek().map(|c| *c == '\'').unwrap_or(false) {
-                        s.push(ch);
-                        chars.next();
-                    } else {
-                        return Ok(s);
+                    chars.next(); // consume '
+                    match chars.peek() {
+                        // escaped
+                        Some('\'') => {
+                            chars.next(); // consume second '
+                            s.push('\'');
+                            s.push('\'');
+                        }
+                        _ => {
+                            return Ok(s);
+                        }
                     }
                 }
                 _ => {
