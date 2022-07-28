@@ -202,7 +202,8 @@ fn transform_columns(
     // R Paren      -> position X?
     let column_names = get_column_names_from_insert_into_query(&tokens);
     let column_values = get_column_values_from_insert_into_query(&tokens);
-
+    assert_eq!(column_names.len(), column_values.len(), "Column names do not match values: got {} names and {} values", column_names.len(), column_values.len());
+    
     let mut original_columns = vec![];
     let mut columns = vec![];
 
