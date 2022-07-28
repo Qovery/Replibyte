@@ -11,7 +11,7 @@ use crate::mysql::Keyword::{
 pub enum Token {
     /// An end-of-file marker, not a real token
     EOF,
-    /// An unsigned numeric literal
+    /// An signed numeric literal
     Number(String, bool),
     /// TABLE instruction
     Word(Word),
@@ -320,39 +320,7 @@ impl<'a> Tokenizer<'a> {
                     Ok(Some(Token::SingleQuotedString(s)))
                 }
                 // numbers and period
-                '0'..='9' | '.' => {
-                    let mut s = peeking_take_while(chars, |ch| matches!(ch, '0'..='9'));
-
-                    // match binary literal that starts with 0x
-                    if s == "0" && chars.peek() == Some(&'x') {
-                        chars.next();
-                        let s2 = peeking_take_while(
-                            chars,
-                            |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'),
-                        );
-                        return Ok(Some(Token::HexStringLiteral(s2)));
-                    }
-
-                    // match one period
-                    if let Some('.') = chars.peek() {
-                        s.push('.');
-                        chars.next();
-                    }
-                    s += &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'));
-
-                    // No number -> Token::Period
-                    if s == "." {
-                        return Ok(Some(Token::Period));
-                    }
-
-                    let long = if chars.peek() == Some(&'L') {
-                        chars.next();
-                        true
-                    } else {
-                        false
-                    };
-                    Ok(Some(Token::Number(s, long)))
-                }
+                '0'..='9' | '.' => self.tokenize_number_literal(chars, None),
                 // punctuation
                 '(' => self.consume_and_return(chars, Token::LParen),
                 ')' => self.consume_and_return(chars, Token::RParen),
@@ -369,6 +337,8 @@ impl<'a> Tokenizer<'a> {
                                 comment,
                             })))
                         }
+                        // This is still not exhaustive as "SELECT - 1 as test" in postgres would return a numeric -1.
+                        Some('0'..='9') => self.tokenize_number_literal(chars, Some('-')),
                         // a regular '-' operator
                         _ => Ok(Some(Token::Minus)),
                     }
@@ -384,7 +354,15 @@ impl<'a> Tokenizer<'a> {
                         _ => Ok(Some(Token::Div)),
                     }
                 }
-                '+' => self.consume_and_return(chars, Token::Plus),
+                '+' => {
+                    chars.next(); // consume the '+'
+                    match chars.peek() {
+                        // This is still not exhaustive as "SELECT + 1 as test" in postgres would return a numeric 1.
+                        Some('0'..='9') => self.tokenize_number_literal(chars, Some('+')),
+                        // a regular '-' operator
+                        _ => Ok(Some(Token::Plus)),
+                    }
+                }
                 '*' => self.consume_and_return(chars, Token::Mul),
                 '%' => self.consume_and_return(chars, Token::Mod),
                 '=' => {
@@ -529,6 +507,51 @@ impl<'a> Tokenizer<'a> {
         }
 
         self.tokenizer_error("Unterminated string literal")
+    }
+
+    // Read a signed number literal
+    fn tokenize_number_literal(
+        &self,
+        chars: &mut Peekable<Chars<'_>>,
+        sign: Option<char>
+    ) -> Result<Option<Token>, TokenizerError> {
+        let mut s = match sign {
+            Some(ch) if ch == '+' || ch == '-' => {
+                String::from(ch) + &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+            }
+            Some(_) => panic!("invalid sign"),
+            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+        };
+
+        // match binary literal that starts with 0x
+        if s == "0" && chars.peek() == Some(&'x') {
+            chars.next();
+            let s2 = peeking_take_while(
+                chars,
+                |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'),
+            );
+            return Ok(Some(Token::HexStringLiteral(s2)));
+        }
+
+        // match one period
+        if let Some('.') = chars.peek() {
+            s.push('.');
+            chars.next();
+        }
+        s += &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'));
+
+        // No number -> Token::Period
+        if s == "." {
+            return Ok(Some(Token::Period));
+        }
+
+        let long = if chars.peek() == Some(&'L') {
+            chars.next();
+            true
+        } else {
+            false
+        };
+        Ok(Some(Token::Number(s, long)))
     }
 
     fn tokenize_multiline_comment(
@@ -870,7 +893,7 @@ CREATE TABLE `customer_store` (
 
     #[test]
     fn tokenize_insert_into_with_special_chars() {
-        let q = "INSERT INTO `country` VALUES ('CHN','China','Asia','Eastern Asia',9572900.00,-1523,1277558000,71.4,982268.00,917719.00,'Zhongquo','People\\'sRepublic','Jiang Zemin',1891,'CN');";
+        let q = "INSERT INTO `country` VALUES ('CHN','China','Asia','Eastern Asia',9572900.00,-1523,+1277558000,71.4,982268.00,917719.00,'Zhongquo','People\\'sRepublic','Jiang Zemin',1891,'CN');";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
@@ -896,10 +919,9 @@ CREATE TABLE `customer_store` (
             Token::Comma,
             Token::Number("9572900.00".to_string(), false),
             Token::Comma,
-            Token::Minus,
-            Token::Number("1523".to_string(), false),
+            Token::Number("-1523".to_string(), false),
             Token::Comma,
-            Token::Number("1277558000".to_string(), false),
+            Token::Number("+1277558000".to_string(), false),
             Token::Comma,
             Token::Number("71.4".to_string(), false),
             Token::Comma,
@@ -1038,5 +1060,26 @@ VALUES ('Romaric', true);
             get_single_quoted_string_value_at_position(&tokens, 4).unwrap()
         );
         assert!(get_single_quoted_string_value_at_position(&tokens, 0).is_none());
+    }
+
+    #[test]
+    fn test_insert_into_with_numbers() {
+        let q = "INSERT INTO test (postive_number, negative_number, long_number) VALUES (+5.75, -10.20, 20L);";
+
+        let mut tokenizer = Tokenizer::new(q);
+        let tokens_result = tokenizer.tokenize();
+        assert_eq!(tokens_result.is_ok(), true);
+
+        let tokens = trim_pre_whitespaces(tokens_result.unwrap());
+        let column_values = get_column_values_from_insert_into_query(&tokens);
+
+        assert_eq!(
+            column_values,
+            vec![
+                &Token::Number("+5.75".to_string(), false),
+                &Token::Number("-10.20".to_string(), false),
+                &Token::Number("20".to_string(), true),
+            ]
+        );
     }
 }
