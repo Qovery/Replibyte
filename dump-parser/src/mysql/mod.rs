@@ -11,7 +11,7 @@ use crate::mysql::Keyword::{
 pub enum Token {
     /// An end-of-file marker, not a real token
     EOF,
-    /// An signed numeric literal
+    /// A signed numeric literal
     Number(String, bool),
     /// TABLE instruction
     Word(Word),
