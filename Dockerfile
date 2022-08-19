@@ -36,7 +36,7 @@ RUN rm ./target/release/deps/replibyte*
 RUN cargo build --release
 
 # our final base
-FROM rust:1.59-slim-buster
+FROM debian:buster-slim
 
 # used to configure Github Packages
 LABEL org.opencontainers.image.source https://github.com/qovery/replibyte
