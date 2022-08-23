@@ -99,10 +99,7 @@ impl<'a> Source for Postgres<'a> {
             .iter()
             .map(|cfg| format!("--table={}.{}", cfg.database, cfg.table))
             .collect();
-        let mut only_tables_args: Vec<&str> = only_tables_args
-            .iter()
-            .map(String::as_str)
-            .collect();
+        let mut only_tables_args: Vec<&str> = only_tables_args.iter().map(String::as_str).collect();
 
         dump_args.append(&mut only_tables_args);
 
@@ -219,29 +216,33 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                 table_name,
             } => {
                 if !skip_tables_map.contains_key(&format!("{}.{}", database_name, table_name)) {
-                    let (original_columns, columns) = transform_columns(
-                        database_name.as_str(),
-                        table_name.as_str(),
-                        &tokens,
-                        &transformer_by_db_and_table_and_column_name,
-                    );
+                    if transformer_by_db_and_table_and_column_name.len() == 0 {
+                        no_change_query_callback(query_callback.borrow_mut(), query);
+                    } else {
+                        let (original_columns, columns) = transform_columns(
+                            database_name.as_str(),
+                            table_name.as_str(),
+                            &tokens,
+                            &transformer_by_db_and_table_and_column_name,
+                        );
 
-                    query_callback(
-                        to_query(
-                            Some(database_name.as_str()),
-                            InsertIntoQuery {
-                                table_name: table_name.to_string(),
-                                columns: original_columns,
-                            },
-                        ),
-                        to_query(
-                            Some(database_name.as_str()),
-                            InsertIntoQuery {
-                                table_name: table_name.to_string(),
-                                columns,
-                            },
-                        ),
-                    )
+                        query_callback(
+                            to_query(
+                                Some(database_name.as_str()),
+                                InsertIntoQuery {
+                                    table_name: table_name.to_string(),
+                                    columns: original_columns,
+                                },
+                            ),
+                            to_query(
+                                Some(database_name.as_str()),
+                                InsertIntoQuery {
+                                    table_name: table_name.to_string(),
+                                    columns,
+                                },
+                            ),
+                        )
+                    }
                 }
             }
             RowType::CreateTable {
@@ -296,7 +297,13 @@ fn transform_columns(
     // R Paren      -> position X?
     let column_names = get_column_names_from_insert_into_query(&tokens);
     let column_values = get_column_values_from_insert_into_query(&tokens);
-    assert_eq!(column_names.len(), column_values.len(), "Column names do not match values: got {} names and {} values", column_names.len(), column_values.len());
+    assert_eq!(
+        column_names.len(),
+        column_values.len(),
+        "Column names do not match values: got {} names and {} values",
+        column_names.len(),
+        column_values.len()
+    );
 
     let mut original_columns = vec![];
     let mut columns = vec![];
