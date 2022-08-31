@@ -99,8 +99,10 @@ fn main() {
         let _ = telemetry_client.capture_command(&telemetry_config, sub_commands, &env_args, None);
     }
 
+    let mut exit_code = 0;
     if let Err(err) = run(config, &sub_commands) {
         eprintln!("{}", err);
+        exit_code = 1;
     }
 
     if let Some(telemetry_client) = &telemetry_client {
@@ -110,6 +112,9 @@ fn main() {
             &env_args,
             Some(epoch_millis() - start_exec_time),
         );
+    }
+    if exit_code != 0 {
+         std::process::exit(exit_code);
     }
 }
 
