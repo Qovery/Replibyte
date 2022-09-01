@@ -14,8 +14,9 @@ datastore:
   aws:
     bucket: $BUCKET_NAME
     region: $S3_REGION
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+    credentials:
+      access_key_id: $ACCESS_KEY_ID
+      secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
   connection_uri: postgres://user:password@host:port/db # you can use $DATABASE_URL
 ```
@@ -121,8 +122,9 @@ datastore:
   aws:
     bucket: $BUCKET_NAME
     region: $S3_REGION
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $AWS_SECRET_ACCESS_KEY
+    credentials:
+      access_key_id: $ACCESS_KEY_ID
+      secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
   connection_uri: postgres://user:password@host:port/db # you can use $DATABASE_URL
 ```
