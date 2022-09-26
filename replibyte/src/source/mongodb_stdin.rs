@@ -10,7 +10,7 @@ pub struct MongoDBStdin {}
 
 impl Default for MongoDBStdin {
     fn default() -> Self {
-        MongoDBStdin {}
+        Self {}
     }
 }
 

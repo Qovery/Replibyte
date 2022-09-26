@@ -13,7 +13,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use migration::{migrations, Migrator};
 use utils::get_replibyte_version;
 
-use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI};
+use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI, SourceCommand};
 use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
 use crate::datastore::local_disk::LocalDisk;
 use crate::datastore::s3::S3;
@@ -186,6 +186,11 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
                     commands::dump::restore_remote(args, datastore, config, progress_callback)
                 }
             },
+        },
+        SubCommand::Source(cmd) => match cmd {
+            SourceCommand::Schema => {
+                commands::source::schema(config)
+            }
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {

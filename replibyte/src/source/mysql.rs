@@ -5,17 +5,17 @@ use std::process::{Command, Stdio};
 
 use dump_parser::mysql::Keyword::NoKeyword;
 use dump_parser::mysql::{
-    get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
-    get_single_quoted_string_value_at_position, get_tokens_from_query_str,
-    match_keyword_at_position, Keyword, Token,
+    get_column_names_from_insert_into_query, get_column_names_from_create_query,
+    get_column_values_from_insert_into_query, get_single_quoted_string_value_at_position, 
+    get_tokens_from_query_str, match_keyword_at_position, Keyword, Token,
 };
 use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
 
 use crate::connector::Connector;
-use crate::source::Source;
+use crate::source::{Explain, Source};
 use crate::transformer::Transformer;
 use crate::types::{Column, InsertIntoQuery, OriginalQuery, Query};
-use crate::utils::{binary_exists, wait_for_command};
+use crate::utils::{binary_exists, table, wait_for_command};
 
 use super::SourceOptions;
 
@@ -54,7 +54,47 @@ impl<'a> Mysql<'a> {
 
 impl<'a> Connector for Mysql<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        binary_exists("mysqldump")
+        let _ = binary_exists("mysqldump")?;
+
+        Ok(())
+    }
+}
+
+impl<'a> Explain for Mysql<'a> {
+    fn schema(&self) -> Result<(), Error> {
+        let s_port = self.port.to_string();
+        let password = &format!("-p{}", self.password);
+
+        let dump_args = vec![
+            "-h",
+            self.host,
+            "-P",
+            s_port.as_str(),
+            "-u",
+            self.username,
+            password,
+            "--no-data", // do not write any table row information
+            "--quick", // reads out large tables in a way that doesn't require having enough RAM to fit the full table in memory
+            "--hex-blob",
+            self.database,
+        ];
+
+        let mut process = Command::new("mysqldump")
+            .args(dump_args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let stdout = process
+            .stdout
+            .take()
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
+
+        let reader = BufReader::new(stdout);
+
+        read_and_parse_schema(reader)?;
+
+        wait_for_command(&mut process)
     }
 }
 
@@ -180,6 +220,36 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     }
 }
 
+pub fn read_and_parse_schema<R: Read>(reader: BufReader<R>) -> Result<(), Error> {
+    match list_sql_queries_from_dump_reader(reader, |query| {
+        let tokens = get_tokens_from_query_str(query.clone());
+        match get_row_type(&tokens) {
+            RowType::CreateTable { table_name } => {
+                let column_schema = get_column_names_from_create_query(&tokens);
+
+                let mut table = table();
+                table.set_titles(row!["Field"]);
+
+                column_schema.iter().for_each(|column_name| {
+                    table.add_row(row![column_name]);
+                });
+
+                println!(" Table {}", table_name);
+
+                let _ = table.printstd();
+
+                println!();
+            }
+            _ => {}
+        }
+
+        ListQueryResult::Continue
+    }) {
+        Ok(_) => Ok(()),
+        Err(err) => panic!("{:?}", err),
+    }
+}
+
 fn no_change_query_callback<F: FnMut(OriginalQuery, Query)>(query_callback: &mut F, query: &str) {
     query_callback(
         // there is no diff between the original and the modified one
@@ -202,8 +272,14 @@ fn transform_columns(
     // R Paren      -> position X?
     let column_names = get_column_names_from_insert_into_query(&tokens);
     let column_values = get_column_values_from_insert_into_query(&tokens);
-    assert_eq!(column_names.len(), column_values.len(), "Column names do not match values: got {} names and {} values", column_names.len(), column_values.len());
-    
+    assert_eq!(
+        column_names.len(),
+        column_values.len(),
+        "Column names do not match values: got {} names and {} values",
+        column_names.len(),
+        column_values.len()
+    );
+
     let mut original_columns = vec![];
     let mut columns = vec![];
 
