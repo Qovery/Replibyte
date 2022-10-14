@@ -3,14 +3,15 @@ use std::io::{BufReader, Error, ErrorKind, Read};
 use std::process::{Command, Stdio};
 
 use crate::connector::Connector;
-use crate::source::Source;
+use crate::source::{Explain, Source};
 use crate::transformer::Transformer;
 use crate::types::{Column, OriginalQuery, Query};
-use crate::utils::{binary_exists, wait_for_command};
+use crate::utils::{binary_exists, table, wait_for_command};
 use crate::SourceOptions;
 
 use bson::{Bson, Document};
 use dump_parser::mongodb::Archive;
+use mongodb_schema_parser::SchemaParser;
 
 pub struct MongoDB<'a> {
     uri: &'a str,
@@ -33,6 +34,35 @@ impl<'a> Connector for MongoDB<'a> {
     }
 }
 
+impl<'a> Explain for MongoDB<'a> {
+    fn schema(&self) -> Result<(), Error> {
+        let dump_args = vec![
+            "--uri",
+            self.uri,
+            "--db",
+            self.database,
+            "--archive", // dump to stdin
+        ];
+
+        let mut process = Command::new("mongodump")
+            .args(dump_args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let stdout = process
+            .stdout
+            .take()
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture standard output."))?;
+
+        let reader = BufReader::new(stdout);
+
+        read_and_parse_schema(reader)?;
+
+        wait_for_command(&mut process)
+    }
+}
+
 impl<'a> Source for MongoDB<'a> {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,
@@ -43,14 +73,16 @@ impl<'a> Source for MongoDB<'a> {
             todo!("database subset not supported yet for MongoDB source")
         }
 
+        let dump_args = vec![
+            "--uri",
+            self.uri,
+            "--db",
+            self.database,
+            "--archive", // dump to stdin
+        ];
+
         let mut process = Command::new("mongodump")
-            .args([
-                "--uri",
-                self.uri,
-                "--db",
-                self.database,
-                "--archive", // dump to stdin
-            ])
+            .args(dump_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
@@ -264,6 +296,35 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     let query = Query(archive.into_bytes()?);
 
     query_callback(original_query, query);
+    Ok(())
+}
+
+pub fn read_and_parse_schema<R: Read>(reader: BufReader<R>) -> Result<(), Error> {
+    let mut archive = Archive::from_reader(reader)?;
+
+    archive.alter_docs(|prefixed_collections| {
+        for (name, collection) in prefixed_collections.to_owned() {
+            let mut table = table();
+
+            table.set_titles(row![format!("Collection {}", name)]);
+
+            let mut schema_parser = SchemaParser::new();
+
+            for doc in collection {
+                schema_parser.write_bson(doc).unwrap();
+            }
+
+            let schema = schema_parser.flush();
+
+            let json_data = serde_json::to_string_pretty(&schema).unwrap();
+
+            table.add_row(row![name]);
+            table.add_row(row![json_data]);
+
+            let _ = table.printstd();
+        }
+    });
+
     Ok(())
 }
 

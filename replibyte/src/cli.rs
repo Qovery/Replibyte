@@ -23,7 +23,10 @@ pub enum SubCommand {
     /// all dump commands
     #[clap(subcommand)]
     Dump(DumpCommand),
-    /// all transformers command
+    /// all source commands
+    #[clap(subcommand)]
+    Source(SourceCommand),
+    /// all transformer commands
     #[clap(subcommand)]
     Transformer(TransformerCommand),
 }
@@ -121,4 +124,11 @@ pub struct DumpDeleteArgs {
     /// Keep only the last N dumps
     #[clap(long, group = "delete-mode")]
     pub keep_last: Option<usize>,
+}
+
+/// all source commands
+#[derive(Subcommand, Debug)]
+pub enum SourceCommand {
+    /// Show the database schema. When used with MongoDB, the schema will be probabilistic and returned as a JSON document
+    Schema,
 }

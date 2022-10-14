@@ -660,6 +660,40 @@ pub fn get_single_quoted_string_value_at_position(tokens: &Vec<Token>, pos: usiz
     None
 }
 
+pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
+    if !match_keyword_at_position(Create, &tokens, 0) {
+        return Vec::new();
+    }
+
+    let mut consumed = false;
+    tokens
+        .iter()
+        .skip_while(|token| match **token {
+            Token::LParen => false,
+            _ => true,
+        })
+        .take_while(|token| match **token {
+            Token::RParen => false,
+            _ => true,
+        })
+        .filter_map(|token| match token {
+            Token::Comma => {
+                consumed = false;
+                None
+            }
+            Token::SingleQuotedString(name) => {
+                if consumed {
+                    None
+                } else {
+                    consumed = true;
+                    Some(name.as_str().to_string())
+                }
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+}
+
 pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str> {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)

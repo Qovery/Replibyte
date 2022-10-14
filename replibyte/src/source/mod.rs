@@ -12,6 +12,10 @@ pub mod mysql_stdin;
 pub mod postgres;
 pub mod postgres_stdin;
 
+pub trait Explain: Connector {
+    fn schema(&self) -> Result<(), Error>;
+}
+
 pub trait Source: Connector {
     fn read<F: FnMut(OriginalQuery, Query)>(
         &self,

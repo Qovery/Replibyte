@@ -9,15 +9,9 @@ use crate::SourceOptions;
 /// Source Postgres dump from STDIN
 pub struct PostgresStdin {}
 
-impl PostgresStdin {
-    pub fn new() -> Self {
-        PostgresStdin {}
-    }
-}
-
 impl Default for PostgresStdin {
     fn default() -> Self {
-        PostgresStdin {}
+        Self {}
     }
 }
 

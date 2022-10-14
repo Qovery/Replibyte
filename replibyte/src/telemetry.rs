@@ -1,5 +1,5 @@
 use crate::config::{ConnectionUri, TransformerTypeConfig};
-use crate::{Config, DumpCommand, RestoreCommand, SubCommand, TransformerCommand};
+use crate::{Config, DumpCommand, RestoreCommand, SourceCommand, SubCommand, TransformerCommand};
 use chrono::{NaiveDateTime, Utc};
 use reqwest::blocking::Client as HttpClient;
 use reqwest::header::CONTENT_TYPE;
@@ -140,6 +140,9 @@ impl TelemetryClient {
                     RestoreCommand::Local(_) => "dump-restore-local",
                     RestoreCommand::Remote(_) => "dump-restore-remote",
                 },
+            },
+            SubCommand::Source(cmd) => match cmd {
+                SourceCommand::Schema => "source-schema",
             },
             SubCommand::Transformer(cmd) => match cmd {
                 TransformerCommand::List => "transformer-list",

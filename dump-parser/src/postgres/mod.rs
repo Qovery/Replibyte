@@ -779,6 +779,40 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<
         .collect::<Vec<_>>()
 }
 
+pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
+    if !match_keyword_at_position(Create, &tokens, 0) {
+        return Vec::new();
+    }
+
+    let mut consumed = false;
+    tokens
+        .iter()
+        .skip_while(|token| match **token {
+            Token::LParen => false,
+            _ => true,
+        })
+        .take_while(|token| match **token {
+            Token::RParen => false,
+            _ => true,
+        })
+        .filter_map(|token| match token {
+            Token::Comma => {
+                consumed = false;
+                None
+            }
+            Token::Word(word) => {
+                if consumed {
+                    None
+                } else {
+                    consumed = true;
+                    Some(word.value.as_str().to_string())
+                }
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+}
+
 pub fn get_tokens_from_query_str(query: &str) -> Vec<Token> {
     // query by query
     let mut tokenizer = Tokenizer::new(query);

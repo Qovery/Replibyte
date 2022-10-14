@@ -9,15 +9,9 @@ use crate::SourceOptions;
 /// Source MySQL dump from STDIN
 pub struct MysqlStdin {}
 
-impl MysqlStdin {
-    pub fn new() -> Self {
-        MysqlStdin {}
-    }
-}
-
 impl Default for MysqlStdin {
     fn default() -> Self {
-        MysqlStdin {}
+        Self {}
     }
 }
 
