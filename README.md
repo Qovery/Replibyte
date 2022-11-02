@@ -11,6 +11,13 @@
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
 
+<p align="center">
+<a href="https://runacap.com/ross-index/q3-2022/" target="_blank" rel="noopener">
+<img style="width: 260px; height: 56px" src="https://runacap.com/wp-content/uploads/2022/10/ROSS_badge_black_Q3_2022.svg" alt="ROSS Index - Fastest Growing Open-Source Startups in Q3 2022 | Runa Capital" width="260" height="56" />
+</a>
+
+</p>
+
 ## Prerequisites
 
 - MacOSX / Linux / Windows
