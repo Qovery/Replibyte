@@ -104,6 +104,8 @@ pub struct DumpCreateArgs {
     /// import dump from stdin
     #[clap(name = "input", short, long, requires = "source_type")]
     pub input: bool,
+    #[clap(name = "buffer_size", short, long, default_value_t = 100)]
+    pub buffer_size: usize,
     #[clap(short, long, parse(from_os_str), value_name = "dump file")]
     /// dump file
     pub file: Option<PathBuf>,
