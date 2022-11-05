@@ -428,19 +428,14 @@ fn create_bucket<'a, S: AsRef<str>>(
 
     let cfg = cfg.build();
 
-    if let Ok(output) = block_on(client.list_buckets().send()) {
-        if let Some(buckets) = output.buckets {
-            if buckets.iter().any(|b| {
-                if let Some(name) = &b.name {
-                    name == bucket
-                } else {
-                    false
-                }
-            }) {
-                info!("bucket {} exists", bucket);
-                return Ok(());
-            }
-        }
+    if let Ok(_) = block_on(
+        client
+            .get_bucket_location()
+            .bucket(bucket)
+            .send(),
+    ) {
+        info!("bucket {} exists", bucket);
+        return Ok(());
     }
 
     let result = block_on(
