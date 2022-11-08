@@ -73,10 +73,7 @@ where
             if buf_bytes.len() > 1 {
                 let query_str = match str::from_utf8(buf_bytes.as_slice()) {
                     Ok(t) => t,
-                    Err(e) => {
-                        warning!("Failed to parse {} as utf-8. Skipping query.", buf_bytes.as_slice())
-                        continue
-                    }
+                    Err(e) => continue
                 };
 
                 for statement in list_statements(query_str) {
