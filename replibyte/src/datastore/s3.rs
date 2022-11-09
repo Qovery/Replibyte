@@ -314,9 +314,9 @@ fn write_objects<B: Datastore>(
     };
 
     let data_size = data.len();
-    let key = format!("{}/{}.dump", root_key, file_part);
+    let key = format!("{}/{:02}.dump", root_key, file_part);
 
-    info!("upload object '{}' part {} on", key.as_str(), file_part);
+    info!("upload object '{}' part {:02} on", key.as_str(), file_part);
 
     let _ = create_object(client, bucket, key.as_str(), data)?;
 

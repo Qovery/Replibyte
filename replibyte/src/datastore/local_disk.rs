@@ -124,7 +124,7 @@ impl Datastore for LocalDisk {
 
         let data_size = data.len();
         let dump_dir_path = format!("{}/{}", self.dir, self.dump_name);
-        let dump_file_path = format!("{}/{}.dump", dump_dir_path, file_part);
+        let dump_file_path = format!("{}/{:02}.dump", dump_dir_path, file_part);
 
         // create the dump directory if needed
         DirBuilder::new()
@@ -314,7 +314,7 @@ mod tests {
 
         // part 1 of dump should exists
         assert!(Path::new(&format!(
-            "{}/{}/1.dump",
+            "{}/{}/01.dump",
             dir.path().to_str().unwrap(),
             dump.directory_name
         ))
