@@ -71,7 +71,10 @@ where
             let mut buf_bytes_to_keep: Vec<u8> = Vec::new();
 
             if buf_bytes.len() > 1 {
-                let query_str = str::from_utf8(buf_bytes.as_slice()).unwrap(); // FIXME remove unwrap
+                let query_str = match str::from_utf8(buf_bytes.as_slice()) {
+                    Ok(t) => t,
+                    Err(e) => continue
+                };
 
                 for statement in list_statements(query_str) {
                     match statement {
