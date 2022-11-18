@@ -43,7 +43,7 @@ I will take our final `conf.yaml` file from the ["create a dump"](/docs/guides/c
 
 :::caution
 
-You must name your replibyte configuration file `replibyte.conf`. Otherwise, it will not work.
+You must name your replibyte configuration file `replibyte.yaml`. Otherwise, it will not work.
 
 :::
 
