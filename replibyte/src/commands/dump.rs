@@ -132,6 +132,7 @@ where
                 skip_config: &skip_config,
                 database_subset: &source.database_subset,
                 only_tables: &only_tables_config,
+                dump_chunk_size: &args.dump_chunk_size,
             };
 
             match args.source_type.as_ref().map(|x| x.as_str()) {
@@ -145,7 +146,7 @@ where
                             password.as_str(),
                         );
 
-                        let task = FullDumpTask::new(postgres, datastore, options, args.buffer_size);
+                        let task = FullDumpTask::new(postgres, datastore, options);
                         task.run(progress_callback)?
                     }
                     ConnectionUri::Mysql(host, port, username, password, database) => {
@@ -157,13 +158,13 @@ where
                             password.as_str(),
                         );
 
-                        let task = FullDumpTask::new(mysql, datastore, options, args.buffer_size);
+                        let task = FullDumpTask::new(mysql, datastore, options);
                         task.run(progress_callback)?
                     }
                     ConnectionUri::MongoDB(uri, database) => {
                         let mongodb = MongoDB::new(uri.as_str(), database.as_str());
 
-                        let task = FullDumpTask::new(mongodb, datastore, options, args.buffer_size);
+                        let task = FullDumpTask::new(mongodb, datastore, options);
                         task.run(progress_callback)?
                     }
                 },
@@ -177,7 +178,7 @@ where
                     }
 
                     let postgres = PostgresStdin::default();
-                    let task = FullDumpTask::new(postgres, datastore, options, args.buffer_size);
+                    let task = FullDumpTask::new(postgres, datastore, options);
                     task.run(progress_callback)?
                 }
                 Some(v) if v == "mysql" => {
@@ -189,7 +190,7 @@ where
                     }
 
                     let mysql = MysqlStdin::default();
-                    let task = FullDumpTask::new(mysql, datastore, options, args.buffer_size);
+                    let task = FullDumpTask::new(mysql, datastore, options);
                     task.run(progress_callback)?
                 }
                 Some(v) if v == "mongodb" => {
@@ -201,7 +202,7 @@ where
                     }
 
                     let mongodb = MongoDBStdin::default();
-                    let task = FullDumpTask::new(mongodb, datastore, options, args.buffer_size);
+                    let task = FullDumpTask::new(mongodb, datastore, options);
                     task.run(progress_callback)?
                 }
                 Some(v) => {

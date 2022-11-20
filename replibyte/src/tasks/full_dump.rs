@@ -18,19 +18,17 @@ where
     source: S,
     datastore: Box<dyn Datastore>,
     options: SourceOptions<'a>,
-    arg_buffer_size: usize,
 }
 
 impl<'a, S> FullDumpTask<'a, S>
 where
     S: Source,
 {
-    pub fn new(source: S, datastore: Box<dyn Datastore>, options: SourceOptions<'a>, arg_buffer_size: usize) -> Self {
+    pub fn new(source: S, datastore: Box<dyn Datastore>, options: SourceOptions<'a>) -> Self {
         FullDumpTask {
             source,
             datastore,
             options,
-            arg_buffer_size,
         }
     }
 }
@@ -72,7 +70,7 @@ where
         });
 
         // buffer of 100MB in memory to use and re-use to upload data into datastore
-        let buffer_size = self.arg_buffer_size * 1024 * 1024;
+        let buffer_size = self.options.dump_chunk_size * 1024 * 1024;
         let mut queries = vec![];
         let mut consumed_buffer_size = 0usize;
         let mut total_transferred_bytes = 0usize;

@@ -357,6 +357,10 @@ mod tests {
         )
     }
 
+    fn get_default_dump_chunk_size() -> usize {
+        100
+    }
+
     #[test]
     fn connect() {
         let p = get_mongodb();
@@ -368,6 +372,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         assert!(p.read(source_options, |_, _| {}).is_ok());
@@ -380,6 +385,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         assert!(p.read(source_options, |_, _| {}).is_err());
@@ -395,6 +401,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         p.read(source_options, |original_query, query| {
