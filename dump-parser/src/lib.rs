@@ -1,12 +1,15 @@
 use std::io::{BufReader, Read};
 
 use crate::errors::DumpFileError;
+use crate::mysql::Token;
 
 pub mod errors;
 pub mod mongodb;
 pub mod mysql;
 pub mod postgres;
 pub mod utils;
+
+pub(crate) type SmallVecTokens = [Token; 1024];
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub enum Type {
