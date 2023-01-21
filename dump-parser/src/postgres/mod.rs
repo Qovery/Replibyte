@@ -1,7 +1,8 @@
-use smallvec::SmallVec;
 use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
+
+use smallvec::SmallVec;
 
 use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
@@ -240,10 +241,10 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Tokenize the statement and produce a vector of tokens
-    pub fn tokenize(&mut self) -> Result<SmallVec<Token>, TokenizerError> {
+    pub fn tokenize(&mut self) -> Result<SmallVecTokens, TokenizerError> {
         let mut peekable = self.query.chars().peekable();
 
-        let mut tokens: SmallVec<Token> = SmallVec::with_capacity(1024);
+        let mut tokens = SmallVec::with_capacity(1024);
 
         while let Some(token) = self.next_token(&mut peekable)? {
             match &token {
@@ -675,7 +676,7 @@ fn parse_quoted_ident(chars: &mut Peekable<Chars<'_>>, quote_end: char) -> (Stri
     (s, last_char)
 }
 
-pub fn match_keyword_at_position(keyword: Keyword, tokens: &SmallVec<Token>, pos: usize) -> bool {
+pub fn match_keyword_at_position(keyword: Keyword, tokens: &SmallVecTokens, pos: usize) -> bool {
     if let Some(token) = tokens.get(pos) {
         return match token {
             Token::Word(word) => word.keyword == keyword,
@@ -686,7 +687,7 @@ pub fn match_keyword_at_position(keyword: Keyword, tokens: &SmallVec<Token>, pos
     false
 }
 
-pub fn get_word_value_at_position(tokens: &SmallVec<Token>, pos: usize) -> Option<&str> {
+pub fn get_word_value_at_position(tokens: &SmallVecTokens, pos: usize) -> Option<&str> {
     if let Some(fifth_token) = tokens.get(pos) {
         return match fifth_token {
             Token::Word(word) => Some(word.value.as_str()),
@@ -697,7 +698,7 @@ pub fn get_word_value_at_position(tokens: &SmallVec<Token>, pos: usize) -> Optio
     None
 }
 
-pub fn get_column_names_from_insert_into_query(tokens: &SmallVec<Token>) -> Vec<String> {
+pub fn get_column_names_from_insert_into_query(tokens: &SmallVecTokens) -> Vec<String> {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
@@ -731,7 +732,8 @@ pub fn get_column_names_from_insert_into_query(tokens: &SmallVec<Token>) -> Vec<
         .collect::<Vec<_>>()
 }
 
-pub fn get_column_values_from_insert_into_query(tokens: &SmallVec<Token>) -> SmallVec<&Token> {
+// FIXME return a reference to the token instead of cloning it
+pub fn get_column_values_from_insert_into_query(tokens: &SmallVecTokens) -> SmallVecTokens {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
@@ -760,10 +762,10 @@ pub fn get_column_values_from_insert_into_query(tokens: &SmallVec<Token>) -> Sma
         .collect::<SmallVec<_>>()
 }
 
-pub fn get_column_values_str_from_insert_into_query(tokens: &SmallVec<Token>) -> Vec<String> {
+pub fn get_column_values_str_from_insert_into_query(tokens: &SmallVecTokens) -> Vec<String> {
     get_column_values_from_insert_into_query(&tokens)
         .iter()
-        .filter_map(|x| match *x {
+        .filter_map(|x| match x {
             Token::Word(word) => Some(word.value.clone()),
             Token::SingleQuotedString(word) => Some(word.clone()),
             Token::Number(value, is_long) => Some(match is_long {
@@ -779,7 +781,7 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &SmallVec<Token>) ->
         .collect::<Vec<_>>()
 }
 
-pub fn get_column_names_from_create_query(tokens: &SmallVec<Token>) -> SmallVec<String> {
+pub fn get_column_names_from_create_query(tokens: &SmallVecTokens) -> SmallVecTokens {
     if !match_keyword_at_position(Create, &tokens, 0) {
         return SmallVec::new();
     }
@@ -810,10 +812,10 @@ pub fn get_column_names_from_create_query(tokens: &SmallVec<Token>) -> SmallVec<
             }
             _ => None,
         })
-        .collect::<SmallVec<_>>()
+        .collect::<SmallVecTokens>()
 }
 
-pub fn get_tokens_from_query_str(query: &str) -> SmallVec<Token> {
+pub fn get_tokens_from_query_str(query: &str) -> SmallVecTokens {
     // query by query
     let mut tokenizer = Tokenizer::new(query);
 
@@ -989,7 +991,7 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL, NULL);
                 "company_name",
                 "contact_name",
                 "contact_title",
-                r#""upperCaseColumnName""#
+                r#""upperCaseColumnName""#,
             ]
         );
     }

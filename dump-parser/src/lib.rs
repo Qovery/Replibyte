@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use std::io::{BufReader, Read};
 
 use crate::errors::DumpFileError;
@@ -9,7 +10,7 @@ pub mod mysql;
 pub mod postgres;
 pub mod utils;
 
-pub(crate) type SmallVecTokens = [Token; 1024];
+pub(crate) type SmallVecTokens = SmallVec<[Token; 1024]>;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub enum Type {
