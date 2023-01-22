@@ -9,6 +9,7 @@ use dump_parser::postgres::{
     trim_pre_whitespaces, Keyword, Token,
 };
 use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
+use dump_parser::SmallVecPostgresTokens;
 use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::fs::File;
@@ -570,7 +571,7 @@ fn table_stats_by_database_and_table_name<R: Read>(
     Ok(table_stats_by_database_and_table_name)
 }
 
-fn trim_tokens(tokens: &SmallVec<Token>, keyword: Keyword) -> SmallVec<Token> {
+fn trim_tokens(tokens: &SmallVecPostgresTokens, keyword: Keyword) -> SmallVecPostgresTokens {
     tokens
         .iter()
         .skip_while(|token| match *token {
@@ -620,7 +621,9 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
     Ok(subset_table_by_database_and_table_name)
 }
 
-fn get_create_table_database_and_table_name(tokens: &SmallVec<Token>) -> Option<(Database, Table)> {
+fn get_create_table_database_and_table_name(
+    tokens: &SmallVecPostgresTokens,
+) -> Option<(Database, Table)> {
     let tokens = trim_tokens(&tokens, Keyword::Create);
 
     if tokens.is_empty() {
@@ -640,7 +643,9 @@ fn get_create_table_database_and_table_name(tokens: &SmallVec<Token>) -> Option<
     None
 }
 
-fn get_insert_into_database_and_table_name(tokens: &SmallVec<Token>) -> Option<(Database, Table)> {
+fn get_insert_into_database_and_table_name(
+    tokens: &SmallVecPostgresTokens,
+) -> Option<(Database, Table)> {
     let tokens = trim_tokens(&tokens, Keyword::Insert);
 
     if tokens.is_empty() {
@@ -660,7 +665,7 @@ fn get_insert_into_database_and_table_name(tokens: &SmallVec<Token>) -> Option<(
     None
 }
 
-fn get_alter_table_foreign_key(tokens: &SmallVec<Token>) -> Option<ForeignKey> {
+fn get_alter_table_foreign_key(tokens: &SmallVecPostgresTokens) -> Option<ForeignKey> {
     let tokens = trim_tokens(&tokens, Keyword::Alter);
 
     if tokens.is_empty() {
@@ -695,14 +700,19 @@ fn get_alter_table_foreign_key(tokens: &SmallVec<Token>) -> Option<ForeignKey> {
         None => return None,
     };
 
-    let next_foreign_tokens = tokens
+    let mut next_foreign_tokens = SmallVecPostgresTokens::new();
+
+    let _next_foreign_tokens = tokens
         .iter()
         .skip_while(|token| match token {
             Token::Word(word) if word.keyword == Keyword::Foreign => false,
             _ => true,
         })
-        .map(|token| token.clone())
         .collect::<Vec<_>>();
+
+    for token in _next_foreign_tokens {
+        next_foreign_tokens.push(token.clone()); // FIXME remove clone?
+    }
 
     let from_property = match get_word_value_at_position(&next_foreign_tokens, 5) {
         Some(property) => property,

@@ -8,7 +8,7 @@ use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
     Into as KeywordInto, Key, NoKeyword, Not, Null, Only, Primary, References, Replace, Table,
 };
-use crate::SmallVecTokens;
+use crate::SmallVecPostgresTokens;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -241,7 +241,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Tokenize the statement and produce a vector of tokens
-    pub fn tokenize(&mut self) -> Result<SmallVecTokens, TokenizerError> {
+    pub fn tokenize(&mut self) -> Result<SmallVecPostgresTokens, TokenizerError> {
         let mut peekable = self.query.chars().peekable();
 
         let mut tokens = SmallVec::with_capacity(1024);
@@ -676,7 +676,11 @@ fn parse_quoted_ident(chars: &mut Peekable<Chars<'_>>, quote_end: char) -> (Stri
     (s, last_char)
 }
 
-pub fn match_keyword_at_position(keyword: Keyword, tokens: &SmallVecTokens, pos: usize) -> bool {
+pub fn match_keyword_at_position(
+    keyword: Keyword,
+    tokens: &SmallVecPostgresTokens,
+    pos: usize,
+) -> bool {
     if let Some(token) = tokens.get(pos) {
         return match token {
             Token::Word(word) => word.keyword == keyword,
@@ -687,7 +691,7 @@ pub fn match_keyword_at_position(keyword: Keyword, tokens: &SmallVecTokens, pos:
     false
 }
 
-pub fn get_word_value_at_position(tokens: &SmallVecTokens, pos: usize) -> Option<&str> {
+pub fn get_word_value_at_position(tokens: &SmallVecPostgresTokens, pos: usize) -> Option<&str> {
     if let Some(fifth_token) = tokens.get(pos) {
         return match fifth_token {
             Token::Word(word) => Some(word.value.as_str()),
@@ -698,7 +702,7 @@ pub fn get_word_value_at_position(tokens: &SmallVecTokens, pos: usize) -> Option
     None
 }
 
-pub fn get_column_names_from_insert_into_query(tokens: &SmallVecTokens) -> Vec<String> {
+pub fn get_column_names_from_insert_into_query(tokens: &SmallVecPostgresTokens) -> Vec<String> {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
@@ -733,7 +737,9 @@ pub fn get_column_names_from_insert_into_query(tokens: &SmallVecTokens) -> Vec<S
 }
 
 // FIXME return a reference to the token instead of cloning it
-pub fn get_column_values_from_insert_into_query(tokens: &SmallVecTokens) -> SmallVecTokens {
+pub fn get_column_values_from_insert_into_query(
+    tokens: &SmallVecPostgresTokens,
+) -> SmallVecPostgresTokens {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
@@ -741,7 +747,7 @@ pub fn get_column_values_from_insert_into_query(tokens: &SmallVecTokens) -> Smal
         return SmallVec::new();
     }
 
-    tokens
+    let tokens = tokens
         .iter()
         .skip_while(|token| match **token {
             Token::RParen => false,
@@ -759,10 +765,15 @@ pub fn get_column_values_from_insert_into_query(tokens: &SmallVecTokens) -> Smal
             Token::Comma | Token::Whitespace(_) | Token::LParen | Token::RParen => None,
             token => Some(token), // column value
         })
-        .collect::<SmallVec<_>>()
+        .map(|token| token.clone()) // FIXME
+        .collect::<Vec<_>>();
+
+    SmallVec::from_vec(tokens)
 }
 
-pub fn get_column_values_str_from_insert_into_query(tokens: &SmallVecTokens) -> Vec<String> {
+pub fn get_column_values_str_from_insert_into_query(
+    tokens: &SmallVecPostgresTokens,
+) -> Vec<String> {
     get_column_values_from_insert_into_query(&tokens)
         .iter()
         .filter_map(|x| match x {
@@ -781,9 +792,9 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &SmallVecTokens) -> 
         .collect::<Vec<_>>()
 }
 
-pub fn get_column_names_from_create_query(tokens: &SmallVecTokens) -> SmallVecTokens {
+pub fn get_column_names_from_create_query(tokens: &SmallVecPostgresTokens) -> Vec<String> {
     if !match_keyword_at_position(Create, &tokens, 0) {
-        return SmallVec::new();
+        return Vec::new();
     }
 
     let mut consumed = false;
@@ -812,10 +823,10 @@ pub fn get_column_names_from_create_query(tokens: &SmallVecTokens) -> SmallVecTo
             }
             _ => None,
         })
-        .collect::<SmallVecTokens>()
+        .collect::<Vec<_>>()
 }
 
-pub fn get_tokens_from_query_str(query: &str) -> SmallVecTokens {
+pub fn get_tokens_from_query_str(query: &str) -> SmallVecPostgresTokens {
     // query by query
     let mut tokenizer = Tokenizer::new(query);
 
@@ -830,7 +841,7 @@ pub fn get_tokens_from_query_str(query: &str) -> SmallVecTokens {
     trim_pre_whitespaces(tokens)
 }
 
-pub fn trim_pre_whitespaces(tokens: SmallVecTokens) -> SmallVecTokens {
+pub fn trim_pre_whitespaces(tokens: SmallVecPostgresTokens) -> SmallVecPostgresTokens {
     tokens
         .into_iter()
         .skip_while(|token| match token {
@@ -838,7 +849,7 @@ pub fn trim_pre_whitespaces(tokens: SmallVecTokens) -> SmallVecTokens {
             Token::Whitespace(_) => true,
             _ => false,
         })
-        .collect::<SmallVecTokens>()
+        .collect::<SmallVecPostgresTokens>()
 }
 
 #[cfg(test)]
@@ -847,6 +858,7 @@ mod tests {
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
         trim_pre_whitespaces, Token, Tokenizer, Whitespace,
     };
+    use smallvec::SmallVec;
 
     #[test]
     fn tokenizer_for_create_table_query() {
@@ -861,7 +873,7 @@ CREATE TABLE public.orders (
 
         let tokens = tokens_result.unwrap();
 
-        let expected = vec![
+        let expected = SmallVec::<[Token; 1024]>::from_vec(vec![
             Token::Whitespace(Whitespace::Newline),
             Token::make_keyword("CREATE"),
             Token::Whitespace(Whitespace::Space),
@@ -887,7 +899,7 @@ CREATE TABLE public.orders (
             Token::Whitespace(Whitespace::Newline),
             Token::RParen,
             Token::SemiColon,
-        ];
+        ]);
 
         assert_eq!(tokens, expected);
     }
@@ -1012,12 +1024,12 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
 
         assert_eq!(
             column_values,
-            vec![
-                &Token::Number("1".to_string(), false),
-                &Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
-                &Token::SingleQuotedString("Maria Anders".to_string()),
-                &Token::make_keyword("NULL"),
-            ]
+            SmallVec::<[Token; 1024]>::from_vec(vec![
+                Token::Number("1".to_string(), false),
+                Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
+                Token::SingleQuotedString("Maria Anders".to_string()),
+                Token::make_keyword("NULL"),
+            ])
         );
     }
 
@@ -1037,10 +1049,10 @@ VALUES ('Romaric', true);
 
         assert_eq!(
             column_values,
-            vec![
-                &Token::SingleQuotedString("Romaric".to_string()),
-                &Token::make_word("true", None),
-            ]
+            SmallVec::<[Token; 1024]>::from_vec(vec![
+                Token::SingleQuotedString("Romaric".to_string()),
+                Token::make_word("true", None),
+            ])
         );
     }
 
@@ -1057,11 +1069,11 @@ VALUES ('Romaric', true);
 
         assert_eq!(
             column_values,
-            vec![
-                &Token::Number("+5.75".to_string(), false),
-                &Token::Number("-10.20".to_string(), false),
-                &Token::Number("20".to_string(), true),
-            ]
+            SmallVec::<[Token; 1024]>::from_vec(vec![
+                Token::Number("5.75".to_string(), true),
+                Token::Number("10.20".to_string(), true),
+                Token::Number("20".to_string(), false),
+            ]),
         );
     }
 }
