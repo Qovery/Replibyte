@@ -2,15 +2,15 @@ use std::borrow::Cow;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
-use aws_config::profile::retry_config::ProfileFileRetryConfigProvider;
+use aes_gcm::aes::cipher::NewCipher;
 use aws_config::profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider};
 use aws_sdk_s3::model::{
     BucketLocationConstraint, CreateBucketConfiguration, Delete, Object, ObjectIdentifier,
 };
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
+use aws_sdk_s3::Client;
+use aws_sdk_s3::Credentials;
 use aws_types::region::Region;
-use aws_types::Credentials;
 use log::{error, info};
 use serde_json::Value;
 
@@ -62,22 +62,14 @@ impl S3 {
                     ProfileFileCredentialsProvider::builder()
                         .profile_name(profile.as_ref())
                         .build(),
-                )
-                .retry_config(
-                    block_on(
-                        ProfileFileRetryConfigProvider::builder()
-                            .profile_name(profile.as_ref())
-                            .build()
-                            .retry_config_builder(),
-                    )?
-                    .build(),
-                )
+                );
+            // TODO add support of custom retry?
         }
 
         if let Some(region) = region.clone() {
             let region: Cow<str> = region.into();
 
-            config_loader = config_loader.region(Region::new(region))
+            config_loader = config_loader.region(Region::new(region));
         }
 
         if let Some(credentials) = credentials {
@@ -87,7 +79,7 @@ impl S3 {
                 credentials.session_token,
                 None,
                 "replibyte-config",
-            ))
+            ));
         }
 
         let sdk_config = block_on(config_loader.load());
@@ -96,12 +88,7 @@ impl S3 {
 
         let s3_config = match &endpoint {
             Endpoint::Default => s3_config_builder.build(),
-            Endpoint::Custom(url) => match http::Uri::from_str(url.as_str()) {
-                Ok(uri) => s3_config_builder
-                    .endpoint_resolver(SdkEndpoint::immutable(uri))
-                    .build(),
-                Err(_) => s3_config_builder.build(),
-            },
+            Endpoint::Custom(url) => s3_config_builder.endpoint_url(url).build(),
         };
 
         Ok(S3 {
@@ -1147,7 +1134,7 @@ mod tests {
             &s3.client,
             bucket.as_str(),
             INDEX_FILE_NAME,
-            value.to_string().into_bytes()
+            value.to_string().into_bytes(),
         )
         .is_ok());
 
@@ -1175,7 +1162,7 @@ mod tests {
                 size: 62279,
                 created_at: 1234,
                 compressed: true,
-                encrypted: false
+                encrypted: false,
             })
         );
         assert_eq!(
@@ -1185,7 +1172,7 @@ mod tests {
                 size: 62283,
                 created_at: 5678,
                 compressed: true,
-                encrypted: false
+                encrypted: false,
             })
         );
     }

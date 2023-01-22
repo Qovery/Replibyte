@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 bson = "2.2"
 serde = "1.0"
-smallvec = "1.8"
+smallvec = "1.10"
 
 ########## WARNING #############
 # DO NOT UPGRADE THE CRC CRATE #
