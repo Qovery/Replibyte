@@ -9,8 +9,9 @@ pub mod mysql;
 pub mod postgres;
 pub mod utils;
 
-pub type SmallVecPostgresTokens = SmallVec<[postgres::Token; 1024 * 512]>;
-pub type SmallVecMySQLTokens = SmallVec<[mysql::Token; 1024 * 512]>;
+const ARRAY_CAPACITY: usize = 32 * 4;
+pub type SmallVecPostgresTokens = SmallVec<[postgres::Token; ARRAY_CAPACITY]>;
+pub type SmallVecMySQLTokens = SmallVec<[mysql::Token; ARRAY_CAPACITY]>;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub enum Type {

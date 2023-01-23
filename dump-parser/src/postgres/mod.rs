@@ -8,7 +8,7 @@ use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
     Into as KeywordInto, Key, NoKeyword, Not, Null, Only, Primary, References, Replace, Table,
 };
-use crate::SmallVecPostgresTokens;
+use crate::{SmallVecPostgresTokens, ARRAY_CAPACITY};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -244,7 +244,7 @@ impl<'a> Tokenizer<'a> {
     pub fn tokenize(&mut self) -> Result<SmallVecPostgresTokens, TokenizerError> {
         let mut peekable = self.query.chars().peekable();
 
-        let mut tokens = SmallVec::with_capacity(1024);
+        let mut tokens = SmallVec::with_capacity(ARRAY_CAPACITY);
 
         while let Some(token) = self.next_token(&mut peekable)? {
             match &token {
