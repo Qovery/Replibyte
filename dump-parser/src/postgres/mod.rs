@@ -1070,9 +1070,9 @@ VALUES ('Romaric', true);
         assert_eq!(
             column_values,
             SmallVec::<[Token; 1024]>::from_vec(vec![
-                Token::Number("5.75".to_string(), true),
-                Token::Number("10.20".to_string(), true),
-                Token::Number("20".to_string(), false),
+                Token::Number("+5.75".to_string(), false),
+                Token::Number("-10.20".to_string(), false),
+                Token::Number("20".to_string(), true),
             ]),
         );
     }
