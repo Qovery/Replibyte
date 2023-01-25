@@ -797,6 +797,42 @@ CREATE TABLE public.toto2 (
     }
 
     #[test]
+    fn insert_queries_with_backslash_in_string_value() {
+        let s = list_statements(
+            r#"
+INSERT INTO public.tbl (id, body, created_at, updated_at) VALUES (1, 'test@test.pl', 'is that a wild backslash here?\', '2016-03-14 17:32:53.505811');
+INSERT INTO public.tbl (id, body, created_at, updated_at) VALUES (2, 'yet@anoher.test', 'not relevant comment', '2016-03-14 17:36:35.825205');
+"#,
+        );
+        assert_eq!(s.len(), 5);
+        match s.get(0).unwrap() {
+            Statement::NewLine => { assert!(true); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(_) => { assert!(false); }
+        }
+        match s.get(1).unwrap() {
+            Statement::NewLine => { assert!(false); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(q) => { assert!(q.valid); }
+        }
+        match s.get(2).unwrap() {
+            Statement::NewLine => { assert!(true); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(_) => { assert!(false); }
+        }
+        match s.get(3).unwrap() {
+            Statement::NewLine => { assert!(false); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(q) => { assert!(q.valid); }
+        }
+        match s.get(4).unwrap() {
+            Statement::NewLine => { assert!(true); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(_) => { assert!(false); }
+        }
+    }
+
+    #[test]
     fn check_query_line_with_comment_at_the_end() {
         let s = list_statements(
             r#"
