@@ -106,10 +106,10 @@ where
 
         // 49 is an empirical number -
         // not too large to avoid looping too much time, and not too small to avoid wrong end of query
-        if count_empty_lines > 49 {
-            // EOF?
-            break;
-        }
+        // if count_empty_lines > 49 {
+        //     // EOF?
+        //     break;
+        // }
 
         match query_res {
             ListQueryResult::Continue => {}

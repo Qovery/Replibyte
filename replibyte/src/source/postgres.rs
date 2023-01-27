@@ -244,7 +244,6 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
 
     match list_sql_queries_from_dump_reader(reader, |query| {
         let tokens = get_tokens_from_query_str(query);
-
         match get_row_type(&tokens) {
             RowType::InsertInto {
                 database_name,
