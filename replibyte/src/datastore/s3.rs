@@ -442,6 +442,7 @@ fn create_bucket<'a, S: AsRef<str>>(
         Ok(_) => {}
         Err(err) => {
             error!("{}", err.to_string());
+            let x = err.to_string();
             return Err(S3Error::FailedToCreateBucket { bucket });
         }
     }
@@ -597,6 +598,7 @@ fn delete_directory<'a>(
 mod tests {
     use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
+    use log::error;
     use serde_json::json;
 
     use crate::cli::DumpDeleteArgs;
@@ -691,7 +693,10 @@ mod tests {
         let bucket = aws_bucket();
 
         let mut s3 = aws_s3(bucket.as_str());
-        let _ = s3.init().expect("s3 init failed");
+
+        if let Err(err) = s3.init() {
+            panic!("{}", err.to_string());
+        }
 
         let key = format!("testing-object-{}", Faker.fake::<String>());
 

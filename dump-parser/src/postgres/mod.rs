@@ -792,6 +792,28 @@ pub fn get_column_values_str_from_insert_into_query(
         .collect::<Vec<_>>()
 }
 
+pub fn get_column_value_str_from_insert_into_query(
+    column_idx: usize,
+    tokens: &SmallVecPostgresTokens,
+) -> Option<String> {
+    match get_column_values_from_insert_into_query(&tokens).get(column_idx) {
+        Some(token) => match token {
+            Token::Word(word) => Some(word.value.clone()),
+            Token::SingleQuotedString(word) => Some(word.clone()),
+            Token::Number(value, is_long) => Some(match is_long {
+                false => value.clone(),
+                true => {
+                    let mut long_value = value.to_owned();
+                    long_value.push('L');
+                    long_value
+                }
+            }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 pub fn get_column_names_from_create_query(tokens: &SmallVecPostgresTokens) -> Vec<String> {
     if !match_keyword_at_position(Create, &tokens, 0) {
         return Vec::new();
@@ -854,11 +876,12 @@ pub fn trim_pre_whitespaces(tokens: SmallVecPostgresTokens) -> SmallVecPostgresT
 
 #[cfg(test)]
 mod tests {
+    use smallvec::SmallVec;
+
     use crate::postgres::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
         trim_pre_whitespaces, Token, Tokenizer, Whitespace,
     };
-    use smallvec::SmallVec;
 
     #[test]
     fn tokenizer_for_create_table_query() {
