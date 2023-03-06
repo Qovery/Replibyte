@@ -3,14 +3,17 @@ use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
 use aes_gcm::aes::cipher::NewCipher;
+use aws_config::meta::region::RegionProviderChain;
+use aws_config::profile::retry_config::ProfileFileRetryConfigProvider;
 use aws_config::profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider};
 use aws_sdk_s3::model::{
     BucketLocationConstraint, CreateBucketConfiguration, Delete, Object, ObjectIdentifier,
 };
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::Client;
 use aws_sdk_s3::Credentials;
+use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::region::Region;
+use env_logger::builder;
 use log::{error, info};
 use serde_json::Value;
 
@@ -62,14 +65,22 @@ impl S3 {
                     ProfileFileCredentialsProvider::builder()
                         .profile_name(profile.as_ref())
                         .build(),
-                );
-            // TODO add support of custom retry?
+                )
+                .retry_config(
+                    block_on(
+                        ProfileFileRetryConfigProvider::builder()
+                            .profile_name(profile.as_ref())
+                            .build()
+                            .retry_config_builder(),
+                    )?
+                    .build(),
+                )
         }
 
         if let Some(region) = region.clone() {
             let region: Cow<str> = region.into();
 
-            config_loader = config_loader.region(Region::new(region));
+            config_loader = config_loader.region(Region::new(region))
         }
 
         if let Some(credentials) = credentials {
@@ -79,7 +90,7 @@ impl S3 {
                 credentials.session_token,
                 None,
                 "replibyte-config",
-            ));
+            ))
         }
 
         let sdk_config = block_on(config_loader.load());
@@ -88,7 +99,12 @@ impl S3 {
 
         let s3_config = match &endpoint {
             Endpoint::Default => s3_config_builder.build(),
-            Endpoint::Custom(url) => s3_config_builder.endpoint_url(url).build(),
+            Endpoint::Custom(url) => match http::Uri::from_str(url.as_str()) {
+                Ok(uri) => s3_config_builder
+                    .endpoint_resolver(SdkEndpoint::immutable(uri))
+                    .build(),
+                Err(_) => s3_config_builder.build(),
+            },
         };
 
         Ok(S3 {
@@ -407,14 +423,6 @@ fn create_bucket<'a, S: AsRef<str>>(
     bucket: &'a str,
     region: Option<S>,
 ) -> Result<(), S3Error<'a>> {
-    let mut cfg = CreateBucketConfiguration::builder();
-    if let Some(region) = region {
-        let constraint = BucketLocationConstraint::from(region.as_ref());
-        cfg = cfg.location_constraint(constraint);
-    }
-
-    let cfg = cfg.build();
-
     if let Ok(output) = block_on(client.list_buckets().send()) {
         if let Some(buckets) = output.buckets {
             if buckets.iter().any(|b| {
@@ -430,6 +438,10 @@ fn create_bucket<'a, S: AsRef<str>>(
         }
     }
 
+    let mut cfg = CreateBucketConfiguration::builder()
+        .set_location_constraint(region.map(|r| BucketLocationConstraint::from(r.as_ref())))
+        .build();
+
     let result = block_on(
         client
             .create_bucket()
@@ -442,7 +454,6 @@ fn create_bucket<'a, S: AsRef<str>>(
         Ok(_) => {}
         Err(err) => {
             error!("{}", err.to_string());
-            let x = err.to_string();
             return Err(S3Error::FailedToCreateBucket { bucket });
         }
     }
