@@ -26,6 +26,12 @@ jobs:
       - name: Install Build Essentials
         run: sudo apt-get install build-essential mingw-w64 gcc
 
+      - name: Install mongosh binary for MongoDB
+        run: |
+          wget https://downloads.mongodb.com/compass/mongodb-mongosh_1.8.0_amd64.deb
+          dpkg -i mongodb-mongosh_1.8.0_amd64.deb
+          mongosh -h
+
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version
 
