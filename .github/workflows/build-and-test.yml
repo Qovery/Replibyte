@@ -29,7 +29,7 @@ jobs:
       - name: Install mongosh binary for MongoDB
         run: |
           wget https://downloads.mongodb.com/compass/mongodb-mongosh_1.8.0_amd64.deb
-          dpkg -i mongodb-mongosh_1.8.0_amd64.deb
+          sudo dpkg -i mongodb-mongosh_1.8.0_amd64.deb
           mongosh -h
 
       - name: Verify versions
