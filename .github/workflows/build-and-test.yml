@@ -26,11 +26,16 @@ jobs:
       - name: Install Build Essentials
         run: sudo apt-get install build-essential mingw-w64 gcc
 
-      - name: Install mongosh binary for MongoDB
+      - name: Install mongosh binary, mongorestore and mongodump for MongoDB
         run: |
           wget https://downloads.mongodb.com/compass/mongodb-mongosh_1.8.0_amd64.deb
           sudo dpkg -i mongodb-mongosh_1.8.0_amd64.deb
-          mongosh -h
+          mongosh -h > /dev/null
+          
+          wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-debian11-x86_64-100.7.0.deb
+          sudo dpkg -i mongodb-database-tools-debian11-x86_64-100.7.0.deb
+          mongodump --help > /dev/null
+          mongorestore --help > /dev/null
 
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version
