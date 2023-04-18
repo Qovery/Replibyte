@@ -166,6 +166,12 @@ source:
       table: orders
     - database: public
       table: customers
+  # skip: # optional - exclude from the dump the specified tables.
+  #   - database: public
+  #     table: us_states
+  #   - database: public
+  #     table: order_details
+
 datastore:
   aws:
     bucket: $BUCKET_NAME
