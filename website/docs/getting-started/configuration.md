@@ -78,6 +78,54 @@ Any datastore compatible with the S3 protocol is a valid datastore.
 
 :::
 
+## Select tables from the source
+
+You have the possibility to select which tables you want in the dump.
+
+There are two options to achieve this:
+ 1. By specifying a list of tables you want (include strategy)
+ 2. By skipping a list of tables you don't want (exclude strategy)
+
+### Include strategy (`only_tables`)
+
+Add a key named `only_tables` under the `source`:
+
+```yaml
+source:
+  connection_uri: postgres://root:password@localhost:5432/root
+  only_tables: # optional - dumps only specified tables.
+    - database: public
+      table: orders
+    - database: public
+      table: customers
+```
+
+### Exclude strategy (`skip_tables`)
+
+Add a key named `skip` under the `source`:
+
+```yaml
+source:
+  connection_uri: postgres://root:password@localhost:5432/root
+  skip: # optional - exclude from the dump the specified tables.
+    - database: public
+      table: us_states
+    - database: public
+      table: order_details
+```
+
+This will exclude from the dump the tables `us_states` and `order_details`.
+
+:::warning
+
+This will exclude the table schema AND the table data.
+:::
+
+:::warning
+
+Currently only PostgreSQL and MySQL sources support this feature.
+:::
+
 ## Example
 
 Here is a configuration file including some transformations and different options like the database subset.
