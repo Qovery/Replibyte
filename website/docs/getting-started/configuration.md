@@ -100,7 +100,7 @@ source:
       table: customers
 ```
 
-### Exclude strategy (`skip_tables`)
+### Exclude strategy (`skip`)
 
 Add a key named `skip` under the `source`:
 
