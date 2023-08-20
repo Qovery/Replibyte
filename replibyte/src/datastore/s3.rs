@@ -2,15 +2,18 @@ use std::borrow::Cow;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
+use aes_gcm::aes::cipher::NewCipher;
+use aws_config::meta::region::RegionProviderChain;
 use aws_config::profile::retry_config::ProfileFileRetryConfigProvider;
 use aws_config::profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider};
 use aws_sdk_s3::model::{
     BucketLocationConstraint, CreateBucketConfiguration, Delete, Object, ObjectIdentifier,
 };
 use aws_sdk_s3::types::ByteStream;
+use aws_sdk_s3::Credentials;
 use aws_sdk_s3::{Client, Endpoint as SdkEndpoint};
 use aws_types::region::Region;
-use aws_types::Credentials;
+use env_logger::builder;
 use log::{error, info};
 use serde_json::Value;
 
@@ -420,14 +423,6 @@ fn create_bucket<'a, S: AsRef<str>>(
     bucket: &'a str,
     region: Option<S>,
 ) -> Result<(), S3Error<'a>> {
-    let mut cfg = CreateBucketConfiguration::builder();
-    if let Some(region) = region {
-        let constraint = BucketLocationConstraint::from(region.as_ref());
-        cfg = cfg.location_constraint(constraint);
-    }
-
-    let cfg = cfg.build();
-
     if let Ok(output) = block_on(client.list_buckets().send()) {
         if let Some(buckets) = output.buckets {
             if buckets.iter().any(|b| {
@@ -442,6 +437,10 @@ fn create_bucket<'a, S: AsRef<str>>(
             }
         }
     }
+
+    let mut cfg = CreateBucketConfiguration::builder()
+        .set_location_constraint(region.map(|r| BucketLocationConstraint::from(r.as_ref())))
+        .build();
 
     let result = block_on(
         client
@@ -610,6 +609,7 @@ fn delete_directory<'a>(
 mod tests {
     use chrono::{Duration, Utc};
     use fake::{Fake, Faker};
+    use log::error;
     use serde_json::json;
 
     use crate::cli::DumpDeleteArgs;
@@ -704,7 +704,10 @@ mod tests {
         let bucket = aws_bucket();
 
         let mut s3 = aws_s3(bucket.as_str());
-        let _ = s3.init().expect("s3 init failed");
+
+        if let Err(err) = s3.init() {
+            panic!("{}", err.to_string());
+        }
 
         let key = format!("testing-object-{}", Faker.fake::<String>());
 
@@ -1147,7 +1150,7 @@ mod tests {
             &s3.client,
             bucket.as_str(),
             INDEX_FILE_NAME,
-            value.to_string().into_bytes()
+            value.to_string().into_bytes(),
         )
         .is_ok());
 
@@ -1175,7 +1178,7 @@ mod tests {
                 size: 62279,
                 created_at: 1234,
                 compressed: true,
-                encrypted: false
+                encrypted: false,
             })
         );
         assert_eq!(
@@ -1185,7 +1188,7 @@ mod tests {
                 size: 62283,
                 created_at: 5678,
                 compressed: true,
-                encrypted: false
+                encrypted: false,
             })
         );
     }

@@ -4,8 +4,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::str;
 
-const COMMENT_CHARS: &str = "--";
-
 pub enum ListQueryResult {
     Continue,
     Break,
@@ -63,7 +61,7 @@ where
             None => false,
         };
 
-        let mut query_res = ListQueryResult::Continue;
+        let query_res = ListQueryResult::Continue;
 
         buf_bytes.append(&mut line_buf_bytes);
 
@@ -73,7 +71,7 @@ where
             if buf_bytes.len() > 1 {
                 let query_str = match str::from_utf8(buf_bytes.as_slice()) {
                     Ok(t) => t,
-                    Err(e) => continue
+                    Err(_) => continue,
                 };
 
                 for statement in list_statements(query_str) {
@@ -190,7 +188,10 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 if stack.get(0) == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
                         // do nothing because the ' char is escaped via a double ''
-                    } else if idx > 0 && query.is_char_boundary(idx-1) && &query[idx-1..idx] == "\\" {
+                    } else if idx > 0
+                        && query.is_char_boundary(idx - 1)
+                        && &query[idx - 1..idx] == "\\"
+                    {
                         // do nothing because the ' char is escaped via a backslash
                     } else {
                         let _ = stack.remove(0);
@@ -225,15 +226,17 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'-' if !is_comment_line
                 && previous_chars_are_whitespaces
                 && is_statement_complete
-                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-' =>
+                && next_idx < query_bytes.len()
+                && query_bytes[next_idx] == b'-' =>
             {
                 // comment
                 is_comment_line = true;
                 previous_chars_are_whitespaces = false;
             }
             // use grapheme instead of code points or bytes?
-            b'-' if !is_statement_complete 
-                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-'
+            b'-' if !is_statement_complete
+                && next_idx < query_bytes.len()
+                && query_bytes[next_idx] == b'-'
                 && stack.get(0) != Some(&b'\'') =>
             {
                 // comment

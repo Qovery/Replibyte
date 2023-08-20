@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use std::io::{BufReader, Read};
 
 use crate::errors::DumpFileError;
@@ -7,6 +8,10 @@ pub mod mongodb;
 pub mod mysql;
 pub mod postgres;
 pub mod utils;
+
+const ARRAY_CAPACITY: usize = 32 * 4;
+pub type SmallVecPostgresTokens = SmallVec<[postgres::Token; ARRAY_CAPACITY]>;
+pub type SmallVecMySQLTokens = SmallVec<[mysql::Token; ARRAY_CAPACITY]>;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub enum Type {

@@ -14,6 +14,7 @@ use dump_parser::postgres::{
     get_word_value_at_position, match_keyword_at_position, Keyword, Token,
 };
 use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};
+use dump_parser::SmallVecPostgresTokens;
 use subset::postgres::{PostgresSubset, SubsetStrategy};
 use subset::{PassthroughTable, Subset, SubsetOptions};
 
@@ -349,7 +350,7 @@ fn no_change_query_callback<F: FnMut(OriginalQuery, Query)>(query_callback: &mut
 fn transform_columns(
     database_name: &str,
     table_name: &str,
-    tokens: &Vec<Token>,
+    tokens: &SmallVecPostgresTokens,
     transformer_by_db_and_table_and_column_name: &HashMap<String, &Box<dyn Transformer>>,
 ) -> (Vec<Column>, Vec<Column>) {
     // find database name by filtering out all queries starting with
@@ -430,22 +431,22 @@ fn transform_columns(
     (original_columns, columns)
 }
 
-fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
+fn is_insert_into_statement(tokens: &SmallVecPostgresTokens) -> bool {
     match_keyword_at_position(Keyword::Insert, &tokens, 0)
         && match_keyword_at_position(Keyword::Into, &tokens, 2)
 }
 
-fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
+fn is_create_table_statement(tokens: &SmallVecPostgresTokens) -> bool {
     match_keyword_at_position(Keyword::Create, &tokens, 0)
         && match_keyword_at_position(Keyword::Table, &tokens, 2)
 }
 
-fn is_alter_table_statement(tokens: &Vec<Token>) -> bool {
+fn is_alter_table_statement(tokens: &SmallVecPostgresTokens) -> bool {
     match_keyword_at_position(Keyword::Alter, &tokens, 0)
         && match_keyword_at_position(Keyword::Table, &tokens, 2)
 }
 
-fn get_row_type(tokens: &Vec<Token>) -> RowType {
+fn get_row_type(tokens: &SmallVecPostgresTokens) -> RowType {
     let mut row_type = RowType::Others;
 
     if is_insert_into_statement(&tokens) {
