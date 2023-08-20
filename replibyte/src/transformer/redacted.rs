@@ -84,7 +84,7 @@ impl Transformer for RedactedTransformer {
                     len if len > 3 => {
                         format!(
                             "{}{}",
-                            &value[0..3],
+                            value.chars().take(3).collect::<String>(),
                             self.options
                                 .character
                                 .to_string()
@@ -116,6 +116,18 @@ mod tests {
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.string_value().unwrap();
         assert_eq!(transformed_value.to_owned(), "424**********")
+    }
+
+    #[test]
+    fn redact_with_multi_byte_char() {
+        let transformer = get_transformer();
+        let column = Column::StringValue(
+            "multi_byte_column".to_string(),
+            "🦀ë池cd".to_string(),
+        );
+        let transformed_column = transformer.transform(column);
+        let transformed_value = transformed_column.string_value().unwrap();
+        assert_eq!(transformed_value.to_owned(), "🦀ë池**********")
     }
 
     #[test]
