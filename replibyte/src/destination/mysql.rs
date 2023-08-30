@@ -34,7 +34,7 @@ impl<'a> Mysql<'a> {
 
 impl<'a> Connector for Mysql<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists("mysql")?;
+        binary_exists("mysql")?;
 
         // test MySQL connection
         let mut process = Command::new("mysql")
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn connect() {
         let mut m = get_mysql();
-        let _ = m.init().expect("can't init mysql");
+        m.init().expect("can't init mysql");
         assert!(m.write(b"SELECT 1;".to_vec()).is_ok());
 
         let mut m = get_invalid_mysql();

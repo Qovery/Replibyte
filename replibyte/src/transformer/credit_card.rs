@@ -5,6 +5,7 @@ use fake::locales::EN;
 use fake::Fake;
 
 /// This struct is dedicated to replacing a credit card string.
+#[derive(Default)]
 pub struct CreditCardTransformer {
     database_name: String,
     table_name: String,
@@ -24,15 +25,7 @@ impl CreditCardTransformer {
     }
 }
 
-impl Default for CreditCardTransformer {
-    fn default() -> Self {
-        CreditCardTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-        }
-    }
-}
+
 
 impl Transformer for CreditCardTransformer {
     fn id(&self) -> &str {

@@ -72,7 +72,7 @@ pub fn run<F>(
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
-    F: Fn(usize, usize) -> (),
+    F: Fn(usize, usize),
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key)
@@ -129,12 +129,12 @@ where
 
             let options = SourceOptions {
                 transformers: &transformers,
-                skip_config: &skip_config,
+                skip_config,
                 database_subset: &source.database_subset,
-                only_tables: &only_tables_config,
+                only_tables: only_tables_config,
             };
 
-            match args.source_type.as_ref().map(|x| x.as_str()) {
+            match args.source_type.as_deref() {
                 None => match source.connection_uri()? {
                     ConnectionUri::Postgres(host, port, username, password, database) => {
                         let postgres = Postgres::new(
@@ -216,16 +216,16 @@ where
             Ok(())
         }
         None => {
-            return Err(anyhow::Error::from(Error::new(
+            Err(anyhow::Error::from(Error::new(
                 ErrorKind::Other,
                 "missing <source> object in the configuration file",
-            )));
+            )))
         }
     }
 }
 
 pub fn delete(datastore: Box<dyn Datastore>, args: &DumpDeleteArgs) -> anyhow::Result<()> {
-    let _ = datastore.delete(args)?;
+    datastore.delete(args)?;
     println!("Dump deleted!");
     Ok(())
 }
@@ -238,7 +238,7 @@ pub fn restore_local<F>(
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
-    F: Fn(usize, usize) -> (),
+    F: Fn(usize, usize),
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key);
@@ -254,7 +254,7 @@ where
     if args.output {
         let mut generic_stdout = GenericStdout::new();
         let task = FullRestoreTask::new(&mut generic_stdout, datastore, options);
-        let _ = task.run(|_, _| {})?; // do not display the progress bar
+        task.run(|_, _| {})?; // do not display the progress bar
         return Ok(());
     }
 
@@ -279,7 +279,7 @@ where
 
         let mut postgres = PostgresDocker::new(tag.to_string(), port);
         let task = FullRestoreTask::new(&mut postgres, datastore, options);
-        let _ = task.run(progress_callback)?;
+        task.run(progress_callback)?;
 
         print_connection_string_and_wait(
             "To connect to your PostgreSQL instance, use the following connection string:",
@@ -327,7 +327,7 @@ where
 
         let mut mongodb = MongoDBDocker::new(tag.to_string(), port);
         let task = FullRestoreTask::new(&mut mongodb, datastore, options);
-        let _ = task.run(progress_callback)?;
+        task.run(progress_callback)?;
 
         print_connection_string_and_wait(
             "To connect to your MongoDB instance, use the following connection string:",
@@ -372,7 +372,7 @@ where
 
         let mut mysql = MysqlDocker::new(tag.to_string(), port);
         let task = FullRestoreTask::new(&mut mysql, datastore, options);
-        let _ = task.run(progress_callback)?;
+        task.run(progress_callback)?;
 
         print_connection_string_and_wait(
             "To connect to your MySQL instance, use the following connection string:",
@@ -419,7 +419,7 @@ pub fn restore_remote<F>(
     progress_callback: F,
 ) -> anyhow::Result<()>
 where
-    F: Fn(usize, usize) -> (),
+    F: Fn(usize, usize),
 {
     if let Some(encryption_key) = config.encryption_key()? {
         datastore.set_encryption_key(encryption_key);
@@ -435,7 +435,7 @@ where
     if args.output {
         let mut generic_stdout = GenericStdout::new();
         let task = FullRestoreTask::new(&mut generic_stdout, datastore, options);
-        let _ = task.run(|_, _| {})?; // do not display the progress bar
+        task.run(|_, _| {})?; // do not display the progress bar
         return Ok(());
     }
 
@@ -479,10 +479,10 @@ where
             Ok(())
         }
         None => {
-            return Err(anyhow::Error::from(Error::new(
+            Err(anyhow::Error::from(Error::new(
                 ErrorKind::Other,
                 "missing <destination> object in the configuration file",
-            )));
+            )))
         }
     }
 }

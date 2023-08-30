@@ -100,7 +100,7 @@ fn main() {
     }
 
     let mut exit_code = 0;
-    if let Err(err) = run(config, &sub_commands) {
+    if let Err(err) = run(config, sub_commands) {
         eprintln!("{}", err);
         exit_code = 1;
     }
@@ -138,9 +138,9 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
     };
 
     let migrator = Migrator::new(get_replibyte_version(), &datastore, migrations());
-    let _ = migrator.migrate()?;
+    migrator.migrate()?;
 
-    let _ = datastore.init()?;
+    datastore.init()?;
 
     let (tx_pb, rx_pb) = mpsc::sync_channel::<(TransferredBytes, MaxBytes)>(1000);
 
@@ -167,7 +167,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
     match sub_commands {
         SubCommand::Dump(cmd) => match cmd {
             DumpCommand::List => {
-                let _ = commands::dump::list(&mut datastore)?;
+                commands::dump::list(&mut datastore)?;
                 Ok(())
             }
             DumpCommand::Create(args) => {
@@ -194,7 +194,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {
-                let _ = commands::transformer::list();
+                commands::transformer::list();
                 Ok(())
             }
         },

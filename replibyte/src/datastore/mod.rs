@@ -138,7 +138,7 @@ impl IndexFile {
 
                 match self.dumps.last() {
                     Some(dump) => Ok(dump),
-                    None => return Err(Error::new(ErrorKind::Other, "No dumps available.")),
+                    None => Err(Error::new(ErrorKind::Other, "No dumps available.")),
                 }
             }
             ReadOptions::Dump { name } => {
@@ -149,10 +149,10 @@ impl IndexFile {
                 {
                     Some(dump) => Ok(dump),
                     None => {
-                        return Err(Error::new(
+                        Err(Error::new(
                             ErrorKind::Other,
                             format!("Can't find dump with name '{}'", name),
-                        ));
+                        ))
                     }
                 }
             }

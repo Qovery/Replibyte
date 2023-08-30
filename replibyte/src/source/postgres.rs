@@ -200,7 +200,7 @@ pub fn subset<R: Read>(
     let named_subset_file = tempfile::NamedTempFile::new()?;
     let mut subset_file = named_subset_file.as_file();
 
-    let _ = subset.read(
+    subset.read(
         |row| {
             match subset_file.write(format!("{}\n", row).as_bytes()) {
                 Ok(_) => {}
@@ -269,7 +269,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                         to_query(
                             Some(database_name.as_str()),
                             InsertIntoQuery {
-                                table_name: table_name.to_string(),
+                                table_name,
                                 columns,
                             },
                         ),
@@ -310,7 +310,7 @@ pub fn read_and_parse_schema<R: Read>(reader: BufReader<R>) -> Result<(), Error>
         let tokens = get_tokens_from_query_str(query.clone());
         match get_row_type(&tokens) {
             RowType::CreateTable {
-                database_name,
+                database_name: _,
                 table_name,
             } => {
                 let column_schema = get_column_names_from_create_query(&tokens);
@@ -359,8 +359,8 @@ fn transform_columns(
     // <table>      -> position 6
     // L Paren      -> position X?
     // R Paren      -> position X?
-    let column_names = get_column_names_from_insert_into_query(&tokens);
-    let column_values = get_column_values_from_insert_into_query(&tokens);
+    let column_names = get_column_names_from_insert_into_query(tokens);
+    let column_values = get_column_values_from_insert_into_query(tokens);
     assert_eq!(
         column_names.len(),
         column_values.len(),
@@ -377,7 +377,7 @@ fn transform_columns(
 
         let column = match value_token {
             Token::Number(column_value, _) => {
-                if column_value.contains(".") {
+                if column_value.contains('.') {
                     Column::FloatNumberValue(
                         column_name.to_string(),
                         column_value.parse::<f64>().unwrap(),
@@ -390,7 +390,7 @@ fn transform_columns(
                 }
             }
             Token::Char(column_value) => {
-                Column::CharValue(column_name.to_string(), column_value.clone())
+                Column::CharValue(column_name.to_string(), *column_value)
             }
             Token::SingleQuotedString(column_value) => {
                 Column::StringValue(column_name.to_string(), column_value.clone())
@@ -403,7 +403,7 @@ fn transform_columns(
             }
             Token::Word(w)
                 if (w.value == "true" || w.value == "false")
-                    && w.quote_style == None
+                    && w.quote_style.is_none()
                     && w.keyword == NoKeyword =>
             {
                 Column::BooleanValue(column_name.to_string(), w.value.parse::<bool>().unwrap())
@@ -431,26 +431,26 @@ fn transform_columns(
 }
 
 fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        && match_keyword_at_position(Keyword::Into, &tokens, 2)
+    match_keyword_at_position(Keyword::Insert, tokens, 0)
+        && match_keyword_at_position(Keyword::Into, tokens, 2)
 }
 
 fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Create, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    match_keyword_at_position(Keyword::Create, tokens, 0)
+        && match_keyword_at_position(Keyword::Table, tokens, 2)
 }
 
 fn is_alter_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Alter, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    match_keyword_at_position(Keyword::Alter, tokens, 0)
+        && match_keyword_at_position(Keyword::Table, tokens, 2)
 }
 
 fn get_row_type(tokens: &Vec<Token>) -> RowType {
     let mut row_type = RowType::Others;
 
-    if is_insert_into_statement(&tokens) {
-        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+    if is_insert_into_statement(tokens) {
+        if let Some(database_name) = get_word_value_at_position(tokens, 4) {
+            if let Some(table_name) = get_word_value_at_position(tokens, 6) {
                 row_type = RowType::InsertInto {
                     database_name: database_name.to_string(),
                     table_name: table_name.to_string(),
@@ -459,9 +459,9 @@ fn get_row_type(tokens: &Vec<Token>) -> RowType {
         }
     }
 
-    if is_create_table_statement(&tokens) {
-        if let Some(database_name) = get_word_value_at_position(&tokens, 4) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, 6) {
+    if is_create_table_statement(tokens) {
+        if let Some(database_name) = get_word_value_at_position(tokens, 4) {
+            if let Some(table_name) = get_word_value_at_position(tokens, 6) {
                 row_type = RowType::CreateTable {
                     database_name: database_name.to_string(),
                     table_name: table_name.to_string(),
@@ -470,21 +470,21 @@ fn get_row_type(tokens: &Vec<Token>) -> RowType {
         }
     }
 
-    if is_alter_table_statement(&tokens) {
-        let database_name_pos = if match_keyword_at_position(Keyword::Only, &tokens, 4) {
+    if is_alter_table_statement(tokens) {
+        let database_name_pos = if match_keyword_at_position(Keyword::Only, tokens, 4) {
             6
         } else {
             4
         };
 
-        let table_name_pos = if match_keyword_at_position(Keyword::Only, &tokens, 4) {
+        let table_name_pos = if match_keyword_at_position(Keyword::Only, tokens, 4) {
             8
         } else {
             6
         };
 
-        if let Some(database_name) = get_word_value_at_position(&tokens, database_name_pos) {
-            if let Some(table_name) = get_word_value_at_position(&tokens, table_name_pos) {
+        if let Some(database_name) = get_word_value_at_position(tokens, database_name_pos) {
+            if let Some(table_name) = get_word_value_at_position(tokens, table_name_pos) {
                 row_type = RowType::AlterTable {
                     database_name: database_name.to_string(),
                     table_name: table_name.to_string(),
@@ -512,7 +512,7 @@ fn to_query(database: Option<&str>, query: InsertIntoQuery) -> Query {
             }
             Column::StringValue(column_name, value) => {
                 column_names.push(column_name);
-                values.push(format!("'{}'", value.replace("'", "''")));
+                values.push(format!("'{}'", value.replace('\'', "''")));
             }
             Column::CharValue(column_name, value) => {
                 column_names.push(column_name);
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn connect() {
         let p = get_postgres();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -583,10 +583,10 @@ mod tests {
             only_tables: &vec![],
         };
 
-        assert!(p.read(source_options, |original_query, query| {}).is_ok());
+        assert!(p.read(source_options, |_original_query, _query| {}).is_ok());
 
         let p = get_invalid_postgres();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -595,13 +595,13 @@ mod tests {
             only_tables: &vec![],
         };
 
-        assert!(p.read(source_options, |original_query, query| {}).is_err());
+        assert!(p.read(source_options, |_original_query, _query| {}).is_err());
     }
 
     #[test]
     fn list_rows() {
         let p = get_postgres();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -611,8 +611,8 @@ mod tests {
         };
 
         let _ = p.read(source_options, |original_query, query| {
-            assert!(original_query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!original_query.data().is_empty());
+            assert!(!query.data().is_empty());
         });
     }
 
@@ -721,7 +721,7 @@ mod tests {
         let table_name = "employees";
         let column_name_to_obfuscate = "last_name";
 
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let t2: Box<dyn Transformer> = Box::new(RandomTransformer::new(
             database_name,
             table_name,
@@ -737,8 +737,8 @@ mod tests {
         };
 
         let _ = p.read(source_options, |original_query, query| {
-            assert!(query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
+            assert!(!query.data().is_empty());
 
             let query_str = str::from_utf8(query.data()).unwrap();
 
@@ -761,7 +761,7 @@ mod tests {
         let database_name = "public";
         let table_name = "employees";
 
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let skip_employees_table = SkipConfig {
             database: database_name.to_string(),
             table: table_name.to_string(),
@@ -778,8 +778,8 @@ mod tests {
         };
 
         let _ = p.read(source_options, |_original_query, query| {
-            assert!(query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
+            assert!(!query.data().is_empty());
 
             let query_str = str::from_utf8(query.data()).unwrap();
             let unexpected_insert_into = format!("INSERT INTO {}.{}", database_name, table_name);
@@ -812,7 +812,7 @@ mod tests {
     #[test]
     fn subset_options() {
         let p = get_postgres();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
 
         let source_options = SourceOptions {
             transformers: &vec![t1],
@@ -830,7 +830,7 @@ mod tests {
 
         let mut rows_percent_50 = vec![];
         let _ = p.read(source_options, |_original_query, query| {
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
             rows_percent_50.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
 
@@ -849,7 +849,7 @@ mod tests {
         // check that there is no duplicated rows
         assert_eq!(x.len(), y.len());
 
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
 
         let source_options = SourceOptions {
             transformers: &vec![t1],
@@ -867,7 +867,7 @@ mod tests {
 
         let mut rows_percent_30 = vec![];
         let _ = p.read(source_options, |_original_query, query| {
-            assert!(query.data().len() > 0);
+            assert!(!query.data().is_empty());
             rows_percent_30.push(String::from_utf8_lossy(query.data().as_slice()).to_string());
         });
 

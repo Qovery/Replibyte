@@ -150,7 +150,7 @@ impl S3 {
             Ok(index_file) => Ok(index_file),
             Err(_) => {
                 let index_file = IndexFile::new();
-                let _ = self.write_index_file(&index_file)?;
+                self.write_index_file(&index_file)?;
                 Ok(index_file)
             }
         }
@@ -164,7 +164,7 @@ impl Connector for S3 {
                 // Do not try to create bucket - the current S3 client does not supports well GCP Cloud Storage
             }
             _ => {
-                let _ = create_bucket(&self.client, self.bucket.as_str(), self.region.as_ref())?;
+                create_bucket(&self.client, self.bucket.as_str(), self.region.as_ref())?;
             }
         }
 
@@ -195,7 +195,7 @@ impl Datastore for S3 {
             INDEX_FILE_NAME,
             index_file_json,
         )
-        .map_err(|err| Error::from(err))
+        .map_err(Error::from)
     }
 
     fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error> {
@@ -207,7 +207,7 @@ impl Datastore for S3 {
             INDEX_FILE_NAME,
             index_file_json,
         )
-        .map_err(|err| Error::from(err))
+        .map_err(Error::from)
     }
 
     fn write(&self, file_part: u16, data: Bytes) -> Result<(), Error> {
@@ -224,7 +224,7 @@ impl Datastore for S3 {
     fn read(
         &self,
         options: &ReadOptions,
-        mut data_callback: &mut dyn FnMut(Bytes),
+        data_callback: &mut dyn FnMut(Bytes),
     ) -> Result<(), Error> {
         let mut index_file = self.index_file()?;
         let dump = index_file.find_dump(options)?;
@@ -284,7 +284,7 @@ impl Datastore for S3 {
 
         let bucket = &self.bucket;
 
-        let _ = delete_directory(&self.client, bucket, &name).map_err(|err| Error::from(err))?;
+        delete_directory(&self.client, bucket, &name).map_err(Error::from)?;
 
         index_file.dumps.retain(|b| b.directory_name != name);
 
@@ -318,7 +318,7 @@ fn write_objects<B: Datastore>(
 
     info!("upload object '{}' part {} on", key.as_str(), file_part);
 
-    let _ = create_object(client, bucket, key.as_str(), data)?;
+    create_object(client, bucket, key.as_str(), data)?;
 
     // update index file
     let mut index_file = datastore.index_file()?;
@@ -345,7 +345,7 @@ fn write_objects<B: Datastore>(
         index_file.dumps.push(new_dump);
     } else {
         // update total dump size
-        dump.size = dump.size + data_size;
+        dump.size += data_size;
     }
 
     // save index file
@@ -704,7 +704,7 @@ mod tests {
         let bucket = aws_bucket();
 
         let mut s3 = aws_s3(bucket.as_str());
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         let key = format!("testing-object-{}", Faker.fake::<String>());
 
@@ -774,7 +774,7 @@ mod tests {
     fn create_and_get_and_delete_object_for_gcp_s3() {
         let bucket = gcp_bucket();
         let mut s3 = gcp_s3(bucket.as_str());
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         let key = format!("testing-object-{}", Faker.fake::<String>());
 
@@ -843,7 +843,7 @@ mod tests {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         assert!(s3.index_file().is_ok());
 
@@ -881,7 +881,7 @@ mod tests {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         assert!(s3.index_file().is_ok());
 
@@ -953,7 +953,7 @@ mod tests {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         assert!(s3.index_file().is_ok());
 
@@ -1028,7 +1028,7 @@ mod tests {
         let bucket = aws_bucket();
         let mut s3 = aws_s3(bucket.as_str());
 
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         assert!(s3.index_file().is_ok());
 
@@ -1162,7 +1162,7 @@ mod tests {
         );
         assert!(migrator.migrate().is_ok());
 
-        let _ = s3.init().expect("s3 init failed");
+        s3.init().expect("s3 init failed");
 
         // assert
         assert!(s3.index_file().is_ok());

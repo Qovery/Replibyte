@@ -38,8 +38,8 @@ impl PostgresDocker {
 
 impl Connector for PostgresDocker {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists(DOCKER_BINARY_NAME)?;
-        let _ = daemon_is_running()?;
+        binary_exists(DOCKER_BINARY_NAME)?;
+        daemon_is_running()?;
 
         let password_env = format!("POSTGRES_PASSWORD={}", DEFAULT_POSTGRES_PASSWORD);
         let user_env = format!("POSTGRES_USER={}", DEFAULT_POSTGRES_USER);
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn connect() {
         let mut p = get_postgres();
-        let _ = p.init().expect("can't init postgres");
+        p.init().expect("can't init postgres");
         assert!(p.write(b"SELECT 1".to_vec()).is_ok());
 
         // cleanup container

@@ -24,15 +24,15 @@ pub mod custom_wasm;
 
 pub fn transformers() -> Vec<Box<dyn Transformer>> {
     vec![
-        Box::new(EmailTransformer::default()),
-        Box::new(FirstNameTransformer::default()),
-        Box::new(PhoneNumberTransformer::default()),
-        Box::new(RandomTransformer::default()),
-        Box::new(KeepFirstCharTransformer::default()),
-        Box::new(TransientTransformer::default()),
-        Box::new(CreditCardTransformer::default()),
-        Box::new(RedactedTransformer::default()),
-        Box::new(CustomWasmTransformer::default()),
+        Box::<EmailTransformer>::default(),
+        Box::<FirstNameTransformer>::default(),
+        Box::<PhoneNumberTransformer>::default(),
+        Box::<RandomTransformer>::default(),
+        Box::<KeepFirstCharTransformer>::default(),
+        Box::<TransientTransformer>::default(),
+        Box::<CreditCardTransformer>::default(),
+        Box::<RedactedTransformer>::default(),
+        Box::<CustomWasmTransformer>::default(),
     ]
 }
 

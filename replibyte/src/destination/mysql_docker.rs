@@ -36,8 +36,8 @@ impl MysqlDocker {
 
 impl Connector for MysqlDocker {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists(DOCKER_BINARY_NAME)?;
-        let _ = daemon_is_running()?;
+        binary_exists(DOCKER_BINARY_NAME)?;
+        daemon_is_running()?;
 
         let password_env = format!("MYSQL_ROOT_PASSWORD={}", DEFAULT_MYSQL_PASSWORD);
         let container = Container::new(
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn connect() {
         let mut p = get_mysql();
-        let _ = p.init().expect("can't init mysql");
+        p.init().expect("can't init mysql");
         assert!(p.write(b"SELECT 1".to_vec()).is_ok());
 
         // cleanup container

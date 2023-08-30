@@ -133,7 +133,7 @@ impl<'a> PostgresSubset<'a> {
         // find the subset table from this row
         let row_subset_table = self
             .subset_table_by_database_and_table_name
-            .get(&(row_database.to_string(), row_table.to_string()))
+            .get(&(row_database, row_table))
             .unwrap();
 
         let row_column_names = get_column_names_from_insert_into_query(&row_tokens);
@@ -159,7 +159,7 @@ impl<'a> PostgresSubset<'a> {
                 }
             };
 
-            let _ = filter_insert_into_rows(
+            filter_insert_into_rows(
                 row_relation.to_property.as_str(),
                 value.as_str(),
                 self.dump_reader(),
@@ -185,11 +185,11 @@ impl<'a> Subset for PostgresSubset<'a> {
     fn read<F: FnMut(String), P: FnMut(Progress)>(
         &self,
         mut data: F,
-        mut progress: P,
+        progress: P,
     ) -> Result<(), Error> {
         let temp_dir = tempfile::tempdir()?;
 
-        let _ = read(
+        read(
             self,
             |line| {
                 if line.contains("INSERT INTO") {
@@ -230,7 +230,7 @@ fn read<F: FnMut(String), P: FnMut(Progress)>(
 
     // send schema header
     let table_stats_values = table_stats.values().collect::<Vec<_>>();
-    let _ = dump_header(
+    dump_header(
         postgres_subset.dump_reader(),
         last_header_row_idx(&table_stats_values),
         |row| {
@@ -255,7 +255,7 @@ fn read<F: FnMut(String), P: FnMut(Progress)>(
     // send INSERT INTO rows
     for row in rows {
         let start_time = utils::epoch_millis();
-        let _ = postgres_subset.visits(row, &table_stats, &mut data)?;
+        postgres_subset.visits(row, &table_stats, &mut data)?;
 
         processed_rows += 1;
 
@@ -273,7 +273,7 @@ fn read<F: FnMut(String), P: FnMut(Progress)>(
             if table_stats.database.as_str() == passthrough_table.database
                 && table_stats.table.as_str() == passthrough_table.table
             {
-                let _ = list_insert_into_rows(postgres_subset.dump_reader(), table_stats, |row| {
+                list_insert_into_rows(postgres_subset.dump_reader(), table_stats, |row| {
                     data(row.to_string());
                 })?;
             }
@@ -281,7 +281,7 @@ fn read<F: FnMut(String), P: FnMut(Progress)>(
     }
 
     // send schema footer
-    let _ = dump_footer(
+    dump_footer(
         postgres_subset.dump_reader(),
         first_footer_row_idx(&table_stats_values),
         |row| {
@@ -319,7 +319,7 @@ fn list_percent_of_insert_into_rows<R: Read>(
     let modulo = (table_stats.total_rows as f32 / total_rows_to_pick) as usize;
 
     let mut counter = 1usize;
-    let _ = list_insert_into_rows(dump_reader, table_stats, |rows| {
+    list_insert_into_rows(dump_reader, table_stats, |rows| {
         if counter % modulo == 0 {
             insert_into_rows.push(rows.to_string());
         }
@@ -336,7 +336,7 @@ fn list_insert_into_rows<R: Read, F: FnMut(&str)>(
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
-    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
+    list_sql_queries_from_dump_reader(dump_reader, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         // optimization to avoid tokenizing unnecessary queries -- it's a 13x optim (benched)
@@ -351,7 +351,7 @@ fn list_insert_into_rows<R: Read, F: FnMut(&str)>(
                 && get_word_value_at_position(&tokens, 4) == Some(table_stats.database.as_str())
                 && get_word_value_at_position(&tokens, 6) == Some(table_stats.table.as_str())
             {
-                rows(query.as_ref());
+                rows(query);
             }
         }
 
@@ -392,7 +392,7 @@ fn filter_insert_into_rows<R: Read, F: FnMut(&str)>(
     };
 
     let mut query_idx = 0usize;
-    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
+    list_sql_queries_from_dump_reader(dump_reader, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         // optimization to avoid tokenizing unnecessary queries -- it's a 13x optim (benched)
@@ -457,7 +457,7 @@ fn dump_header<R: Read, F: FnMut(&str)>(
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
-    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
+    list_sql_queries_from_dump_reader(dump_reader, |query| {
         let mut query_res = ListQueryResult::Continue;
 
         if query_idx <= last_header_row_idx {
@@ -484,7 +484,7 @@ fn dump_footer<R: Read, F: FnMut(&str)>(
     mut rows: F,
 ) -> Result<(), Error> {
     let mut query_idx = 0usize;
-    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
+    list_sql_queries_from_dump_reader(dump_reader, |query| {
         if query_idx >= first_footer_row_idx {
             rows(query)
         }
@@ -503,10 +503,10 @@ fn table_stats_by_database_and_table_name<R: Read>(
         HashMap::<(Database, Table), TableStats>::new();
 
     let mut query_idx = 0usize;
-    let _ = list_sql_queries_from_dump_reader(dump_reader, |query| {
+    list_sql_queries_from_dump_reader(dump_reader, |query| {
         let tokens = get_tokens_from_query_str(query);
 
-        let _ = match get_create_table_database_and_table_name(&tokens) {
+        match get_create_table_database_and_table_name(&tokens) {
             Some((database, table)) => {
                 table_stats_by_database_and_table_name.insert(
                     (database.clone(), table.clone()),
@@ -575,8 +575,7 @@ fn trim_tokens(tokens: &Vec<Token>, keyword: Keyword) -> Vec<Token> {
         .skip_while(|token| match *token {
             Token::Word(word) if word.keyword == keyword => false,
             _ => true,
-        })
-        .map(|token| token.clone()) // FIXME - do not clone token
+        }).cloned() // FIXME - do not clone token
         .collect::<Vec<_>>()
 }
 
@@ -598,7 +597,7 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
         }
 
         if let Some(fk) = get_alter_table_foreign_key(&tokens) {
-            let _ = match subset_table_by_database_and_table_name
+            match subset_table_by_database_and_table_name
                 .get_mut(&(fk.from_database, fk.from_table))
             {
                 Some(subset_table) => {
@@ -620,7 +619,7 @@ fn get_subset_table_by_database_and_table_name<R: Read>(
 }
 
 fn get_create_table_database_and_table_name(tokens: &Vec<Token>) -> Option<(Database, Table)> {
-    let tokens = trim_tokens(&tokens, Keyword::Create);
+    let tokens = trim_tokens(tokens, Keyword::Create);
 
     if tokens.is_empty() {
         return None;
@@ -640,7 +639,7 @@ fn get_create_table_database_and_table_name(tokens: &Vec<Token>) -> Option<(Data
 }
 
 fn get_insert_into_database_and_table_name(tokens: &Vec<Token>) -> Option<(Database, Table)> {
-    let tokens = trim_tokens(&tokens, Keyword::Insert);
+    let tokens = trim_tokens(tokens, Keyword::Insert);
 
     if tokens.is_empty() {
         return None;
@@ -660,7 +659,7 @@ fn get_insert_into_database_and_table_name(tokens: &Vec<Token>) -> Option<(Datab
 }
 
 fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
-    let tokens = trim_tokens(&tokens, Keyword::Alter);
+    let tokens = trim_tokens(tokens, Keyword::Alter);
 
     if tokens.is_empty() {
         return None;
@@ -699,8 +698,7 @@ fn get_alter_table_foreign_key(tokens: &Vec<Token>) -> Option<ForeignKey> {
         .skip_while(|token| match token {
             Token::Word(word) if word.keyword == Keyword::Foreign => false,
             _ => true,
-        })
-        .map(|token| token.clone())
+        }).cloned()
         .collect::<Vec<_>>();
 
     let from_property = match get_word_value_at_position(&next_foreign_tokens, 5) {
@@ -803,7 +801,7 @@ ALTER TABLE ONLY public.territories
     #[test]
     fn check_subset_table() {
         let m = get_subset_table_by_database_and_table_name(dump_reader()).unwrap();
-        assert!(m.len() > 0);
+        assert!(!m.is_empty());
 
         let t = m
             .get(&("public".to_string(), "customer_demographics".to_string()))
@@ -834,7 +832,7 @@ ALTER TABLE ONLY public.territories
     #[test]
     fn check_table_stats() {
         let table_stats = table_stats_by_database_and_table_name(dump_reader()).unwrap();
-        assert!(table_stats.len() > 0);
+        assert!(!table_stats.is_empty());
         // TODO add more tests to check table.rows size
     }
 
@@ -884,7 +882,7 @@ ALTER TABLE ONLY public.territories
         assert!(idx > 0);
 
         let mut rows = vec![];
-        let _ = dump_header(dump_reader(), idx, |row| {
+        dump_header(dump_reader(), idx, |row| {
             rows.push(row.to_string());
         })
         .unwrap();
@@ -905,7 +903,7 @@ ALTER TABLE ONLY public.territories
         assert!(idx > 0);
 
         let mut rows = vec![];
-        let _ = dump_footer(dump_reader(), idx, |row| {
+        dump_footer(dump_reader(), idx, |row| {
             rows.push(row.to_string());
         })
         .unwrap();

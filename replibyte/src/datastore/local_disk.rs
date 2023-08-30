@@ -1,6 +1,6 @@
 use std::fs::{read, read_dir, remove_dir_all, write, DirBuilder, OpenOptions};
 use std::io::{BufReader, Error, Read, Write};
-use std::path::Path;
+
 
 use log::{debug, error, info};
 use serde_json::Value;
@@ -34,7 +34,7 @@ impl LocalDisk {
             Err(_) => {
                 info!("creating a new index_file");
                 let index_file = IndexFile::new();
-                let _ = self.write_index_file(&index_file)?;
+                self.write_index_file(&index_file)?;
                 Ok(index_file)
             }
         }
@@ -59,7 +59,7 @@ impl Datastore for LocalDisk {
         let reader = BufReader::new(file);
 
         let index_file: IndexFile =
-            serde_json::from_reader(reader).map_err(|err| Error::from(err))?;
+            serde_json::from_reader(reader).map_err(Error::from)?;
 
         Ok(index_file)
     }
@@ -73,7 +73,7 @@ impl Datastore for LocalDisk {
 
         let reader = BufReader::new(file);
 
-        let raw_index_file = serde_json::from_reader(reader).map_err(|err| Error::from(err))?;
+        let raw_index_file = serde_json::from_reader(reader).map_err(Error::from)?;
 
         Ok(raw_index_file)
     }
@@ -90,7 +90,7 @@ impl Datastore for LocalDisk {
             .open(&index_file_path)?;
 
         debug!("writing index_file at {}", index_file_path.as_str());
-        serde_json::to_writer(file, index_file).map_err(|err| Error::from(err))
+        serde_json::to_writer(file, index_file).map_err(Error::from)
     }
 
     fn write_raw_index_file(&self, raw_index_file: &Value) -> Result<(), Error> {
@@ -105,7 +105,7 @@ impl Datastore for LocalDisk {
             .open(&index_file_path)?;
 
         debug!("writing raw index_file at {}", index_file_path.as_str());
-        serde_json::to_writer(file, raw_index_file).map_err(|err| Error::from(err))
+        serde_json::to_writer(file, raw_index_file).map_err(Error::from)
     }
 
     fn write(&self, file_part: u16, data: types::Bytes) -> Result<(), Error> {
@@ -136,7 +136,7 @@ impl Datastore for LocalDisk {
             })?;
 
         debug!("writing dump at: {}", dump_file_path);
-        let _ = write(&dump_file_path, data).map_err(|err| {
+        write(&dump_file_path, data).map_err(|err| {
             error!("error while writing dumpt at: {}", dump_file_path);
             err
         })?;
@@ -166,7 +166,7 @@ impl Datastore for LocalDisk {
             index_file.dumps.push(new_dump);
         } else {
             // update total dump size
-            dump.size = dump.size + data_size;
+            dump.size += data_size;
         }
 
         // save index file
@@ -300,7 +300,7 @@ mod tests {
     fn test_write_and_read() {
         let dir = tempdir().expect("cannot create tempdir");
         let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
-        let _ = local_disk.init().expect("local_disk init failed");
+        local_disk.init().expect("local_disk init failed");
 
         let bytes: Vec<u8> = b"hello world".to_vec();
 
@@ -334,7 +334,7 @@ mod tests {
     fn test_index_file() {
         let dir = tempdir().expect("cannot create tempdir");
         let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
-        let _ = local_disk.init().expect("local_disk init failed");
+        local_disk.init().expect("local_disk init failed");
 
         assert!(local_disk.index_file().is_ok());
 
@@ -371,7 +371,7 @@ mod tests {
         let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
 
         // init local_disk
-        let _ = local_disk.init().expect("local_disk init failed");
+        local_disk.init().expect("local_disk init failed");
         assert!(local_disk.index_file().is_ok());
         let index_file = local_disk.index_file().unwrap();
         assert!(index_file.dumps.is_empty());
@@ -419,7 +419,7 @@ mod tests {
         let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
 
         // init local_disk
-        let _ = local_disk.init().expect("local_disk init failed");
+        local_disk.init().expect("local_disk init failed");
         assert!(local_disk.index_file().is_ok());
         let index_file = local_disk.index_file().unwrap();
         assert!(index_file.dumps.is_empty());
@@ -481,7 +481,7 @@ mod tests {
         let mut local_disk = LocalDisk::new(dir.path().to_str().unwrap().to_string());
 
         // init local_disk
-        let _ = local_disk.init().expect("local_disk init failed");
+        local_disk.init().expect("local_disk init failed");
         assert!(local_disk.index_file().is_ok());
         let index_file = local_disk.index_file().unwrap();
         assert!(index_file.dumps.is_empty());
@@ -568,7 +568,7 @@ mod tests {
             .create(true)
             .write(true)
             .truncate(true)
-            .open(&format!(
+            .open(format!(
                 "{}/{}",
                 dir.path().to_str().unwrap(),
                 INDEX_FILE_NAME
@@ -610,7 +610,7 @@ mod tests {
         );
         assert!(migrator.migrate().is_ok());
 
-        let _ = local_disk.init().expect("local_disk init failed");
+        local_disk.init().expect("local_disk init failed");
 
         // assert
         assert!(local_disk.index_file().is_ok());

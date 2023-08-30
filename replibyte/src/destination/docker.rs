@@ -54,7 +54,7 @@ impl Container {
                 Err(err) => Err(Error::new(ErrorKind::Other, format!("{}", err))),
             },
             false => match String::from_utf8(output.stderr) {
-                Ok(stderr) => Err(Error::new(ErrorKind::Other, format!("{}", stderr))),
+                Ok(stderr) => Err(Error::new(ErrorKind::Other, stderr)),
                 Err(err) => Err(Error::new(ErrorKind::Other, format!("{}", err))),
             },
         }
@@ -106,7 +106,7 @@ pub fn daemon_is_running() -> Result<(), Error> {
                     ErrorKind::Other,
                     format!(
                         "cannot connect to the Docker daemon: exit_status {}",
-                        exit_status.to_string()
+                        exit_status
                     ),
                 ))
             }
@@ -143,7 +143,7 @@ mod tests {
 
         let container = Container::new(&image, &options, args, None).unwrap();
 
-        assert!(container.id != "".to_string());
+        assert!(container.id != *"");
         assert!(container.stop().is_ok());
         assert!(container.rm().is_ok());
     }

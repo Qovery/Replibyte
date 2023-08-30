@@ -42,7 +42,7 @@ where
         mut progress_callback: F,
     ) -> Result<(), Error> {
         // initialize the source
-        let _ = self.source.init()?;
+        self.source.init()?;
 
         let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(1);
         let datastore = self.datastore;
@@ -59,7 +59,7 @@ where
                 };
 
                 if let Ok((chunk_part, queries)) = result {
-                    let _ = match datastore.write(chunk_part, to_bytes(queries)) {
+                    match datastore.write(chunk_part, to_bytes(queries)) {
                         Ok(_) => {}
                         Err(err) => return Err(Error::new(ErrorKind::Other, format!("{}", err))),
                     };
@@ -82,7 +82,7 @@ where
             buffer_size * (chunk_part as usize + 1),
         );
 
-        let _ = self.source.read(self.options, |_original_query, query| {
+        self.source.read(self.options, |_original_query, query| {
             if consumed_buffer_size + query.data().len() > buffer_size {
                 chunk_part += 1;
                 consumed_buffer_size = 0;
@@ -91,7 +91,7 @@ where
                 let message = Message::Data((chunk_part, queries.clone()));
 
                 let _ = tx.send(message); // FIXME catch SendError?
-                let _ = queries.clear();
+                queries.clear();
             }
 
             consumed_buffer_size += query.data().len();

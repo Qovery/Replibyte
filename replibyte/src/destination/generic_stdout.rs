@@ -5,6 +5,7 @@ use crate::destination::Destination;
 use crate::types::Bytes;
 
 /// Stream dump output on stdout
+#[derive(Default)]
 pub struct GenericStdout {}
 
 impl GenericStdout {
@@ -13,11 +14,7 @@ impl GenericStdout {
     }
 }
 
-impl Default for GenericStdout {
-    fn default() -> Self {
-        GenericStdout {}
-    }
-}
+
 
 impl Connector for GenericStdout {
     fn init(&mut self) -> Result<(), Error> {

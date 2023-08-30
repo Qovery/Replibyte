@@ -5,6 +5,7 @@ use fake::locales::EN;
 use fake::Fake;
 
 /// This struct is dedicated to replacing a string by an email address.
+#[derive(Default)]
 pub struct PhoneNumberTransformer {
     database_name: String,
     table_name: String,
@@ -24,15 +25,7 @@ impl PhoneNumberTransformer {
     }
 }
 
-impl Default for PhoneNumberTransformer {
-    fn default() -> Self {
-        PhoneNumberTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-        }
-    }
-}
+
 
 impl Transformer for PhoneNumberTransformer {
     fn id(&self) -> &str {

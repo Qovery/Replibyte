@@ -27,7 +27,7 @@ impl Migration for RenameBackupsToDump {
         info!("migrate: rename backups to dumps");
 
         let mut raw_index_file = datastore.raw_index_file()?;
-        let _ = rename_backups_to_dumps(&mut raw_index_file)?;
+        rename_backups_to_dumps(&mut raw_index_file)?;
         datastore.write_raw_index_file(&raw_index_file)
     }
 }

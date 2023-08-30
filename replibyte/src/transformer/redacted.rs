@@ -4,6 +4,7 @@ use crate::transformer::Transformer;
 use crate::types::Column;
 
 /// This struct is dedicated to redact a string with a specific character (default to '*').
+#[derive(Default)]
 pub struct RedactedTransformer {
     database_name: String,
     table_name: String,
@@ -45,16 +46,7 @@ impl RedactedTransformer {
     }
 }
 
-impl Default for RedactedTransformer {
-    fn default() -> Self {
-        RedactedTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-            options: RedactedTransformerOptions::default(),
-        }
-    }
-}
+
 
 impl Transformer for RedactedTransformer {
     fn id(&self) -> &str {

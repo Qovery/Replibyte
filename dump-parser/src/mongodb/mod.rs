@@ -120,7 +120,7 @@ impl Archive {
 
         // read metadata headers and seperator (seperator is read when while let fails for the 1st time)
         while let Ok(collection_metadata_doc) = bson::from_reader(&mut reader) {
-            let metadata_doc = Metadata::from(collection_metadata_doc);
+            let metadata_doc = collection_metadata_doc;
             metadata_docs.push(metadata_doc);
             num_blocks += 1;
         }

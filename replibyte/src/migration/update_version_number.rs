@@ -29,7 +29,7 @@ impl<'a> Migration for UpdateVersionNumber<'a> {
         info!("migrate: update version number");
 
         let mut raw_index_file = datastore.raw_index_file()?;
-        let _ = update_version(&mut raw_index_file, self.version)?;
+        update_version(&mut raw_index_file, self.version)?;
         datastore.write_raw_index_file(&raw_index_file)
     }
 }

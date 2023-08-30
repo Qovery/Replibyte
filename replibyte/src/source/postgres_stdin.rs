@@ -7,13 +7,10 @@ use crate::Source;
 use crate::SourceOptions;
 
 /// Source Postgres dump from STDIN
+#[derive(Default)]
 pub struct PostgresStdin {}
 
-impl Default for PostgresStdin {
-    fn default() -> Self {
-        Self {}
-    }
-}
+
 
 impl Connector for PostgresStdin {
     fn init(&mut self) -> Result<(), Error> {
