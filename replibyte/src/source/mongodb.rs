@@ -26,9 +26,9 @@ impl<'a> MongoDB<'a> {
 
 impl<'a> Connector for MongoDB<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists("mongosh")?;
-        let _ = binary_exists("mongodump")?;
-        let _ = check_connection_status(self)?;
+        binary_exists("mongosh")?;
+        binary_exists("mongodump")?;
+        check_connection_status(self)?;
 
         Ok(())
     }
@@ -133,7 +133,7 @@ pub fn recursively_transform_bson(
     let mut column;
     match bson {
         Bson::String(value) => {
-            column = Column::StringValue(key.clone(), value.clone());
+            column = Column::StringValue(key.clone(), value);
             column = match transformers.get(key.as_str()) {
                 Some(transformer) => transformer.transform(column), // apply transformation on the column
                 None => column,
@@ -245,7 +245,7 @@ pub(crate) fn find_all_keys_with_array_wildcard_op(
         }
         // try to find last delim
         let last_delim = ".$[]"; // no dot at the end
-        if let Some(_) = column_name[iter..].find(last_delim) {
+        if column_name[iter..].contains(last_delim) {
             let key = column_name.to_string();
             wildcard_keys.insert(format!("{}.{}", transformer.database_and_table_name(), key));
         }
@@ -361,7 +361,7 @@ mod tests {
     fn connect() {
         let p = get_mongodb();
 
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -373,7 +373,7 @@ mod tests {
         assert!(p.read(source_options, |_, _| {}).is_ok());
 
         let p = get_invalid_mongodb();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn list_rows() {
         let p = get_mongodb();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -398,8 +398,8 @@ mod tests {
         };
 
         p.read(source_options, |original_query, query| {
-            assert!(original_query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!original_query.data().is_empty());
+            assert!(!query.data().is_empty());
         })
         .unwrap();
     }
@@ -413,7 +413,7 @@ mod tests {
             "no_nest": 5,
             "info": {
                 "ext": {
-                    "number": 123456789000 as i64
+                    "number": 123456789000_i64
                 }
             },
             "info_arr" : [
@@ -426,7 +426,7 @@ mod tests {
             let t: Box<dyn Transformer> = Box::new(RandomTransformer::new(
                 database_name,
                 table_name,
-                &c.to_string(),
+                c,
             ));
             t
         }));
@@ -498,7 +498,7 @@ mod tests {
         let t: Box<dyn Transformer> = Box::new(RandomTransformer::new(
             database_name,
             table_name,
-            column_name.into(),
+            column_name,
         ));
         let transformers_vec = vec![t];
         // create a set of wildcards to be used in the transformation

@@ -5,6 +5,7 @@ use fake::locales::EN;
 use fake::Fake;
 
 /// This struct is dedicated to replacing string by a first name.
+#[derive(Default)]
 pub struct FirstNameTransformer {
     database_name: String,
     table_name: String,
@@ -24,15 +25,7 @@ impl FirstNameTransformer {
     }
 }
 
-impl Default for FirstNameTransformer {
-    fn default() -> Self {
-        FirstNameTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-        }
-    }
-}
+
 
 impl Transformer for FirstNameTransformer {
     fn id(&self) -> &str {
@@ -62,7 +55,7 @@ impl Transformer for FirstNameTransformer {
                 Column::FloatNumberValue(column_name, value)
             }
             Column::StringValue(column_name, value) => {
-                let new_value = if value == "" {
+                let new_value = if value.is_empty() {
                     "".to_string()
                 } else {
                     FirstName(EN).fake()

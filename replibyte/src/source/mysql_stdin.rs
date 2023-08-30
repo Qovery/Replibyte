@@ -7,13 +7,10 @@ use crate::Source;
 use crate::SourceOptions;
 
 /// Source MySQL dump from STDIN
+#[derive(Default)]
 pub struct MysqlStdin {}
 
-impl Default for MysqlStdin {
-    fn default() -> Self {
-        Self {}
-    }
-}
+
 
 impl Connector for MysqlStdin {
     fn init(&mut self) -> Result<(), Error> {

@@ -123,7 +123,7 @@ impl Token {
         Token::Word(Word {
             value: word.to_string(),
             quote_style,
-            keyword: if quote_style == None {
+            keyword: if quote_style.is_none() {
                 match word_uppercase.as_str() {
                     "ALTER" => Alter,
                     "CREATE" => Create,
@@ -313,7 +313,7 @@ impl<'a> Tokenizer<'a> {
                     chars.next(); // consume the first char
                     let s = self.tokenize_word(ch, chars);
 
-                    if s.chars().all(|x| ('0'..='9').contains(&x) || x == '.') {
+                    if s.chars().all(|x| x.is_ascii_digit() || x == '.') {
                         let mut s = peeking_take_while(&mut s.chars().peekable(), |ch| {
                             matches!(ch, '0'..='9' | '.')
                         });
@@ -496,7 +496,7 @@ impl<'a> Tokenizer<'a> {
     /// Tokenize an identifier or keyword, after the first char is already consumed.
     fn tokenize_word(&self, first_char: char, chars: &mut Peekable<Chars<'_>>) -> String {
         let mut s = first_char.to_string();
-        s.push_str(&peeking_take_while(chars, |ch| is_identifier_part(ch)));
+        s.push_str(&peeking_take_while(chars, is_identifier_part));
         s
     }
 
@@ -544,10 +544,10 @@ impl<'a> Tokenizer<'a> {
     ) -> Result<Option<Token>, TokenizerError> {
         let mut s = match sign {
             Some(ch) if ch == '+' || ch == '-' => {
-                String::from(ch) + &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+                String::from(ch) + &peeking_take_while(chars, |ch| ch.is_ascii_digit())
             }
             Some(_) => panic!("invalid sign"),
-            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+            None => peeking_take_while(chars, |ch| ch.is_ascii_digit())
         };
 
         // match binary literal that starts with 0x
@@ -565,7 +565,7 @@ impl<'a> Tokenizer<'a> {
             s.push('.');
             chars.next();
         }
-        s += &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'));
+        s += &peeking_take_while(chars, |ch| ch.is_ascii_digit());
 
         // No number -> Token::Period
         if s == "." {
@@ -623,13 +623,13 @@ fn is_identifier_start(ch: char) -> bool {
     // See https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
     // We don't yet support identifiers beginning with "letters with
     // diacritical marks and non-Latin letters"
-    ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == '"'
+    ch.is_ascii_lowercase() || ch.is_ascii_uppercase() || ch == '_' || ch == '"'
 }
 
 fn is_identifier_part(ch: char) -> bool {
-    ('a'..='z').contains(&ch)
-        || ('A'..='Z').contains(&ch)
-        || ('0'..='9').contains(&ch)
+    ch.is_ascii_lowercase()
+        || ch.is_ascii_uppercase()
+        || ch.is_ascii_digit()
         || ch == '$'
         || ch == '_'
         || ch == '"'
@@ -698,8 +698,8 @@ pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&st
 }
 
 pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
-    if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        || !match_keyword_at_position(Keyword::Into, &tokens, 2)
+    if !match_keyword_at_position(Keyword::Insert, tokens, 0)
+        || !match_keyword_at_position(Keyword::Into, tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
         return Vec::new();
@@ -732,8 +732,8 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<Strin
 }
 
 pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Token> {
-    if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        || !match_keyword_at_position(Keyword::Into, &tokens, 2)
+    if !match_keyword_at_position(Keyword::Insert, tokens, 0)
+        || !match_keyword_at_position(Keyword::Into, tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
         return Vec::new();
@@ -761,7 +761,7 @@ pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Tok
 }
 
 pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
-    get_column_values_from_insert_into_query(&tokens)
+    get_column_values_from_insert_into_query(tokens)
         .iter()
         .filter_map(|x| match *x {
             Token::Word(word) => Some(word.value.clone()),
@@ -780,7 +780,7 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<
 }
 
 pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
-    if !match_keyword_at_position(Create, &tokens, 0) {
+    if !match_keyword_at_position(Create, tokens, 0) {
         return Vec::new();
     }
 
@@ -855,7 +855,7 @@ CREATE TABLE public.orders (
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = tokens_result.unwrap();
 
@@ -917,11 +917,11 @@ CREATE TABLE public.application (
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
-        let tokens = tokens_result.unwrap();
+        let _tokens = tokens_result.unwrap();
 
-        let expected: Vec<Token> = vec![];
+        let _expected: Vec<Token> = vec![];
 
         // FIXME assert_eq!(tokens, expected);
     }
@@ -942,11 +942,11 @@ COPY public.categories (category_id, category_name, description, picture) FROM s
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
-        let tokens = tokens_result.unwrap();
+        let _tokens = tokens_result.unwrap();
 
-        let expected: Vec<Token> = vec![];
+        let _expected: Vec<Token> = vec![];
 
         // FIXME assert_eq!(tokens, expected);
     }
@@ -960,11 +960,11 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
-        let tokens = tokens_result.unwrap();
+        let _tokens = tokens_result.unwrap();
 
-        let expected: Vec<Token> = vec![];
+        let _expected: Vec<Token> = vec![];
 
         // FIXME assert_eq!(tokens, expected);
     }
@@ -977,7 +977,7 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL, NULL);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_names = get_column_names_from_insert_into_query(&tokens);
@@ -1003,7 +1003,7 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_values = get_column_values_from_insert_into_query(&tokens);
@@ -1028,7 +1028,7 @@ VALUES ('Romaric', true);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_values = get_column_values_from_insert_into_query(&tokens);
@@ -1048,7 +1048,7 @@ VALUES ('Romaric', true);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_values = get_column_values_from_insert_into_query(&tokens);

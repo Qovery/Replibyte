@@ -54,7 +54,7 @@ impl<'a> Mysql<'a> {
 
 impl<'a> Connector for Mysql<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists("mysqldump")?;
+        binary_exists("mysqldump")?;
 
         Ok(())
     }
@@ -198,7 +198,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
                     to_query(
                         None,
                         InsertIntoQuery {
-                            table_name: table_name.to_string(),
+                            table_name,
                             columns,
                         },
                     ),
@@ -270,8 +270,8 @@ fn transform_columns(
     // <table>      -> position 4
     // L Paren      -> position X?
     // R Paren      -> position X?
-    let column_names = get_column_names_from_insert_into_query(&tokens);
-    let column_values = get_column_values_from_insert_into_query(&tokens);
+    let column_names = get_column_names_from_insert_into_query(tokens);
+    let column_values = get_column_values_from_insert_into_query(tokens);
     assert_eq!(
         column_names.len(),
         column_values.len(),
@@ -288,7 +288,7 @@ fn transform_columns(
 
         let column = match value_token {
             Token::Number(column_value, _) => {
-                if column_value.contains(".") {
+                if column_value.contains('.') {
                     Column::FloatNumberValue(
                         column_name.to_string(),
                         column_value.parse::<f64>().unwrap(),
@@ -301,7 +301,7 @@ fn transform_columns(
                 }
             }
             Token::Char(column_value) => {
-                Column::CharValue(column_name.to_string(), column_value.clone())
+                Column::CharValue(column_name.to_string(), *column_value)
             }
             Token::SingleQuotedString(column_value) => {
                 Column::StringValue(column_name.to_string(), column_value.clone())
@@ -314,7 +314,7 @@ fn transform_columns(
             }
             Token::Word(w)
                 if (w.value == "true" || w.value == "false")
-                    && w.quote_style == None
+                    && w.quote_style.is_none()
                     && w.keyword == NoKeyword =>
             {
                 Column::BooleanValue(column_name.to_string(), w.value.parse::<bool>().unwrap())
@@ -341,28 +341,28 @@ fn transform_columns(
 }
 
 fn is_insert_into_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        && match_keyword_at_position(Keyword::Into, &tokens, 2)
+    match_keyword_at_position(Keyword::Insert, tokens, 0)
+        && match_keyword_at_position(Keyword::Into, tokens, 2)
 }
 
 fn is_create_table_statement(tokens: &Vec<Token>) -> bool {
-    match_keyword_at_position(Keyword::Create, &tokens, 0)
-        && match_keyword_at_position(Keyword::Table, &tokens, 2)
+    match_keyword_at_position(Keyword::Create, tokens, 0)
+        && match_keyword_at_position(Keyword::Table, tokens, 2)
 }
 
 fn get_row_type(tokens: &Vec<Token>) -> RowType {
     let mut row_type = RowType::Others;
 
-    if is_insert_into_statement(&tokens) {
-        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+    if is_insert_into_statement(tokens) {
+        if let Some(table_name) = get_single_quoted_string_value_at_position(tokens, 4) {
             row_type = RowType::InsertInto {
                 table_name: table_name.to_string(),
             };
         }
     }
 
-    if is_create_table_statement(&tokens) {
-        if let Some(table_name) = get_single_quoted_string_value_at_position(&tokens, 4) {
+    if is_create_table_statement(tokens) {
+        if let Some(table_name) = get_single_quoted_string_value_at_position(tokens, 4) {
             row_type = RowType::CreateTable {
                 table_name: table_name.to_string(),
             };
@@ -449,7 +449,7 @@ mod tests {
         let mut p = get_mysql();
         assert!(p.init().is_ok());
 
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -461,7 +461,7 @@ mod tests {
         assert!(p.read(source_options, |_original_query, _query| {}).is_ok());
 
         let p = get_invalid_mysql();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn list_rows() {
         let p = get_mysql();
-        let t1: Box<dyn Transformer> = Box::new(TransientTransformer::default());
+        let t1: Box<dyn Transformer> = Box::<TransientTransformer>::default();
         let transformers = vec![t1];
         let source_options = SourceOptions {
             transformers: &transformers,
@@ -486,8 +486,8 @@ mod tests {
             only_tables: &vec![],
         };
         let _ = p.read(source_options, |original_query, query| {
-            assert!(original_query.data().len() > 0);
-            assert!(query.data().len() > 0);
+            assert!(!original_query.data().is_empty());
+            assert!(!query.data().is_empty());
         });
     }
 
@@ -497,7 +497,7 @@ mod tests {
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
-        assert_eq!(is_insert_into_statement(&tokens), true);
+        assert!(is_insert_into_statement(&tokens));
 
         let q = "CREATE TABLE `city` (
     `ID` int NOT NULL AUTO_INCREMENT,
@@ -512,7 +512,7 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
-        assert_eq!(is_insert_into_statement(&tokens), false);
+        assert!(!is_insert_into_statement(&tokens));
     }
 
     #[test]
@@ -530,12 +530,12 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
-        assert_eq!(is_create_table_statement(&tokens), true);
+        assert!(is_create_table_statement(&tokens));
 
         let q = "INSERT INTO `customers` (`first_name`, `is_valid`) VALUES ('Romaric', true);";
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
-        assert_eq!(is_create_table_statement(&tokens), false);
+        assert!(!is_create_table_statement(&tokens));
     }
 
     #[test]
@@ -579,7 +579,7 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
-        assert_eq!(is_create_table_statement(&tokens), true);
+        assert!(is_create_table_statement(&tokens));
 
         let q = "CREATE TABLE `test` (
  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -588,6 +588,6 @@ CONSTRAINT `city_ibfk_1` FOREIGN KEY (`CountryCode`) REFERENCES `country` (`Code
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens = tokenizer.tokenize().unwrap();
-        assert_eq!(is_create_table_statement(&tokens), true);
+        assert!(is_create_table_statement(&tokens));
     }
 }

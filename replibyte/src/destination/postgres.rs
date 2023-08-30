@@ -37,7 +37,7 @@ impl<'a> Postgres<'a> {
 
 impl<'a> Connector for Postgres<'a> {
     fn init(&mut self) -> Result<(), Error> {
-        let _ = binary_exists("psql")?;
+        binary_exists("psql")?;
 
         if self.wipe_database {
             let s_port = self.port.to_string();
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn connect() {
         let mut p = get_postgres();
-        let _ = p.init().expect("can't init postgres");
+        p.init().expect("can't init postgres");
         assert!(p.write(b"SELECT 1".to_vec()).is_ok());
 
         let mut p = get_invalid_postgres();

@@ -119,7 +119,7 @@ impl Token {
         Token::Word(Word {
             value: word.to_string(),
             quote_style,
-            keyword: if quote_style == None {
+            keyword: if quote_style.is_none() {
                 match word_uppercase.as_str() {
                     "ALTER" => Alter,
                     "CREATE" => Create,
@@ -303,7 +303,7 @@ impl<'a> Tokenizer<'a> {
                     chars.next(); // consume the first char
                     let s = self.tokenize_word(ch, chars);
 
-                    if s.chars().all(|x| ('0'..='9').contains(&x) || x == '.') {
+                    if s.chars().all(|x| x.is_ascii_digit() || x == '.') {
                         let mut s = peeking_take_while(&mut s.chars().peekable(), |ch| {
                             matches!(ch, '0'..='9' | '.')
                         });
@@ -471,7 +471,7 @@ impl<'a> Tokenizer<'a> {
     /// Tokenize an identifier or keyword, after the first char is already consumed.
     fn tokenize_word(&self, first_char: char, chars: &mut Peekable<Chars<'_>>) -> String {
         let mut s = first_char.to_string();
-        s.push_str(&peeking_take_while(chars, |ch| is_identifier_part(ch)));
+        s.push_str(&peeking_take_while(chars, is_identifier_part));
         s
     }
 
@@ -517,10 +517,10 @@ impl<'a> Tokenizer<'a> {
     ) -> Result<Option<Token>, TokenizerError> {
         let mut s = match sign {
             Some(ch) if ch == '+' || ch == '-' => {
-                String::from(ch) + &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+                String::from(ch) + &peeking_take_while(chars, |ch| ch.is_ascii_digit())
             }
             Some(_) => panic!("invalid sign"),
-            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+            None => peeking_take_while(chars, |ch| ch.is_ascii_digit())
         };
 
         // match binary literal that starts with 0x
@@ -538,7 +538,7 @@ impl<'a> Tokenizer<'a> {
             s.push('.');
             chars.next();
         }
-        s += &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'));
+        s += &peeking_take_while(chars, |ch| ch.is_ascii_digit());
 
         // No number -> Token::Period
         if s == "." {
@@ -596,13 +596,13 @@ fn is_identifier_start(ch: char) -> bool {
     // See https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
     // We don't yet support identifiers beginning with "letters with
     // diacritical marks and non-Latin letters"
-    ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
+    ch.is_ascii_lowercase() || ch.is_ascii_uppercase() || ch == '_'
 }
 
 fn is_identifier_part(ch: char) -> bool {
-    ('a'..='z').contains(&ch)
-        || ('A'..='Z').contains(&ch)
-        || ('0'..='9').contains(&ch)
+    ch.is_ascii_lowercase()
+        || ch.is_ascii_uppercase()
+        || ch.is_ascii_digit()
         || ch == '$'
         || ch == '_'
 }
@@ -661,7 +661,7 @@ pub fn get_single_quoted_string_value_at_position(tokens: &Vec<Token>, pos: usiz
 }
 
 pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
-    if !match_keyword_at_position(Create, &tokens, 0) {
+    if !match_keyword_at_position(Create, tokens, 0) {
         return Vec::new();
     }
 
@@ -695,8 +695,8 @@ pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
 }
 
 pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str> {
-    if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        || !match_keyword_at_position(Keyword::Into, &tokens, 2)
+    if !match_keyword_at_position(Keyword::Insert, tokens, 0)
+        || !match_keyword_at_position(Keyword::Into, tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
         return Vec::new();
@@ -721,8 +721,8 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&str>
 }
 
 pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Token> {
-    if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
-        || !match_keyword_at_position(Keyword::Into, &tokens, 2)
+    if !match_keyword_at_position(Keyword::Insert, tokens, 0)
+        || !match_keyword_at_position(Keyword::Into, tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
         return Vec::new();
@@ -987,7 +987,7 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,'2022-04-13
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_names = get_column_names_from_insert_into_query(&tokens);
@@ -1013,7 +1013,7 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,'2022-04-13
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = tokens_result.unwrap();
         let tokens = trim_pre_whitespaces(tokens);
@@ -1043,14 +1043,12 @@ VALUES (1,'Stanford','Stiedemann','alaina.moore@example.net','EUR',1,NULL,'2022-
 ";
         let tokens = get_tokens_from_query_str(q);
 
-        assert_eq!(
-            match_keyword_at_position(super::Keyword::Insert, &tokens, 0),
-            true
+        assert!(
+            match_keyword_at_position(super::Keyword::Insert, &tokens, 0)
         );
 
-        assert_eq!(
-            match_keyword_at_position(super::Keyword::Into, &tokens, 2),
-            true
+        assert!(
+            match_keyword_at_position(super::Keyword::Into, &tokens, 2)
         );
     }
 
@@ -1063,7 +1061,7 @@ VALUES ('Romaric', true);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_values = get_column_values_from_insert_into_query(&tokens);
@@ -1086,7 +1084,7 @@ VALUES ('Romaric', true);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         assert_eq!(
@@ -1102,7 +1100,7 @@ VALUES ('Romaric', true);
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
-        assert_eq!(tokens_result.is_ok(), true);
+        assert!(tokens_result.is_ok());
 
         let tokens = trim_pre_whitespaces(tokens_result.unwrap());
         let column_values = get_column_values_from_insert_into_query(&tokens);

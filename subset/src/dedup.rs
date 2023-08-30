@@ -56,7 +56,7 @@ pub fn does_line_exist(
             return Ok(true);
         }
 
-        let _ = buf.clear();
+        buf.clear();
     }
 
     Ok(false)
