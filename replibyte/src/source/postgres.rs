@@ -571,6 +571,10 @@ mod tests {
         Postgres::new("localhost", 5432, "root", "root", "wrongpassword")
     }
 
+    fn get_default_dump_chunk_size() -> usize {
+        100
+    }
+
     #[test]
     fn connect() {
         let p = get_postgres();
@@ -581,6 +585,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         assert!(p.read(source_options, |original_query, query| {}).is_ok());
@@ -593,6 +598,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         assert!(p.read(source_options, |original_query, query| {}).is_err());
@@ -608,6 +614,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         let _ = p.read(source_options, |original_query, query| {
@@ -734,6 +741,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         let _ = p.read(source_options, |original_query, query| {
@@ -775,6 +783,7 @@ mod tests {
             skip_config: &skip_config,
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         let _ = p.read(source_options, |_original_query, query| {
@@ -826,6 +835,7 @@ mod tests {
                 passthrough_tables: None,
             }),
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         let mut rows_percent_50 = vec![];
@@ -863,6 +873,7 @@ mod tests {
                 passthrough_tables: None,
             }),
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         let mut rows_percent_30 = vec![];

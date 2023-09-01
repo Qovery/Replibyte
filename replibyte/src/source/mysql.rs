@@ -444,6 +444,10 @@ mod tests {
         Mysql::new("127.0.0.1", 3306, "world", "root", "wrong_password")
     }
 
+    fn get_default_dump_chunk_size() -> usize {
+        100
+    }
+
     #[test]
     fn connect() {
         let mut p = get_mysql();
@@ -456,6 +460,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
 
         assert!(p.read(source_options, |_original_query, _query| {}).is_ok());
@@ -468,6 +473,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
         assert!(p
             .read(source_options, |_original_query, _query| {})
@@ -484,6 +490,7 @@ mod tests {
             skip_config: &vec![],
             database_subset: &None,
             only_tables: &vec![],
+            dump_chunk_size: &get_default_dump_chunk_size(),
         };
         let _ = p.read(source_options, |original_query, query| {
             assert!(original_query.data().len() > 0);
