@@ -76,7 +76,7 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
 }
 
 fn main() {
-    let start_exec_time = utils::epoch_millis();
+    let start_exec_time = epoch_millis();
 
     env_logger::init();
 
