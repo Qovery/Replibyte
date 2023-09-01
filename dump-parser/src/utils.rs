@@ -106,10 +106,10 @@ where
 
         // 49 is an empirical number -
         // not too large to avoid looping too much time, and not too small to avoid wrong end of query
-        if count_empty_lines > 49 {
-            // EOF?
-            break;
-        }
+        // if count_empty_lines > 49 {
+        //     // EOF?
+        //     break;
+        // }
 
         match query_res {
             ListQueryResult::Continue => {}
@@ -190,8 +190,6 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 if stack.get(0) == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
                         // do nothing because the ' char is escaped via a double ''
-                    } else if idx > 0 && query.is_char_boundary(idx-1) && &query[idx-1..idx] == "\\" {
-                        // do nothing because the ' char is escaped via a backslash
                     } else {
                         let _ = stack.remove(0);
                     }
@@ -524,7 +522,7 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
                 assert!(false);
             }
             Statement::Query(s) => {
-                assert!(s.valid);
+                assert!(!s.valid);
             }
         }
 
@@ -793,6 +791,42 @@ CREATE TABLE public.toto2 (
             Statement::Query(s) => {
                 assert!(s.valid);
             }
+        }
+    }
+
+    #[test]
+    fn insert_queries_with_backslash_in_string_value() {
+        let s = list_statements(
+            r#"
+INSERT INTO public.tbl (id, body, created_at, updated_at) VALUES (1, 'test@test.pl', 'is that a wild backslash here?\', '2016-03-14 17:32:53.505811');
+INSERT INTO public.tbl (id, body, created_at, updated_at) VALUES (2, 'yet@anoher.test', 'not relevant comment', '2016-03-14 17:36:35.825205');
+"#,
+        );
+        assert_eq!(s.len(), 5);
+        match s.get(0).unwrap() {
+            Statement::NewLine => { assert!(true); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(_) => { assert!(false); }
+        }
+        match s.get(1).unwrap() {
+            Statement::NewLine => { assert!(false); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(q) => { assert!(q.valid); }
+        }
+        match s.get(2).unwrap() {
+            Statement::NewLine => { assert!(true); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(_) => { assert!(false); }
+        }
+        match s.get(3).unwrap() {
+            Statement::NewLine => { assert!(false); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(q) => { assert!(q.valid); }
+        }
+        match s.get(4).unwrap() {
+            Statement::NewLine => { assert!(true); }
+            Statement::CommentLine(_) => { assert!(false); }
+            Statement::Query(_) => { assert!(false); }
         }
     }
 
