@@ -82,6 +82,8 @@ impl<'a> Explain for Postgres<'a> {
         let dump_args = vec![
             "-s", // dump only the schema definitions
             "--no-owner",
+            "-d",
+            self.database,
             "-h",
             self.host,
             "-p",
@@ -123,6 +125,8 @@ impl<'a> Source for Postgres<'a> {
             "--no-owner",       // skip restoration of object ownership
             "-h",
             self.host,
+            "-d",
+            self.database,
             "-p",
             s_port.as_str(),
             "-U",
@@ -138,7 +142,6 @@ impl<'a> Source for Postgres<'a> {
 
         dump_args.append(&mut only_tables_args);
 
-        dump_args.push(self.database);
 
         // TODO: as for mysql we can exclude tables directly here so we can remove the skip_tables_map checks
         let mut process = Command::new("pg_dump")
