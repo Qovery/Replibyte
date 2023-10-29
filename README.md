@@ -6,7 +6,6 @@
 <p align="center">
 <a href="https://opensource.org/licenses/MIT"> <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-yellow.svg"> </a>
 <img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
-<img src="https://img.shields.io/badge/stability-stable-green.svg?style=flat-square" alt="stable badge">
 <img src="https://github.com/Qovery/replibyte/actions/workflows/build-and-test.yml/badge.svg?style=flat-square" alt="Build and Tests">
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 </p>
