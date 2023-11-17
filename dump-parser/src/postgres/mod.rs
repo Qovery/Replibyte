@@ -572,6 +572,22 @@ impl<'a> Tokenizer<'a> {
             return Ok(Some(Token::Period));
         }
 
+        // match scientific notation
+        // copilot generated
+        if let Some(ch) = chars.peek() {
+            if ch == &'e' || ch == &'E' {
+                s.push('e');
+                chars.next();
+                if let Some(ch) = chars.peek() {
+                    if ch == &'+' || ch == &'-' {
+                        s.push(*ch);
+                        chars.next();
+                    }
+                }
+                s += &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'));
+            }
+        }
+
         let long = if chars.peek() == Some(&'L') {
             chars.next();
             true
