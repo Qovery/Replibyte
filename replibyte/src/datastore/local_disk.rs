@@ -1,6 +1,5 @@
 use std::fs::{read, read_dir, remove_dir_all, write, DirBuilder, OpenOptions};
-use std::io::{BufReader, Error, Read, Write};
-use std::path::Path;
+use std::io::{BufReader, Error};
 
 use log::{debug, error, info};
 use serde_json::Value;
@@ -252,7 +251,7 @@ impl Datastore for LocalDisk {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::OpenOptions};
+    use std::fs::OpenOptions;
     use std::path::Path;
 
     use chrono::{Duration, Utc};

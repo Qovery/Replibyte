@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bson = "2.2"
 serde = "1.0"
+smallvec = "1.10"
 
 ########## WARNING #############
 # DO NOT UPGRADE THE CRC CRATE #
@@ -17,3 +18,10 @@ serde = "1.0"
 # crc-rs ^2.0  ECMA: https://github.com/akhilles/crc-catalog/blob/2.0.1/src/catalog.rs#L104 (INCOMPATIBLE)
 crc = "1.8"
 ################################
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "my_benchmark"
+harness = false

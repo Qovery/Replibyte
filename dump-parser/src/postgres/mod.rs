@@ -2,10 +2,13 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
+use smallvec::SmallVec;
+
 use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
     Into as KeywordInto, Key, NoKeyword, Not, Null, Only, Primary, References, Replace, Table,
 };
+use crate::{SmallVecPostgresTokens, ARRAY_CAPACITY};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -238,10 +241,10 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Tokenize the statement and produce a vector of tokens
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, TokenizerError> {
+    pub fn tokenize(&mut self) -> Result<SmallVecPostgresTokens, TokenizerError> {
         let mut peekable = self.query.chars().peekable();
 
-        let mut tokens: Vec<Token> = vec![];
+        let mut tokens = SmallVec::with_capacity(ARRAY_CAPACITY);
 
         while let Some(token) = self.next_token(&mut peekable)? {
             match &token {
@@ -540,23 +543,21 @@ impl<'a> Tokenizer<'a> {
     fn tokenize_number_literal(
         &self,
         chars: &mut Peekable<Chars<'_>>,
-        sign: Option<char>
+        sign: Option<char>,
     ) -> Result<Option<Token>, TokenizerError> {
         let mut s = match sign {
             Some(ch) if ch == '+' || ch == '-' => {
                 String::from(ch) + &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
             }
             Some(_) => panic!("invalid sign"),
-            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9')),
         };
 
         // match binary literal that starts with 0x
         if s == "0" && chars.peek() == Some(&'x') {
             chars.next();
-            let s2 = peeking_take_while(
-                chars,
-                |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'),
-            );
+            let s2 =
+                peeking_take_while(chars, |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'));
             return Ok(Some(Token::HexStringLiteral(s2)));
         }
 
@@ -675,7 +676,11 @@ fn parse_quoted_ident(chars: &mut Peekable<Chars<'_>>, quote_end: char) -> (Stri
     (s, last_char)
 }
 
-pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usize) -> bool {
+pub fn match_keyword_at_position(
+    keyword: Keyword,
+    tokens: &SmallVecPostgresTokens,
+    pos: usize,
+) -> bool {
     if let Some(token) = tokens.get(pos) {
         return match token {
             Token::Word(word) => word.keyword == keyword,
@@ -686,7 +691,7 @@ pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usi
     false
 }
 
-pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&str> {
+pub fn get_word_value_at_position(tokens: &SmallVecPostgresTokens, pos: usize) -> Option<&str> {
     if let Some(fifth_token) = tokens.get(pos) {
         return match fifth_token {
             Token::Word(word) => Some(word.value.as_str()),
@@ -697,7 +702,7 @@ pub fn get_word_value_at_position(tokens: &Vec<Token>, pos: usize) -> Option<&st
     None
 }
 
-pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
+pub fn get_column_names_from_insert_into_query(tokens: &SmallVecPostgresTokens) -> Vec<String> {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
@@ -731,15 +736,18 @@ pub fn get_column_names_from_insert_into_query(tokens: &Vec<Token>) -> Vec<Strin
         .collect::<Vec<_>>()
 }
 
-pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Token> {
+// FIXME return a reference to the token instead of cloning it
+pub fn get_column_values_from_insert_into_query(
+    tokens: &SmallVecPostgresTokens,
+) -> SmallVecPostgresTokens {
     if !match_keyword_at_position(Keyword::Insert, &tokens, 0)
         || !match_keyword_at_position(Keyword::Into, &tokens, 2)
     {
         // it means that the query is not an INSERT INTO.. one
-        return Vec::new();
+        return SmallVec::new();
     }
 
-    tokens
+    let tokens = tokens
         .iter()
         .skip_while(|token| match **token {
             Token::RParen => false,
@@ -757,13 +765,18 @@ pub fn get_column_values_from_insert_into_query(tokens: &Vec<Token>) -> Vec<&Tok
             Token::Comma | Token::Whitespace(_) | Token::LParen | Token::RParen => None,
             token => Some(token), // column value
         })
-        .collect::<Vec<_>>()
+        .map(|token| token.clone()) // FIXME
+        .collect::<Vec<_>>();
+
+    SmallVec::from_vec(tokens)
 }
 
-pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<String> {
+pub fn get_column_values_str_from_insert_into_query(
+    tokens: &SmallVecPostgresTokens,
+) -> Vec<String> {
     get_column_values_from_insert_into_query(&tokens)
         .iter()
-        .filter_map(|x| match *x {
+        .filter_map(|x| match x {
             Token::Word(word) => Some(word.value.clone()),
             Token::SingleQuotedString(word) => Some(word.clone()),
             Token::Number(value, is_long) => Some(match is_long {
@@ -772,14 +785,36 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<
                     let mut long_value = value.to_owned();
                     long_value.push('L');
                     long_value
-                },
+                }
             }),
             _ => None,
         })
         .collect::<Vec<_>>()
 }
 
-pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
+pub fn get_column_value_str_from_insert_into_query(
+    column_idx: usize,
+    tokens: &SmallVecPostgresTokens,
+) -> Option<String> {
+    match get_column_values_from_insert_into_query(&tokens).get(column_idx) {
+        Some(token) => match token {
+            Token::Word(word) => Some(word.value.clone()),
+            Token::SingleQuotedString(word) => Some(word.clone()),
+            Token::Number(value, is_long) => Some(match is_long {
+                false => value.clone(),
+                true => {
+                    let mut long_value = value.to_owned();
+                    long_value.push('L');
+                    long_value
+                }
+            }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn get_column_names_from_create_query(tokens: &SmallVecPostgresTokens) -> Vec<String> {
     if !match_keyword_at_position(Create, &tokens, 0) {
         return Vec::new();
     }
@@ -813,7 +848,7 @@ pub fn get_column_names_from_create_query(tokens: &Vec<Token>) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-pub fn get_tokens_from_query_str(query: &str) -> Vec<Token> {
+pub fn get_tokens_from_query_str(query: &str) -> SmallVecPostgresTokens {
     // query by query
     let mut tokenizer = Tokenizer::new(query);
 
@@ -828,7 +863,7 @@ pub fn get_tokens_from_query_str(query: &str) -> Vec<Token> {
     trim_pre_whitespaces(tokens)
 }
 
-pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
+pub fn trim_pre_whitespaces(tokens: SmallVecPostgresTokens) -> SmallVecPostgresTokens {
     tokens
         .into_iter()
         .skip_while(|token| match token {
@@ -836,11 +871,13 @@ pub fn trim_pre_whitespaces(tokens: Vec<Token>) -> Vec<Token> {
             Token::Whitespace(_) => true,
             _ => false,
         })
-        .collect::<Vec<_>>()
+        .collect::<SmallVecPostgresTokens>()
 }
 
 #[cfg(test)]
 mod tests {
+    use smallvec::SmallVec;
+
     use crate::postgres::{
         get_column_names_from_insert_into_query, get_column_values_from_insert_into_query,
         trim_pre_whitespaces, Token, Tokenizer, Whitespace,
@@ -859,7 +896,7 @@ CREATE TABLE public.orders (
 
         let tokens = tokens_result.unwrap();
 
-        let expected = vec![
+        let expected = SmallVec::<[Token; 1024]>::from_vec(vec![
             Token::Whitespace(Whitespace::Newline),
             Token::make_keyword("CREATE"),
             Token::Whitespace(Whitespace::Space),
@@ -885,7 +922,7 @@ CREATE TABLE public.orders (
             Token::Whitespace(Whitespace::Newline),
             Token::RParen,
             Token::SemiColon,
-        ];
+        ]);
 
         assert_eq!(tokens, expected);
     }
@@ -989,7 +1026,7 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL, NULL);
                 "company_name",
                 "contact_name",
                 "contact_title",
-                r#""upperCaseColumnName""#
+                r#""upperCaseColumnName""#,
             ]
         );
     }
@@ -1010,12 +1047,12 @@ VALUES (1, 'Alfreds Futterkiste', 'Maria Anders', NULL);
 
         assert_eq!(
             column_values,
-            vec![
-                &Token::Number("1".to_string(), false),
-                &Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
-                &Token::SingleQuotedString("Maria Anders".to_string()),
-                &Token::make_keyword("NULL"),
-            ]
+            SmallVec::<[Token; 1024]>::from_vec(vec![
+                Token::Number("1".to_string(), false),
+                Token::SingleQuotedString("Alfreds Futterkiste".to_string()),
+                Token::SingleQuotedString("Maria Anders".to_string()),
+                Token::make_keyword("NULL"),
+            ])
         );
     }
 
@@ -1035,16 +1072,16 @@ VALUES ('Romaric', true);
 
         assert_eq!(
             column_values,
-            vec![
-                &Token::SingleQuotedString("Romaric".to_string()),
-                &Token::make_word("true", None),
-            ]
+            SmallVec::<[Token; 1024]>::from_vec(vec![
+                Token::SingleQuotedString("Romaric".to_string()),
+                Token::make_word("true", None),
+            ])
         );
     }
 
     #[test]
     fn test_insert_into_with_numbers() {
-        let q = "INSERT INTO public.test (postive_number, negative_number, long_number) VALUES (+5.75, -10.20, 20L);";
+        let q = "INSERT INTO public.test (positive_number, negative_number, long_number) VALUES (+5.75, -10.20, 20L);";
 
         let mut tokenizer = Tokenizer::new(q);
         let tokens_result = tokenizer.tokenize();
@@ -1055,11 +1092,11 @@ VALUES ('Romaric', true);
 
         assert_eq!(
             column_values,
-            vec![
-                &Token::Number("+5.75".to_string(), false),
-                &Token::Number("-10.20".to_string(), false),
-                &Token::Number("20".to_string(), true),
-            ]
+            SmallVec::<[Token; 1024]>::from_vec(vec![
+                Token::Number("+5.75".to_string(), false),
+                Token::Number("-10.20".to_string(), false),
+                Token::Number("20".to_string(), true),
+            ]),
         );
     }
 }

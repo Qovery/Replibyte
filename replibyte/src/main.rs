@@ -13,7 +13,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use migration::{migrations, Migrator};
 use utils::get_replibyte_version;
 
-use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI, SourceCommand};
+use crate::cli::{DumpCommand, RestoreCommand, SourceCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
 use crate::datastore::local_disk::LocalDisk;
 use crate::datastore::s3::S3;
@@ -57,9 +57,7 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
             pb.set_style(ProgressStyle::default_spinner());
             style_is_progress_bar = false;
         } else if _max_bytes > 0 && !style_is_progress_bar {
-            pb.set_style(ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.green/blue}] {bytes}/{total_bytes} ({eta})")
-                .progress_chars("#>-"));
+            pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.green/blue}] {bytes}/{total_bytes} ({eta})").unwrap().progress_chars("=>"));
             style_is_progress_bar = true;
         }
 
@@ -114,7 +112,7 @@ fn main() {
         );
     }
     if exit_code != 0 {
-         std::process::exit(exit_code);
+        std::process::exit(exit_code);
     }
 }
 
@@ -188,9 +186,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
             },
         },
         SubCommand::Source(cmd) => match cmd {
-            SourceCommand::Schema => {
-                commands::source::schema(config)
-            }
+            SourceCommand::Schema => commands::source::schema(config),
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {
