@@ -27,7 +27,7 @@ impl FromStr for Version {
         match numbers.len() {
             3 => {
                 // unwrap is safe here as we know we have 3 items in vec.
-                let major = parse_str_to_u8(numbers.get(0).unwrap())?;
+                let major = parse_str_to_u8(numbers.first().unwrap())?;
                 let minor = parse_str_to_u8(numbers.get(1).unwrap())?;
                 let patch = parse_str_to_u8(numbers.get(2).unwrap())?;
 
@@ -85,7 +85,7 @@ impl<'a> Migrator<'a> {
             Ok(_) => {
                 for migration in &self.migrations {
                     if self.should_run_migration(migration) {
-                        let _ = migration.run(&self.datastore)?;
+                        migration.run(self.datastore)?;
                     }
                 }
                 Ok(())

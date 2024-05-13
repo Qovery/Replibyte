@@ -63,7 +63,7 @@ where
             None => false,
         };
 
-        let mut query_res = ListQueryResult::Continue;
+        let query_res = ListQueryResult::Continue;
 
         buf_bytes.append(&mut line_buf_bytes);
 
@@ -73,7 +73,7 @@ where
             if buf_bytes.len() > 1 {
                 let query_str = match str::from_utf8(buf_bytes.as_slice()) {
                     Ok(t) => t,
-                    Err(e) => continue
+                    Err(_e) => continue
                 };
 
                 for statement in list_statements(query_str) {
@@ -97,7 +97,7 @@ where
                 }
             }
 
-            let _ = buf_bytes.clear();
+            buf_bytes.clear();
             buf_bytes.extend_from_slice(buf_bytes_to_keep.as_slice());
             count_empty_lines += 1;
         } else {
@@ -187,7 +187,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 previous_chars_are_whitespaces = true;
             }
             b'\'' if !is_comment_line && !is_partial_comment_line => {
-                if stack.get(0) == Some(&b'\'') {
+                if stack.first() == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
                         // do nothing because the ' char is escaped via a double ''
                     } else if idx > 0 && query.is_char_boundary(idx-1) && &query[idx-1..idx] == "\\" {
@@ -204,7 +204,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
             }
             b'(' if !is_comment_line
                 && !is_partial_comment_line
-                && stack.get(0) != Some(&b'\'') =>
+                && stack.first() != Some(&b'\'') =>
             {
                 stack.insert(0, byte_char);
                 is_statement_complete = false;
@@ -212,9 +212,9 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 previous_chars_are_whitespaces = false;
             }
             b')' if !is_comment_line && !is_partial_comment_line => {
-                if stack.get(0) == Some(&b'(') {
+                if stack.first() == Some(&b'(') {
                     let _ = stack.remove(0);
-                } else if stack.get(0) != Some(&b'\'') {
+                } else if stack.first() != Some(&b'\'') {
                     stack.insert(0, byte_char);
                 }
 
@@ -234,7 +234,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
             // use grapheme instead of code points or bytes?
             b'-' if !is_statement_complete 
                 && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-'
-                && stack.get(0) != Some(&b'\'') =>
+                && stack.first() != Some(&b'\'') =>
             {
                 // comment
                 is_partial_comment_line = true;
@@ -246,7 +246,7 @@ fn list_statements(query: &str) -> Vec<Statement> {
             }
             b';' if !is_comment_line
                 && !is_partial_comment_line
-                && stack.get(0) != Some(&b'\'') =>
+                && stack.first() != Some(&b'\'') =>
             {
                 // end of query
                 sql_statements.push(Statement::Query(QueryStatement {
@@ -325,7 +325,7 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
             ListQueryResult::Continue
         });
 
-        assert!(queries.len() > 0);
+        assert!(!queries.is_empty());
     }
 
     #[test]

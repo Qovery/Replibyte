@@ -39,11 +39,11 @@ where
     D: Destination,
 {
     fn run<F: FnMut(TransferredBytes, MaxBytes)>(
-        mut self,
+        self,
         mut progress_callback: F,
     ) -> Result<(), Error> {
         // initialize the destination
-        let _ = self.destination.init()?;
+        self.destination.init()?;
 
         // bound to 1 to avoid eating too much memory if we download the dump faster than we ingest it
         let (tx, rx) = mpsc::sync_channel::<Message<Bytes>>(1);
@@ -62,7 +62,7 @@ where
             let datastore = datastore;
             let read_options = read_options;
 
-            let _ = match datastore.read(&read_options, &mut |data| {
+            match datastore.read(&read_options, &mut |data| {
                 let _ = tx.send(Message::Data(data));
             }) {
                 Ok(_) => {}
@@ -81,7 +81,7 @@ where
 
             progress_callback(data.len(), dump.size);
 
-            let _ = self.destination.write(data)?;
+            self.destination.write(data)?;
         }
 
         // wait for end of download execution

@@ -1,6 +1,7 @@
 use crate::transformer::Transformer;
 use crate::types::Column;
 
+#[derive(Default)]
 pub struct KeepFirstCharTransformer {
     database_name: String,
     table_name: String,
@@ -20,15 +21,7 @@ impl KeepFirstCharTransformer {
     }
 }
 
-impl Default for KeepFirstCharTransformer {
-    fn default() -> Self {
-        KeepFirstCharTransformer {
-            database_name: String::default(),
-            table_name: String::default(),
-            column_name: String::default(),
-        }
-    }
-}
+
 
 impl Transformer for KeepFirstCharTransformer {
     fn id(&self) -> &str {
@@ -68,7 +61,7 @@ impl Transformer for KeepFirstCharTransformer {
             Column::StringValue(column_name, value) => {
                 let new_value = match value.len() {
                     len if len > 1 => {
-                        if let Some(first_char) = value.chars().nth(0) {
+                        if let Some(first_char) = value.chars().next() {
                             first_char.to_string()
                         } else {
                             "".to_string()
