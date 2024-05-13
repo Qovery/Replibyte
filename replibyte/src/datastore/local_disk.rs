@@ -182,8 +182,15 @@ impl Datastore for LocalDisk {
         let dump = index_file.find_dump(options)?;
         let entries = read_dir(format!("{}/{}", self.dir, dump.directory_name))?;
 
-        for entry in entries {
-            let entry = entry?;
+        let mut paths: Vec<_> = read_dir(format!("{}/{}", self.dir, dump.directory_name)).unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        paths.sort_by(|a, b| {
+            let a_int = a.path().file_stem().unwrap().to_os_string().to_str().unwrap().parse::<i32>().unwrap();
+            let b_int = b.path().file_stem().unwrap().to_os_string().to_str().unwrap().parse::<i32>().unwrap();
+            return a_int.cmp(&b_int)
+        });
+        for entry in paths {
             let data = read(entry.path())?;
 
             // decrypt data?
