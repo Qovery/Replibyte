@@ -70,7 +70,7 @@ where
         });
 
         // buffer of 100MB in memory to use and re-use to upload data into datastore
-        let buffer_size = 100 * 1024 * 1024;
+        let buffer_size = self.options.dump_chunk_size * 1024 * 1024;
         let mut queries = vec![];
         let mut consumed_buffer_size = 0usize;
         let mut total_transferred_bytes = 0usize;
