@@ -24,7 +24,7 @@ impl BufferPool {
                 return buffer;
             }
         }
-        
+
         // If no buffer available, create a new one
         Vec::with_capacity(self.buffer_capacity)
     }
@@ -78,14 +78,14 @@ mod tests {
     #[test]
     fn test_buffer_pool_basic_operations() {
         let pool = BufferPool::new(5, 1024);
-        
+
         // Get a buffer
         let buffer1 = pool.get_buffer();
         assert_eq!(buffer1.capacity(), 1024);
-        
+
         // Return the buffer
         pool.return_buffer(buffer1);
-        
+
         // Get another buffer (should reuse the returned one)
         let buffer2 = pool.get_buffer();
         assert!(buffer2.capacity() >= 1024);
@@ -94,13 +94,13 @@ mod tests {
     #[test]
     fn test_pooled_buffer() {
         let pool = Arc::new(BufferPool::new(5, 1024));
-        
+
         {
             let mut pooled = PooledBuffer::new(pool.clone());
             pooled.as_mut().extend_from_slice(b"test data");
             assert_eq!(pooled.as_ref().len(), 9);
         } // Buffer should be returned to pool here
-        
+
         // Get a new buffer - should reuse the one from above
         let buffer = pool.get_buffer();
         assert_eq!(buffer.len(), 0); // Should be cleared

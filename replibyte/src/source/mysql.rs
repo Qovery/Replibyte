@@ -5,8 +5,8 @@ use std::process::{Command, Stdio};
 
 use dump_parser::mysql::Keyword::NoKeyword;
 use dump_parser::mysql::{
-    get_column_names_from_insert_into_query, get_column_names_from_create_query,
-    get_column_values_from_insert_into_query, get_single_quoted_string_value_at_position, 
+    get_column_names_from_create_query, get_column_names_from_insert_into_query,
+    get_column_values_from_insert_into_query, get_single_quoted_string_value_at_position,
     get_tokens_from_query_str, match_keyword_at_position, Keyword, Token,
 };
 use dump_parser::utils::{list_sql_queries_from_dump_reader, ListQueryResult};

@@ -196,7 +196,10 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 if stack.get(0) == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
                         // do nothing because the ' char is escaped via a double ''
-                    } else if idx > 0 && query.is_char_boundary(idx-1) && &query[idx-1..idx] == "\\" {
+                    } else if idx > 0
+                        && query.is_char_boundary(idx - 1)
+                        && &query[idx - 1..idx] == "\\"
+                    {
                         // do nothing because the ' char is escaped via a backslash
                     } else {
                         let _ = stack.remove(0);
@@ -231,15 +234,17 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'-' if !is_comment_line
                 && previous_chars_are_whitespaces
                 && is_statement_complete
-                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-' =>
+                && next_idx < query_bytes.len()
+                && query_bytes[next_idx] == b'-' =>
             {
                 // comment
                 is_comment_line = true;
                 previous_chars_are_whitespaces = false;
             }
             // use grapheme instead of code points or bytes?
-            b'-' if !is_statement_complete 
-                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-'
+            b'-' if !is_statement_complete
+                && next_idx < query_bytes.len()
+                && query_bytes[next_idx] == b'-'
                 && stack.get(0) != Some(&b'\'') =>
             {
                 // comment

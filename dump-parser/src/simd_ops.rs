@@ -16,7 +16,10 @@ pub fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<u
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") && haystack.len() >= 16 && needle.len() <= 16 {
+        if std::arch::is_aarch64_feature_detected!("neon")
+            && haystack.len() >= 16
+            && needle.len() <= 16
+        {
             return unsafe { find_pattern_neon_case_insensitive(haystack, needle) };
         }
     }
@@ -77,7 +80,7 @@ unsafe fn find_pattern_avx2_case_insensitive(haystack: &[u8], needle: &[u8]) -> 
             while bit_mask != 0 {
                 let bit_pos = bit_mask.trailing_zeros() as usize;
                 let candidate_pos = offset + bit_pos;
-                
+
                 if candidate_pos + needle.len() <= haystack.len() {
                     let candidate = &haystack[candidate_pos..candidate_pos + needle.len()];
                     if candidate.eq_ignore_ascii_case(needle) {
@@ -91,8 +94,7 @@ unsafe fn find_pattern_avx2_case_insensitive(haystack: &[u8], needle: &[u8]) -> 
     }
 
     // Check remaining bytes
-    find_pattern_fallback_case_insensitive(&haystack[offset..], needle)
-        .map(|pos| offset + pos)
+    find_pattern_fallback_case_insensitive(&haystack[offset..], needle).map(|pos| offset + pos)
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -106,19 +108,19 @@ unsafe fn skip_whitespace_avx2(data: &[u8], mut pos: usize) -> usize {
 
     while pos + 32 <= data.len() {
         let chunk = _mm256_loadu_si256(data.as_ptr().add(pos) as *const __m256i);
-        
+
         let is_space = _mm256_cmpeq_epi8(chunk, space_vec);
         let is_tab = _mm256_cmpeq_epi8(chunk, tab_vec);
         let is_newline = _mm256_cmpeq_epi8(chunk, newline_vec);
         let is_cr = _mm256_cmpeq_epi8(chunk, cr_vec);
-        
+
         let is_whitespace = _mm256_or_si256(
             _mm256_or_si256(is_space, is_tab),
-            _mm256_or_si256(is_newline, is_cr)
+            _mm256_or_si256(is_newline, is_cr),
         );
-        
+
         let mask = _mm256_movemask_epi8(is_whitespace);
-        
+
         if mask == -1 {
             // All bytes are whitespace
             pos += 32;
@@ -162,11 +164,11 @@ unsafe fn find_pattern_neon_case_insensitive(haystack: &[u8], needle: &[u8]) -> 
         let cmp_lower = vceqq_u8(chunk, first_lower_vec);
         let cmp_upper = vceqq_u8(chunk, first_upper_vec);
         let cmp = vorrq_u8(cmp_lower, cmp_upper);
-        
+
         // Extract mask from comparison result
         let mut mask = [0u8; 16];
         vst1q_u8(mask.as_mut_ptr(), cmp);
-        
+
         for (i, &mask_byte) in mask.iter().enumerate() {
             if mask_byte != 0 {
                 let candidate_pos = offset + i;
@@ -182,8 +184,7 @@ unsafe fn find_pattern_neon_case_insensitive(haystack: &[u8], needle: &[u8]) -> 
     }
 
     // Check remaining bytes
-    find_pattern_fallback_case_insensitive(&haystack[offset..], needle)
-        .map(|pos| offset + pos)
+    find_pattern_fallback_case_insensitive(&haystack[offset..], needle).map(|pos| offset + pos)
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -197,24 +198,21 @@ unsafe fn skip_whitespace_neon(data: &[u8], mut pos: usize) -> usize {
 
     while pos + 16 <= data.len() {
         let chunk = vld1q_u8(data.as_ptr().add(pos));
-        
+
         let is_space = vceqq_u8(chunk, space_vec);
         let is_tab = vceqq_u8(chunk, tab_vec);
         let is_newline = vceqq_u8(chunk, newline_vec);
         let is_cr = vceqq_u8(chunk, cr_vec);
-        
-        let is_whitespace = vorrq_u8(
-            vorrq_u8(is_space, is_tab),
-            vorrq_u8(is_newline, is_cr)
-        );
-        
+
+        let is_whitespace = vorrq_u8(vorrq_u8(is_space, is_tab), vorrq_u8(is_newline, is_cr));
+
         // Check if all bytes are whitespace
         let mut mask = [0u8; 16];
         vst1q_u8(mask.as_mut_ptr(), is_whitespace);
-        
+
         let all_whitespace = mask.iter().all(|&b| b != 0);
         let no_whitespace = mask.iter().all(|&b| b == 0);
-        
+
         if all_whitespace {
             pos += 16;
         } else if no_whitespace {
@@ -264,7 +262,7 @@ mod tests {
     #[test]
     fn test_pattern_finding() {
         let haystack = b"SELECT * FROM users WHERE name = 'John'";
-        
+
         assert_eq!(find_pattern_case_insensitive(haystack, b"SELECT"), Some(0));
         assert_eq!(find_pattern_case_insensitive(haystack, b"select"), Some(0));
         assert_eq!(find_pattern_case_insensitive(haystack, b"FROM"), Some(9));

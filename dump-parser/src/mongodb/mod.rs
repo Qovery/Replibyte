@@ -55,9 +55,9 @@ pub type PrefixedCollections = HashMap<Prefix, Collection>;
 ///
 /// mongodump/mongorestore "archives" are binary files with the following structure:
 ///  ```
-/// // +-----------------------+                                                       
-/// // |      magic bytes      |                                                       
-/// // +-----------------------+                                                       
+/// // +-----------------------+
+/// // |      magic bytes      |
+/// // +-----------------------+
 /// // |      header Bson      |
 /// // +-----------------------+
 /// // |    metadata Bson 0    |
@@ -84,7 +84,7 @@ pub type PrefixedCollections = HashMap<Prefix, Collection>;
 /// // |-----------------------|
 /// // |    namespace Bson     |
 /// // |-----------------------|
-/// // |         data          |  
+/// // |         data          |
 /// // +-----------------------+
 /// // |    seperator bytes    |
 /// // +-----------------------+

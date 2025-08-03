@@ -252,7 +252,7 @@ impl Datastore for LocalDisk {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::OpenOptions};
+    use std::fs::OpenOptions;
     use std::path::Path;
 
     use chrono::{Duration, Utc};

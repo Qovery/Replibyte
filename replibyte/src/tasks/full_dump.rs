@@ -91,7 +91,7 @@ where
                 let message = Message::Data((chunk_part, queries_to_send));
 
                 let _ = tx.send(message); // FIXME catch SendError?
-                // Re-initialize with capacity to avoid repeated allocations
+                                          // Re-initialize with capacity to avoid repeated allocations
                 queries = Vec::with_capacity(1000);
             }
 

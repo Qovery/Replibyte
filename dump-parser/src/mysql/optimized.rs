@@ -106,7 +106,7 @@ impl OptimizedMySQLParser {
                         continue;
                     }
                 }
-                
+
                 // Fast string parsing (MySQL supports both single and double quotes)
                 b'\'' => {
                     let (string_content, new_pos) = self.parse_single_quoted_string_fast(data, pos)?;
@@ -118,14 +118,14 @@ impl OptimizedMySQLParser {
                     self.token_buffer.push(Token::SingleQuotedString(string_content)); // MySQL treats both the same
                     pos = new_pos;
                 }
-                
+
                 // MySQL backtick identifiers
                 b'`' => {
                     let (identifier, new_pos) = self.parse_backtick_identifier_fast(data, pos)?;
                     self.token_buffer.push(Token::Word(Word::new(&identifier)));
                     pos = new_pos;
                 }
-                
+
                 // Fast punctuation
                 b'(' => {
                     self.token_buffer.push(Token::LParen);
@@ -151,7 +151,7 @@ impl OptimizedMySQLParser {
                     self.token_buffer.push(Token::Period);
                     pos += 1;
                 }
-                
+
                 // MySQL comments
                 b'-' if pos + 1 < data.len() && data[pos + 1] == b'-' => {
                     pos = self.skip_line_comment(data, pos);
@@ -162,21 +162,21 @@ impl OptimizedMySQLParser {
                 b'#' => {
                     pos = self.skip_line_comment(data, pos);
                 }
-                
+
                 // Fast identifier/word parsing
                 _ if data[pos].is_ascii_alphabetic() || data[pos] == b'_' => {
                     let (word, new_pos) = self.parse_identifier_fast(data, pos);
                     self.token_buffer.push(Token::Word(Word::new(&word)));
                     pos = new_pos;
                 }
-                
+
                 // Fast number parsing
                 _ if data[pos].is_ascii_digit() => {
                     let (number, new_pos) = self.parse_number_fast(data, pos);
                     self.token_buffer.push(Token::Number(number, false));
                     pos = new_pos;
                 }
-                
+
                 // Skip or handle other characters
                 _ => {
                     pos += 1;
@@ -218,19 +218,19 @@ impl OptimizedMySQLParser {
 
         while pos + 32 <= data.len() {
             let chunk = _mm256_loadu_si256(data.as_ptr().add(pos) as *const __m256i);
-            
+
             let is_space = _mm256_cmpeq_epi8(chunk, space_vec);
             let is_tab = _mm256_cmpeq_epi8(chunk, tab_vec);
             let is_newline = _mm256_cmpeq_epi8(chunk, newline_vec);
             let is_cr = _mm256_cmpeq_epi8(chunk, cr_vec);
-            
+
             let is_whitespace = _mm256_or_si256(
                 _mm256_or_si256(is_space, is_tab),
                 _mm256_or_si256(is_newline, is_cr)
             );
-            
+
             let mask = _mm256_movemask_epi8(is_whitespace);
-            
+
             if mask == 0xFFFFFFFF {
                 // All bytes are whitespace
                 pos += 32;
@@ -265,7 +265,7 @@ impl OptimizedMySQLParser {
         if slice.eq_ignore_ascii_case(keyword) {
             let next_pos = pos + keyword.len();
             // Check word boundary
-            if next_pos >= data.len() || 
+            if next_pos >= data.len() ||
                !data[next_pos].is_ascii_alphanumeric() && data[next_pos] != b'_' {
                 return Some(next_pos);
             }
@@ -277,7 +277,7 @@ impl OptimizedMySQLParser {
     fn parse_single_quoted_string_fast(&mut self, data: &[u8], start_pos: usize) -> Result<(String, usize), TokenizerError> {
         self.string_buffer.clear();
         let mut pos = start_pos + 1; // Skip opening quote
-        
+
         while pos < data.len() {
             match data[pos] {
                 b'\'' => {
@@ -330,7 +330,7 @@ impl OptimizedMySQLParser {
     fn parse_double_quoted_string_fast(&mut self, data: &[u8], start_pos: usize) -> Result<(String, usize), TokenizerError> {
         self.string_buffer.clear();
         let mut pos = start_pos + 1; // Skip opening quote
-        
+
         while pos < data.len() {
             match data[pos] {
                 b'"' => {
@@ -374,7 +374,7 @@ impl OptimizedMySQLParser {
     fn parse_backtick_identifier_fast(&mut self, data: &[u8], start_pos: usize) -> Result<(String, usize), TokenizerError> {
         self.string_buffer.clear();
         let mut pos = start_pos + 1; // Skip opening backtick
-        
+
         while pos < data.len() {
             match data[pos] {
                 b'`' => {
@@ -404,7 +404,7 @@ impl OptimizedMySQLParser {
     /// Fast identifier parsing
     fn parse_identifier_fast(&self, data: &[u8], start_pos: usize) -> (String, usize) {
         let mut pos = start_pos;
-        
+
         while pos < data.len() {
             match data[pos] {
                 c if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' => pos += 1,
@@ -424,7 +424,7 @@ impl OptimizedMySQLParser {
     fn parse_number_fast(&self, data: &[u8], start_pos: usize) -> (String, usize) {
         let mut pos = start_pos;
         let mut has_dot = false;
-        
+
         while pos < data.len() {
             match data[pos] {
                 c if c.is_ascii_digit() => pos += 1,
@@ -465,66 +465,66 @@ impl OptimizedMySQLParser {
     /// Skip block comment (/* ... */)
     fn skip_block_comment(&self, data: &[u8], mut pos: usize) -> Result<usize, TokenizerError> {
         pos += 2; // Skip /*
-        
+
         while pos + 1 < data.len() {
             if data[pos] == b'*' && data[pos + 1] == b'/' {
                 return Ok(pos + 2);
             }
             pos += 1;
         }
-        
+
         Err(TokenizerError::General("Unterminated block comment".into()))
     }
 
     /// Optimized INSERT INTO column name extraction for MySQL
     pub fn extract_insert_columns_fast(&mut self, query: &str) -> Result<Vec<Cow<str>>, TokenizerError> {
         let query_bytes = query.as_bytes();
-        
+
         // Find INSERT keyword position
         let insert_pos = simd_ops::find_pattern_case_insensitive(query_bytes, b"INSERT")
             .ok_or_else(|| TokenizerError::General("Not an INSERT statement".into()))?;
-        
-        // Find INTO keyword position  
+
+        // Find INTO keyword position
         let into_pos = simd_ops::find_pattern_case_insensitive(&query_bytes[insert_pos..], b"INTO")
             .ok_or_else(|| TokenizerError::General("Missing INTO keyword".into()))?
             + insert_pos;
-        
+
         // Find opening parenthesis after table name
         let lparen_pos = query_bytes[into_pos..]
             .iter()
             .position(|&b| b == b'(')
             .ok_or_else(|| TokenizerError::General("Missing column list".into()))?
             + into_pos;
-        
+
         // Find closing parenthesis
         let rparen_pos = query_bytes[lparen_pos..]
             .iter()
             .position(|&b| b == b')')
             .ok_or_else(|| TokenizerError::General("Unclosed column list".into()))?
             + lparen_pos;
-        
+
         // Extract column list efficiently
         let column_list = &query_bytes[lparen_pos + 1..rparen_pos];
         let mut columns = Vec::new();
         let mut start = 0;
-        
+
         while start < column_list.len() {
             let comma_pos = column_list[start..]
                 .iter()
                 .position(|&b| b == b',')
                 .unwrap_or(column_list.len() - start) + start;
-            
+
             let column_bytes = &column_list[start..comma_pos];
             let column_str = self.parse_mysql_column_name_fast(column_bytes);
             columns.push(column_str);
-            
+
             start = comma_pos + 1;
             // Skip whitespace
             while start < column_list.len() && column_list[start].is_ascii_whitespace() {
                 start += 1;
             }
         }
-        
+
         Ok(columns)
     }
 
@@ -533,25 +533,25 @@ impl OptimizedMySQLParser {
         // Trim whitespace
         let mut start = 0;
         let mut end = column_bytes.len();
-        
+
         while start < end && column_bytes[start].is_ascii_whitespace() {
             start += 1;
         }
         while end > start && column_bytes[end - 1].is_ascii_whitespace() {
             end -= 1;
         }
-        
+
         let trimmed = &column_bytes[start..end];
-        
+
         if trimmed.is_empty() {
             return Cow::Borrowed("");
         }
-        
+
         // Handle MySQL quoted identifiers (backticks, single quotes, double quotes)
         if trimmed.len() >= 2 {
             let first = trimmed[0];
             let last = trimmed[trimmed.len() - 1];
-            
+
             if (first == b'`' && last == b'`') ||
                (first == b'"' && last == b'"') ||
                (first == b'\'' && last == b'\'') {
@@ -561,7 +561,7 @@ impl OptimizedMySQLParser {
                 };
             }
         }
-        
+
         unsafe {
             Cow::Borrowed(std::str::from_utf8_unchecked(trimmed))
         }
@@ -576,11 +576,11 @@ mod tests {
     fn test_mysql_optimized_tokenization() {
         let mut parser = OptimizedMySQLParser::new(1024);
         let query = "INSERT INTO `users` (`id`, `name`) VALUES (1, 'John');";
-        
+
         let tokens = parser.tokenize_optimized(query).unwrap();
-        
+
         assert!(!tokens.is_empty());
-        
+
         // Check for INSERT keyword
         assert!(tokens.iter().any(|t| matches!(t, Token::Word(w) if w.value == "INSERT")));
     }
@@ -589,9 +589,9 @@ mod tests {
     fn test_mysql_fast_column_extraction() {
         let mut parser = OptimizedMySQLParser::new(1024);
         let query = r#"INSERT INTO `users` (`id`, `name`, `email`) VALUES (1, 'John', 'john@example.com')"#;
-        
+
         let columns = parser.extract_insert_columns_fast(query).unwrap();
-        
+
         assert_eq!(columns.len(), 3);
         assert_eq!(columns[0], "id");
         assert_eq!(columns[1], "name");
@@ -602,7 +602,7 @@ mod tests {
     fn test_mysql_backtick_parsing() {
         let mut parser = OptimizedMySQLParser::new(1024);
         let data = b"`column_name`";
-        
+
         let (result, _) = parser.parse_backtick_identifier_fast(data, 0).unwrap();
         assert_eq!(result, "column_name");
     }
@@ -611,7 +611,7 @@ mod tests {
     fn test_mysql_string_escaping() {
         let mut parser = OptimizedMySQLParser::new(1024);
         let data = b"'Hello''s World'";
-        
+
         let (result, _) = parser.parse_single_quoted_string_fast(data, 0).unwrap();
         assert_eq!(result, "Hello's World");
     }
@@ -620,9 +620,9 @@ mod tests {
     fn test_mysql_comment_handling() {
         let mut parser = OptimizedMySQLParser::new(1024);
         let query = "SELECT * FROM users -- this is a comment\nWHERE id = 1";
-        
+
         let tokens = parser.tokenize_optimized(query).unwrap();
-        
+
         // Should contain SELECT and WHERE but not the comment
         assert!(tokens.iter().any(|t| matches!(t, Token::Word(w) if w.value == "SELECT")));
         assert!(tokens.iter().any(|t| matches!(t, Token::Word(w) if w.value == "WHERE")));

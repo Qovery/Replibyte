@@ -13,7 +13,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use migration::{migrations, Migrator};
 use utils::get_replibyte_version;
 
-use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI, SourceCommand};
+use crate::cli::{DumpCommand, RestoreCommand, SourceCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
 use crate::datastore::local_disk::LocalDisk;
 use crate::datastore::s3::S3;
@@ -83,7 +83,7 @@ fn main() {
     let start_exec_time = utils::epoch_millis();
 
     env_logger::init();
-    
+
     // Initialize profiling based on environment variable
     let enable_profiling = std::env::var("REPLIBYTE_PROFILE").unwrap_or_default() == "1";
     profiling::init_profiler(enable_profiling);
@@ -124,12 +124,15 @@ fn main() {
     // Print profiling report if enabled
     if enable_profiling {
         profiling::get_profiler().print_report();
-        println!("Peak memory usage: {:.2}MB", profiling::get_peak_memory_usage() as f64 / (1024.0 * 1024.0));
+        println!(
+            "Peak memory usage: {:.2}MB",
+            profiling::get_peak_memory_usage() as f64 / (1024.0 * 1024.0)
+        );
         println!("Total allocations: {}", profiling::get_allocation_count());
     }
-    
+
     if exit_code != 0 {
-         std::process::exit(exit_code);
+        std::process::exit(exit_code);
     }
 }
 
@@ -203,9 +206,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
             },
         },
         SubCommand::Source(cmd) => match cmd {
-            SourceCommand::Schema => {
-                commands::source::schema(config)
-            }
+            SourceCommand::Schema => commands::source::schema(config),
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {

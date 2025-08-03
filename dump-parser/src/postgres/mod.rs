@@ -540,23 +540,21 @@ impl<'a> Tokenizer<'a> {
     fn tokenize_number_literal(
         &self,
         chars: &mut Peekable<Chars<'_>>,
-        sign: Option<char>
+        sign: Option<char>,
     ) -> Result<Option<Token>, TokenizerError> {
         let mut s = match sign {
             Some(ch) if ch == '+' || ch == '-' => {
                 String::from(ch) + &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
             }
             Some(_) => panic!("invalid sign"),
-            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9')),
         };
 
         // match binary literal that starts with 0x
         if s == "0" && chars.peek() == Some(&'x') {
             chars.next();
-            let s2 = peeking_take_while(
-                chars,
-                |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'),
-            );
+            let s2 =
+                peeking_take_while(chars, |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'));
             return Ok(Some(Token::HexStringLiteral(s2)));
         }
 
@@ -772,7 +770,7 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<
                     let mut long_value = value.to_owned();
                     long_value.push('L');
                     long_value
-                },
+                }
             }),
             _ => None,
         })

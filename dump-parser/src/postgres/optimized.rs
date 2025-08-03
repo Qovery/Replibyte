@@ -87,14 +87,14 @@ impl OptimizedPostgresParser {
                         continue;
                     }
                 }
-                
+
                 // Fast string parsing
                 b'\'' => {
                     let (string_content, new_pos) = self.parse_single_quoted_string_fast(data, pos)?;
                     self.token_buffer.push(Token::SingleQuotedString(string_content));
                     pos = new_pos;
                 }
-                
+
                 // Fast punctuation
                 b'(' => {
                     self.token_buffer.push(Token::LParen);
@@ -120,21 +120,21 @@ impl OptimizedPostgresParser {
                     self.token_buffer.push(Token::Period);
                     pos += 1;
                 }
-                
+
                 // Fast identifier/word parsing
                 _ if data[pos].is_ascii_alphabetic() || data[pos] == b'_' => {
                     let (word, new_pos) = self.parse_identifier_fast(data, pos);
                     self.token_buffer.push(Token::Word(Word::new(&word)));
                     pos = new_pos;
                 }
-                
+
                 // Fast number parsing
                 _ if data[pos].is_ascii_digit() => {
                     let (number, new_pos) = self.parse_number_fast(data, pos);
                     self.token_buffer.push(Token::Number(number, false));
                     pos = new_pos;
                 }
-                
+
                 // Skip or handle other characters
                 _ => {
                     pos += 1;
@@ -167,7 +167,7 @@ impl OptimizedPostgresParser {
         if slice.eq_ignore_ascii_case(keyword) {
             let next_pos = pos + keyword.len();
             // Check word boundary
-            if next_pos >= data.len() || 
+            if next_pos >= data.len() ||
                !data[next_pos].is_ascii_alphanumeric() && data[next_pos] != b'_' {
                 return Some(next_pos);
             }
@@ -179,7 +179,7 @@ impl OptimizedPostgresParser {
     fn parse_single_quoted_string_fast(&mut self, data: &[u8], start_pos: usize) -> Result<(String, usize), TokenizerError> {
         self.string_buffer.clear();
         let mut pos = start_pos + 1; // Skip opening quote
-        
+
         while pos < data.len() {
             match data[pos] {
                 b'\'' => {
@@ -233,7 +233,7 @@ impl OptimizedPostgresParser {
     /// Fast identifier parsing with zero-copy when possible
     fn parse_identifier_fast(&self, data: &[u8], start_pos: usize) -> (String, usize) {
         let mut pos = start_pos;
-        
+
         while pos < data.len() {
             match data[pos] {
                 c if c.is_ascii_alphanumeric() || c == b'_' => pos += 1,
@@ -254,7 +254,7 @@ impl OptimizedPostgresParser {
     /// Fast number parsing
     fn parse_number_fast(&self, data: &[u8], start_pos: usize) -> (String, usize) {
         let mut pos = start_pos;
-        
+
         while pos < data.len() && (data[pos].is_ascii_digit() || data[pos] == b'.') {
             pos += 1;
         }
@@ -272,53 +272,53 @@ impl OptimizedPostgresParser {
     pub fn extract_insert_columns_fast(&mut self, query: &str) -> Result<Vec<Cow<str>>, TokenizerError> {
         // Use SIMD to quickly find "INSERT INTO" pattern
         let query_bytes = query.as_bytes();
-        
+
         // Find INSERT keyword position
         let insert_pos = simd_ops::find_pattern_case_insensitive(query_bytes, b"INSERT")
             .ok_or_else(|| TokenizerError::General("Not an INSERT statement".into()))?;
-        
-        // Find INTO keyword position  
+
+        // Find INTO keyword position
         let into_pos = simd_ops::find_pattern_case_insensitive(&query_bytes[insert_pos..], b"INTO")
             .ok_or_else(|| TokenizerError::General("Missing INTO keyword".into()))?
             + insert_pos;
-        
+
         // Find opening parenthesis after table name
         let lparen_pos = query_bytes[into_pos..]
             .iter()
             .position(|&b| b == b'(')
             .ok_or_else(|| TokenizerError::General("Missing column list".into()))?
             + into_pos;
-        
+
         // Find closing parenthesis
         let rparen_pos = query_bytes[lparen_pos..]
             .iter()
             .position(|&b| b == b')')
             .ok_or_else(|| TokenizerError::General("Unclosed column list".into()))?
             + lparen_pos;
-        
+
         // Extract column list efficiently
         let column_list = &query_bytes[lparen_pos + 1..rparen_pos];
         let mut columns = Vec::new();
         let mut start = 0;
-        
+
         // Use SIMD to find commas quickly
         while start < column_list.len() {
             let comma_pos = column_list[start..]
                 .iter()
                 .position(|&b| b == b',')
                 .unwrap_or(column_list.len() - start) + start;
-            
+
             let column_bytes = &column_list[start..comma_pos];
             let column_str = self.parse_column_name_fast(column_bytes);
             columns.push(column_str);
-            
+
             start = comma_pos + 1;
             // Skip whitespace
             while start < column_list.len() && column_list[start].is_ascii_whitespace() {
                 start += 1;
             }
         }
-        
+
         Ok(columns)
     }
 
@@ -327,20 +327,20 @@ impl OptimizedPostgresParser {
         // Trim whitespace
         let mut start = 0;
         let mut end = column_bytes.len();
-        
+
         while start < end && column_bytes[start].is_ascii_whitespace() {
             start += 1;
         }
         while end > start && column_bytes[end - 1].is_ascii_whitespace() {
             end -= 1;
         }
-        
+
         let trimmed = &column_bytes[start..end];
-        
+
         if trimmed.is_empty() {
             return Cow::Borrowed("");
         }
-        
+
         // Handle quoted identifiers
         if trimmed[0] == b'"' && trimmed[trimmed.len() - 1] == b'"' {
             let unquoted = &trimmed[1..trimmed.len() - 1];
@@ -398,7 +398,7 @@ mod simd_ops {
             if mask != 0 {
                 let bit_pos = mask.trailing_zeros() as usize;
                 let candidate_pos = offset + bit_pos;
-                
+
                 if candidate_pos + needle.len() <= haystack.len() {
                     let candidate = &haystack[candidate_pos..candidate_pos + needle.len()];
                     if candidate.eq_ignore_ascii_case(needle) {
@@ -429,12 +429,12 @@ mod tests {
     fn test_optimized_tokenization() {
         let mut parser = OptimizedPostgresParser::new(1024);
         let query = "INSERT INTO users (id, name) VALUES (1, 'John');";
-        
+
         let tokens = parser.tokenize_optimized(query).unwrap();
-        
+
         // Verify basic tokenization works
         assert!(!tokens.is_empty());
-        
+
         // Check for INSERT keyword
         assert!(tokens.iter().any(|t| matches!(t, Token::Word(w) if w.value == "INSERT")));
     }
@@ -443,9 +443,9 @@ mod tests {
     fn test_fast_column_extraction() {
         let mut parser = OptimizedPostgresParser::new(1024);
         let query = r#"INSERT INTO public.users (id, "name", email) VALUES (1, 'John', 'john@example.com')"#;
-        
+
         let columns = parser.extract_insert_columns_fast(query).unwrap();
-        
+
         assert_eq!(columns.len(), 3);
         assert_eq!(columns[0], "id");
         assert_eq!(columns[1], "name");
@@ -456,10 +456,10 @@ mod tests {
     fn test_simd_pattern_search() {
         let haystack = b"SELECT * FROM users WHERE name = 'John'";
         let needle = b"SELECT";
-        
+
         let pos = simd_ops::find_pattern_case_insensitive(haystack, needle);
         assert_eq!(pos, Some(0));
-        
+
         let needle = b"FROM";
         let pos = simd_ops::find_pattern_case_insensitive(haystack, needle);
         assert_eq!(pos, Some(14));
@@ -469,7 +469,7 @@ mod tests {
     fn test_fast_string_parsing() {
         let mut parser = OptimizedPostgresParser::new(1024);
         let data = b"'Hello, World!'";
-        
+
         let (result, _) = parser.parse_single_quoted_string_fast(data, 0).unwrap();
         assert_eq!(result, "Hello, World!");
     }

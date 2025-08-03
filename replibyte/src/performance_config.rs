@@ -5,19 +5,19 @@ use serde::{Deserialize, Serialize};
 pub struct PerformanceConfig {
     /// Buffer size for chunking data (in bytes). Default: 100MB
     pub buffer_size: usize,
-    
+
     /// Number of queries to pre-allocate in vectors. Default: 1000
     pub query_vector_capacity: usize,
-    
+
     /// Channel buffer size for inter-thread communication. Default: 10
     pub channel_buffer_size: usize,
-    
+
     /// Progress bar update interval (in milliseconds). Default: 10ms
     pub progress_update_interval: u64,
-    
+
     /// Buffer pool settings
     pub buffer_pool: BufferPoolConfig,
-    
+
     /// Parser settings
     pub parser: ParserConfig,
 }
@@ -26,10 +26,10 @@ pub struct PerformanceConfig {
 pub struct BufferPoolConfig {
     /// Maximum number of buffers to keep in the pool. Default: 10
     pub max_buffers: usize,
-    
+
     /// Default capacity for pooled buffers (in bytes). Default: 8192
     pub buffer_capacity: usize,
-    
+
     /// Whether to enable buffer pooling. Default: true
     pub enabled: bool,
 }
@@ -38,13 +38,13 @@ pub struct BufferPoolConfig {
 pub struct ParserConfig {
     /// Initial capacity for SQL statement vectors. Default: based on query length / 100
     pub statement_vector_capacity: Option<usize>,
-    
+
     /// Initial capacity for parser stack. Default: 16
     pub parser_stack_capacity: usize,
-    
+
     /// Line buffer capacity (in bytes). Default: 1024
     pub line_buffer_capacity: usize,
-    
+
     /// Main buffer capacity (in bytes). Default: 8192
     pub main_buffer_capacity: usize,
 }
@@ -87,42 +87,42 @@ impl PerformanceConfig {
     /// Load performance configuration from environment variables
     pub fn from_env() -> Self {
         let mut config = Self::default();
-        
+
         if let Ok(buffer_size) = std::env::var("REPLIBYTE_BUFFER_SIZE") {
             if let Ok(size) = buffer_size.parse::<usize>() {
                 config.buffer_size = size;
             }
         }
-        
+
         if let Ok(capacity) = std::env::var("REPLIBYTE_QUERY_CAPACITY") {
             if let Ok(cap) = capacity.parse::<usize>() {
                 config.query_vector_capacity = cap;
             }
         }
-        
+
         if let Ok(channel_size) = std::env::var("REPLIBYTE_CHANNEL_BUFFER") {
             if let Ok(size) = channel_size.parse::<usize>() {
                 config.channel_buffer_size = size;
             }
         }
-        
+
         config
     }
-    
+
     /// Validate configuration values
     pub fn validate(&self) -> Result<(), String> {
         if self.buffer_size < 1024 * 1024 {
             return Err("Buffer size must be at least 1MB".to_string());
         }
-        
+
         if self.query_vector_capacity == 0 {
             return Err("Query vector capacity must be greater than 0".to_string());
         }
-        
+
         if self.channel_buffer_size == 0 {
             return Err("Channel buffer size must be greater than 0".to_string());
         }
-        
+
         Ok(())
     }
 }

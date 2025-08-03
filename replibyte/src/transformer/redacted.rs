@@ -121,10 +121,7 @@ mod tests {
     #[test]
     fn redact_with_multi_byte_char() {
         let transformer = get_transformer();
-        let column = Column::StringValue(
-            "multi_byte_column".to_string(),
-            "🦀ë池cd".to_string(),
-        );
+        let column = Column::StringValue("multi_byte_column".to_string(), "🦀ë池cd".to_string());
         let transformed_column = transformer.transform(column);
         let transformed_value = transformed_column.string_value().unwrap();
         assert_eq!(transformed_value.to_owned(), "🦀ë池**********")

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// High-performance profiler with minimal overhead
@@ -30,7 +30,7 @@ impl ProfileMetric {
             memory_peak: 0,
         }
     }
-    
+
     fn update(&mut self, duration: Duration, memory_used: u64) {
         self.total_time += duration;
         self.call_count += 1;
@@ -39,7 +39,7 @@ impl ProfileMetric {
         self.memory_allocated += memory_used;
         self.memory_peak = self.memory_peak.max(memory_used);
     }
-    
+
     pub fn average_time(&self) -> Duration {
         if self.call_count > 0 {
             self.total_time / self.call_count as u32
@@ -47,7 +47,7 @@ impl ProfileMetric {
             Duration::ZERO
         }
     }
-    
+
     pub fn average_memory(&self) -> u64 {
         if self.call_count > 0 {
             self.memory_allocated / self.call_count
@@ -64,7 +64,7 @@ impl Profiler {
             enabled,
         }
     }
-    
+
     pub fn profile<F, R>(&self, name: &str, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -72,57 +72,63 @@ impl Profiler {
         if !self.enabled {
             return f();
         }
-        
+
         let start_time = Instant::now();
         let start_memory = get_current_memory_usage();
-        
+
         let result = f();
-        
+
         let duration = start_time.elapsed();
         let end_memory = get_current_memory_usage();
         let memory_used = end_memory.saturating_sub(start_memory);
-        
+
         if let Ok(mut metrics) = self.metrics.lock() {
-            let metric = metrics.entry(name.to_string()).or_insert_with(ProfileMetric::new);
+            let metric = metrics
+                .entry(name.to_string())
+                .or_insert_with(ProfileMetric::new);
             metric.update(duration, memory_used);
         }
-        
+
         result
     }
-    
+
     pub fn get_metrics(&self) -> HashMap<String, ProfileMetric> {
         self.metrics.lock().unwrap().clone()
     }
-    
+
     pub fn print_report(&self) {
         if !self.enabled {
             println!("Profiling is disabled");
             return;
         }
-        
+
         let metrics = self.get_metrics();
-        
+
         println!("\n=== Performance Profile Report ===");
-        println!("{:<30} {:>10} {:>12} {:>12} {:>12} {:>12} {:>12}", 
-                 "Function", "Calls", "Total (ms)", "Avg (ms)", "Min (ms)", "Max (ms)", "Avg Mem (KB)");
+        println!(
+            "{:<30} {:>10} {:>12} {:>12} {:>12} {:>12} {:>12}",
+            "Function", "Calls", "Total (ms)", "Avg (ms)", "Min (ms)", "Max (ms)", "Avg Mem (KB)"
+        );
         println!("{:-<110}", "");
-        
+
         let mut sorted_metrics: Vec<_> = metrics.iter().collect();
         sorted_metrics.sort_by(|a, b| b.1.total_time.cmp(&a.1.total_time));
-        
+
         for (name, metric) in sorted_metrics {
-            println!("{:<30} {:>10} {:>12.2} {:>12.2} {:>12.2} {:>12.2} {:>12.2}",
-                     name,
-                     metric.call_count,
-                     metric.total_time.as_millis() as f64,
-                     metric.average_time().as_micros() as f64 / 1000.0,
-                     metric.min_time.as_micros() as f64 / 1000.0,
-                     metric.max_time.as_micros() as f64 / 1000.0,
-                     metric.average_memory() as f64 / 1024.0);
+            println!(
+                "{:<30} {:>10} {:>12.2} {:>12.2} {:>12.2} {:>12.2} {:>12.2}",
+                name,
+                metric.call_count,
+                metric.total_time.as_millis() as f64,
+                metric.average_time().as_micros() as f64 / 1000.0,
+                metric.min_time.as_micros() as f64 / 1000.0,
+                metric.max_time.as_micros() as f64 / 1000.0,
+                metric.average_memory() as f64 / 1024.0
+            );
         }
         println!();
     }
-    
+
     pub fn reset(&self) {
         if let Ok(mut metrics) = self.metrics.lock() {
             metrics.clear();
@@ -166,16 +172,17 @@ static ALLOCATION_COUNT: AtomicU64 = AtomicU64::new(0);
 
 pub fn track_allocation(size: u64) {
     let current = MEMORY_USAGE.fetch_add(size, Ordering::Relaxed) + size;
-    
+
     // Update peak memory usage
     let mut peak = PEAK_MEMORY.load(Ordering::Relaxed);
     while current > peak {
-        match PEAK_MEMORY.compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed) {
+        match PEAK_MEMORY.compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed)
+        {
             Ok(_) => break,
             Err(new_peak) => peak = new_peak,
         }
     }
-    
+
     ALLOCATION_COUNT.fetch_add(1, Ordering::Relaxed);
 }
 
@@ -214,22 +221,27 @@ impl HotPathDetector {
             threshold,
         }
     }
-    
+
     pub fn record_call(&self, function_name: &str) {
         if let Ok(mut counts) = self.call_counts.lock() {
-            let counter = counts.entry(function_name.to_string())
-                              .or_insert_with(|| AtomicUsize::new(0));
+            let counter = counts
+                .entry(function_name.to_string())
+                .or_insert_with(|| AtomicUsize::new(0));
             let new_count = counter.fetch_add(1, Ordering::Relaxed) + 1;
-            
+
             if new_count == self.threshold {
-                println!("HOT PATH DETECTED: {} called {} times", function_name, new_count);
+                println!(
+                    "HOT PATH DETECTED: {} called {} times",
+                    function_name, new_count
+                );
             }
         }
     }
-    
+
     pub fn get_hot_paths(&self) -> Vec<(String, usize)> {
         if let Ok(counts) = self.call_counts.lock() {
-            let mut hot_paths: Vec<_> = counts.iter()
+            let mut hot_paths: Vec<_> = counts
+                .iter()
                 .map(|(name, counter)| (name.clone(), counter.load(Ordering::Relaxed)))
                 .filter(|(_, count)| *count >= self.threshold)
                 .collect();
@@ -264,12 +276,12 @@ impl PerformanceMonitor {
             sampling_interval,
         }
     }
-    
+
     pub fn start_monitoring(&self) -> std::thread::JoinHandle<()> {
         let samples = self.samples.clone();
         let start_time = self.start_time;
         let interval = self.sampling_interval;
-        
+
         std::thread::spawn(move || {
             loop {
                 let sample = PerformanceSample {
@@ -278,35 +290,36 @@ impl PerformanceMonitor {
                     cpu_usage: get_cpu_usage(),
                     io_operations: get_io_operations(),
                 };
-                
+
                 if let Ok(mut samples) = samples.lock() {
                     samples.push(sample);
-                    
+
                     // Keep only last 1000 samples to prevent unbounded growth
                     if samples.len() > 1000 {
                         samples.remove(0);
                     }
                 }
-                
+
                 std::thread::sleep(interval);
             }
         })
     }
-    
+
     pub fn get_samples(&self) -> Vec<PerformanceSample> {
         self.samples.lock().unwrap().clone()
     }
-    
+
     pub fn get_memory_trend(&self) -> (u64, u64, f64) {
         let samples = self.get_samples();
         if samples.is_empty() {
             return (0, 0, 0.0);
         }
-        
+
         let min_memory = samples.iter().map(|s| s.memory_usage).min().unwrap_or(0);
         let max_memory = samples.iter().map(|s| s.memory_usage).max().unwrap_or(0);
-        let avg_memory = samples.iter().map(|s| s.memory_usage).sum::<u64>() as f64 / samples.len() as f64;
-        
+        let avg_memory =
+            samples.iter().map(|s| s.memory_usage).sum::<u64>() as f64 / samples.len() as f64;
+
         (min_memory, max_memory, avg_memory)
     }
 }
@@ -347,7 +360,7 @@ impl BenchmarkRunner {
             warmup_iterations,
         }
     }
-    
+
     pub fn benchmark<F>(&self, name: &str, mut f: F) -> BenchmarkResult
     where
         F: FnMut(),
@@ -356,20 +369,20 @@ impl BenchmarkRunner {
         for _ in 0..self.warmup_iterations {
             f();
         }
-        
+
         // Actual benchmark
         let mut times = Vec::with_capacity(self.iterations);
         let start_memory = get_current_memory_usage();
-        
+
         for _ in 0..self.iterations {
             let start = Instant::now();
             f();
             times.push(start.elapsed());
         }
-        
+
         let end_memory = get_current_memory_usage();
         let memory_used = end_memory.saturating_sub(start_memory);
-        
+
         BenchmarkResult::new(name.to_string(), times, memory_used)
     }
 }
@@ -391,7 +404,7 @@ impl BenchmarkResult {
         let min_time = *times.iter().min().unwrap();
         let max_time = *times.iter().max().unwrap();
         let mean_time = total_time / times.len() as u32;
-        
+
         Self {
             name,
             iterations: times.len(),
@@ -402,14 +415,26 @@ impl BenchmarkResult {
             memory_used,
         }
     }
-    
+
     pub fn print_results(&self) {
         println!("Benchmark: {}", self.name);
         println!("  Iterations: {}", self.iterations);
-        println!("  Total time: {:.2}ms", self.total_time.as_micros() as f64 / 1000.0);
-        println!("  Mean time:  {:.2}μs", self.mean_time.as_nanos() as f64 / 1000.0);
-        println!("  Min time:   {:.2}μs", self.min_time.as_nanos() as f64 / 1000.0);
-        println!("  Max time:   {:.2}μs", self.max_time.as_nanos() as f64 / 1000.0);
+        println!(
+            "  Total time: {:.2}ms",
+            self.total_time.as_micros() as f64 / 1000.0
+        );
+        println!(
+            "  Mean time:  {:.2}μs",
+            self.mean_time.as_nanos() as f64 / 1000.0
+        );
+        println!(
+            "  Min time:   {:.2}μs",
+            self.min_time.as_nanos() as f64 / 1000.0
+        );
+        println!(
+            "  Max time:   {:.2}μs",
+            self.max_time.as_nanos() as f64 / 1000.0
+        );
         println!("  Memory:     {:.2}KB", self.memory_used as f64 / 1024.0);
         println!();
     }
@@ -424,62 +449,62 @@ mod tests {
     #[test]
     fn test_profiler() {
         let profiler = Profiler::new(true);
-        
+
         let result = profiler.profile("test_function", || {
             thread::sleep(Duration::from_millis(10));
             42
         });
-        
+
         assert_eq!(result, 42);
-        
+
         let metrics = profiler.get_metrics();
         assert!(metrics.contains_key("test_function"));
-        
+
         let metric = &metrics["test_function"];
         assert_eq!(metric.call_count, 1);
         assert!(metric.total_time >= Duration::from_millis(10));
     }
-    
+
     #[test]
     fn test_memory_tracking() {
         reset_memory_tracking();
-        
+
         track_allocation(1000);
         assert_eq!(get_current_memory_usage(), 1000);
         assert_eq!(get_peak_memory_usage(), 1000);
-        
+
         track_allocation(500);
         assert_eq!(get_current_memory_usage(), 1500);
         assert_eq!(get_peak_memory_usage(), 1500);
-        
+
         track_deallocation(200);
         assert_eq!(get_current_memory_usage(), 1300);
         assert_eq!(get_peak_memory_usage(), 1500); // Peak should remain
     }
-    
+
     #[test]
     fn test_hot_path_detector() {
         let detector = HotPathDetector::new(3);
-        
+
         detector.record_call("function_a");
         detector.record_call("function_a");
         detector.record_call("function_b");
         detector.record_call("function_a");
-        
+
         let hot_paths = detector.get_hot_paths();
         assert_eq!(hot_paths.len(), 1);
         assert_eq!(hot_paths[0].0, "function_a");
         assert_eq!(hot_paths[0].1, 3);
     }
-    
+
     #[test]
     fn test_benchmark_runner() {
         let runner = BenchmarkRunner::new(10, 2);
-        
+
         let result = runner.benchmark("sleep_test", || {
             thread::sleep(Duration::from_micros(100));
         });
-        
+
         result.print_results();
         assert_eq!(result.iterations, 10);
         assert!(result.mean_time >= Duration::from_micros(100));

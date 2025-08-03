@@ -20,7 +20,7 @@ impl<T> LockFreePool<T> {
         for _ in 0..capacity {
             storage.push(std::sync::atomic::AtomicPtr::new(std::ptr::null_mut()));
         }
-        
+
         Self {
             storage,
             head: AtomicUsize::new(0),
@@ -28,19 +28,18 @@ impl<T> LockFreePool<T> {
             constructor: Box::new(constructor),
         }
     }
-    
+
     pub fn get(&self) -> PooledObject<T> {
         // Try to get from pool first
         for _ in 0..self.capacity {
             let current = self.head.load(Ordering::Acquire);
             let next = (current + 1) % self.capacity;
-            
-            if self.head.compare_exchange_weak(
-                current,
-                next,
-                Ordering::Release,
-                Ordering::Relaxed
-            ).is_ok() {
+
+            if self
+                .head
+                .compare_exchange_weak(current, next, Ordering::Release, Ordering::Relaxed)
+                .is_ok()
+            {
                 let ptr = self.storage[current].swap(std::ptr::null_mut(), Ordering::Acquire);
                 if !ptr.is_null() {
                     let obj = unsafe { Box::from_raw(ptr) };
@@ -48,28 +47,26 @@ impl<T> LockFreePool<T> {
                 }
             }
         }
-        
+
         // Pool is empty, create new object
         PooledObject::new((self.constructor)(), Some(self))
     }
-    
+
     fn try_return(&self, obj: T) -> bool {
         let boxed = Box::into_raw(Box::new(obj));
-        
+
         for _ in 0..self.capacity {
             let current = self.head.load(Ordering::Acquire);
             let expected = std::ptr::null_mut();
-            
-            if self.storage[current].compare_exchange_weak(
-                expected,
-                boxed,
-                Ordering::Release,
-                Ordering::Relaxed
-            ).is_ok() {
+
+            if self.storage[current]
+                .compare_exchange_weak(expected, boxed, Ordering::Release, Ordering::Relaxed)
+                .is_ok()
+            {
                 return true;
             }
         }
-        
+
         // Pool is full, drop the object
         unsafe { Box::from_raw(boxed) };
         false
@@ -100,11 +97,11 @@ impl<T> PooledObject<T> {
             pool: pool.map(|p| p as *const _),
         }
     }
-    
+
     pub fn get(&self) -> &T {
         self.object.as_ref().unwrap()
     }
-    
+
     pub fn get_mut(&mut self) -> &mut T {
         self.object.as_mut().unwrap()
     }
@@ -136,7 +133,7 @@ impl VecPool {
             large_pool: LockFreePool::new(10, || Vec::with_capacity(256 * 1024)),
         }
     }
-    
+
     pub fn get_vec(&self, min_capacity: usize) -> PooledObject<Vec<u8>> {
         if min_capacity <= 1024 {
             let mut vec = self.small_pool.get();
@@ -188,35 +185,35 @@ impl AlignedBuffer {
         let ptr = data.as_ptr() as usize;
         let aligned_ptr = (ptr + 31) & !31;
         let offset = aligned_ptr - ptr;
-        
+
         unsafe {
             data.set_len(offset);
             data.reserve_exact(capacity);
         }
-        
+
         Self { data }
     }
-    
+
     pub fn as_slice(&self) -> &[u8] {
         &self.data
     }
-    
+
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.data
     }
-    
+
     pub fn capacity(&self) -> usize {
         self.data.capacity()
     }
-    
+
     pub fn len(&self) -> usize {
         self.data.len()
     }
-    
+
     pub fn clear(&mut self) {
         self.data.clear();
     }
-    
+
     pub fn extend_from_slice(&mut self, data: &[u8]) {
         self.data.extend_from_slice(data);
     }
@@ -244,7 +241,7 @@ impl QueryObject {
             values: Vec::with_capacity(16),
         }
     }
-    
+
     pub fn reset(&mut self) {
         self.data.clear();
         self.table_name.clear();
@@ -259,7 +256,7 @@ impl QueryObjectPool {
             pool: LockFreePool::new(capacity, QueryObject::new),
         }
     }
-    
+
     pub fn get(&self) -> PooledObject<QueryObject> {
         let mut obj = self.pool.get();
         obj.get_mut().reset();
@@ -300,54 +297,54 @@ mod tests {
     #[test]
     fn test_lock_free_pool() {
         let pool = LockFreePool::new(5, || Vec::<u8>::with_capacity(100));
-        
+
         let mut objects = Vec::new();
         for _ in 0..3 {
             objects.push(pool.get());
         }
-        
+
         // Objects should be independent
         objects[0].get_mut().push(1);
         objects[1].get_mut().push(2);
         objects[2].get_mut().push(3);
-        
+
         assert_eq!(objects[0].get()[0], 1);
         assert_eq!(objects[1].get()[0], 2);
         assert_eq!(objects[2].get()[0], 3);
     }
-    
+
     #[test]
     fn test_vec_pool_size_classes() {
         let pool = VecPool::new();
-        
+
         let small = pool.get_vec(512);
         let medium = pool.get_vec(16 * 1024);
         let large = pool.get_vec(128 * 1024);
-        
+
         assert!(small.get().capacity() >= 512);
         assert!(medium.get().capacity() >= 16 * 1024);
         assert!(large.get().capacity() >= 128 * 1024);
     }
-    
+
     #[test]
     fn test_aligned_buffer() {
         let mut buffer = AlignedBuffer::new(1024);
         let ptr = buffer.as_slice().as_ptr() as usize;
         assert_eq!(ptr % 32, 0); // Should be 32-byte aligned
-        
+
         buffer.extend_from_slice(b"test data");
         assert_eq!(buffer.len(), 9);
     }
-    
+
     #[test]
     fn test_query_object_pool() {
         let pool = QueryObjectPool::new(10);
-        
+
         let mut obj = pool.get();
         obj.get_mut().table_name = "users".to_string();
         obj.get_mut().columns.push("id".to_string());
         obj.get_mut().values.push("1".to_string());
-        
+
         assert_eq!(obj.get().table_name, "users");
         assert_eq!(obj.get().columns.len(), 1);
     }

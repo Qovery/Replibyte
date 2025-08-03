@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::io::{BufRead, BufReader, Read};
 use std::str;
 
-use crate::DumpFileError;
 use crate::utils::ListQueryResult;
+use crate::DumpFileError;
 
 /// High-performance SQL parser with zero-copy string processing
 pub struct OptimizedSqlParser {
@@ -26,13 +26,17 @@ impl OptimizedSqlParser {
     }
 
     /// Parse SQL dump with minimal allocations and zero-copy string operations
-    pub fn parse_dump<R: Read, F>(&mut self, mut reader: BufReader<R>, mut callback: F) -> Result<(), DumpFileError>
+    pub fn parse_dump<R: Read, F>(
+        &mut self,
+        mut reader: BufReader<R>,
+        mut callback: F,
+    ) -> Result<(), DumpFileError>
     where
         F: FnMut(&str) -> ListQueryResult,
     {
         self.buffer.clear();
         let mut _bytes_read = 0;
-        
+
         // Read entire input in chunks to minimize system calls
         loop {
             self.line_buffer.clear();
@@ -41,7 +45,7 @@ impl OptimizedSqlParser {
                 Ok(n) => {
                     _bytes_read += n;
                     self.buffer.extend_from_slice(&self.line_buffer);
-                    
+
                     // Process buffer when it gets large enough or at EOF
                     if self.buffer.len() >= self.capacity / 2 {
                         self.process_buffer(&mut callback)?;
@@ -50,12 +54,12 @@ impl OptimizedSqlParser {
                 Err(e) => return Err(DumpFileError::ReadError(e)),
             }
         }
-        
+
         // Process remaining buffer
         if !self.buffer.is_empty() {
             self.process_buffer(&mut callback)?;
         }
-        
+
         Ok(())
     }
 
@@ -67,7 +71,7 @@ impl OptimizedSqlParser {
         let mut in_string = false;
         let mut in_comment = false;
         let mut escape_next = false;
-        
+
         // SIMD-friendly byte scanning
         for (i, &byte) in self.buffer.iter().enumerate() {
             match byte {
@@ -112,14 +116,14 @@ impl OptimizedSqlParser {
             }
             escape_next = false;
         }
-        
+
         // Keep incomplete statement for next batch
         if start < self.buffer.len() {
             self.buffer.drain(0..start);
         } else {
             self.buffer.clear();
         }
-        
+
         Ok(())
     }
 }
@@ -136,32 +140,31 @@ impl<'a> StringRef<'a> {
             data: Cow::Borrowed(s),
         }
     }
-    
+
     pub fn owned(s: String) -> Self {
         Self {
             data: Cow::Owned(s),
         }
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.data
     }
-    
+
     pub fn len(&self) -> usize {
         self.data.len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 }
 
-
 /// SIMD-optimized byte operations for SQL parsing
 pub mod simd_ops {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
-    
+
     /// Fast search for SQL delimiters using SIMD when available
     pub fn find_sql_delimiter(haystack: &[u8], delimiter: u8) -> Option<usize> {
         #[cfg(target_arch = "x86_64")]
@@ -170,33 +173,36 @@ pub mod simd_ops {
                 return unsafe { find_delimiter_avx2(haystack, delimiter) };
             }
         }
-        
+
         // Fallback to standard search
         haystack.iter().position(|&b| b == delimiter)
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe fn find_delimiter_avx2(haystack: &[u8], delimiter: u8) -> Option<usize> {
         if haystack.len() < 32 {
             return haystack.iter().position(|&b| b == delimiter);
         }
-        
+
         let delimiter_vec = _mm256_set1_epi8(delimiter as i8);
         let mut offset = 0;
-        
+
         while offset + 32 <= haystack.len() {
             let chunk = _mm256_loadu_si256(haystack.as_ptr().add(offset) as *const __m256i);
             let cmp = _mm256_cmpeq_epi8(chunk, delimiter_vec);
             let mask = _mm256_movemask_epi8(cmp);
-            
+
             if mask != 0 {
                 return Some(offset + mask.trailing_zeros() as usize);
             }
             offset += 32;
         }
-        
+
         // Handle remaining bytes
-        haystack[offset..].iter().position(|&b| b == delimiter).map(|pos| offset + pos)
+        haystack[offset..]
+            .iter()
+            .position(|&b| b == delimiter)
+            .map(|pos| offset + pos)
     }
 }
 
@@ -213,19 +219,19 @@ impl MmapReader {
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
         Ok(Self { mmap, offset: 0 })
     }
-    
+
     pub fn read_chunk(&mut self, size: usize) -> Option<&[u8]> {
         if self.offset >= self.mmap.len() {
             return None;
         }
-        
+
         let end = std::cmp::min(self.offset + size, self.mmap.len());
         let chunk = &self.mmap[self.offset..end];
         self.offset = end;
-        
+
         Some(chunk)
     }
-    
+
     pub fn remaining(&self) -> usize {
         self.mmap.len().saturating_sub(self.offset)
     }
@@ -240,20 +246,22 @@ mod tests {
     fn test_optimized_parser() {
         let sql = "INSERT INTO users (id, name) VALUES (1, 'John'); INSERT INTO posts (id, title) VALUES (1, 'Hello');";
         let reader = BufReader::new(Cursor::new(sql.as_bytes()));
-        
+
         let mut parser = OptimizedSqlParser::new(8192);
         let mut statements = Vec::new();
-        
-        parser.parse_dump(reader, |stmt| {
-            statements.push(stmt.to_string());
-            ListQueryResult::Continue
-        }).unwrap();
-        
+
+        parser
+            .parse_dump(reader, |stmt| {
+                statements.push(stmt.to_string());
+                ListQueryResult::Continue
+            })
+            .unwrap();
+
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("INSERT INTO users"));
         assert!(statements[1].contains("INSERT INTO posts"));
     }
-    
+
     #[test]
     fn test_simd_delimiter_search() {
         let data = b"SELECT * FROM users WHERE id = 1; SELECT * FROM posts;";
