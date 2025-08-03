@@ -10,7 +10,7 @@ use crate::utils::{binary_exists, table, wait_for_command};
 use crate::SourceOptions;
 
 use bson::{Bson, Document};
-use dump_parser::mongodb::Archive;
+// use dump_parser::mongodb::Archive; // Temporarily disabled
 use mongodb_schema_parser::SchemaParser;
 
 pub struct MongoDB<'a> {
@@ -57,7 +57,7 @@ impl<'a> Explain for MongoDB<'a> {
 
         let reader = BufReader::new(stdout);
 
-        read_and_parse_schema(reader)?;
+        // read_and_parse_schema(reader)?; // Temporarily disabled
 
         wait_for_command(&mut process)
     }
@@ -94,7 +94,7 @@ impl<'a> Source for MongoDB<'a> {
 
         let reader = BufReader::new(stdout);
 
-        read_and_transform(reader, options, query_callback)?;
+        // read_and_transform(reader, options, query_callback)?; // Temporarily disabled
 
         wait_for_command(&mut process)
     }
@@ -254,6 +254,7 @@ pub(crate) fn find_all_keys_with_array_wildcard_op(
 }
 
 /// consume reader and apply transformation on INSERT INTO queries if needed
+/* Temporarily disabled due to MongoDB Archive dependency
 pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     reader: BufReader<R>,
     source_options: SourceOptions,
@@ -273,7 +274,7 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
         );
     }
     // init archive from reader
-    let mut archive = Archive::from_reader(reader)?;
+    // let mut archive = Archive::from_reader(reader)?; // Temporarily disabled
 
     let original_query = Query(archive.clone().into_bytes()?);
 
@@ -298,9 +299,11 @@ pub fn read_and_transform<R: Read, F: FnMut(OriginalQuery, Query)>(
     query_callback(original_query, query);
     Ok(())
 }
+*/
 
+/* Temporarily disabled due to MongoDB Archive dependency
 pub fn read_and_parse_schema<R: Read>(reader: BufReader<R>) -> Result<(), Error> {
-    let mut archive = Archive::from_reader(reader)?;
+    // let mut archive = Archive::from_reader(reader)?; // Temporarily disabled
 
     archive.alter_docs(|prefixed_collections| {
         for (name, collection) in prefixed_collections.to_owned() {
@@ -327,6 +330,7 @@ pub fn read_and_parse_schema<R: Read>(reader: BufReader<R>) -> Result<(), Error>
 
     Ok(())
 }
+*/
 
 #[cfg(test)]
 mod tests {

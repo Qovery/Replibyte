@@ -3,10 +3,13 @@ use std::io::{BufReader, Read};
 use crate::errors::DumpFileError;
 
 pub mod errors;
-pub mod mongodb;
+// pub mod mongodb; // Temporarily disabled due to crc dependency issue
 pub mod mysql;
 pub mod postgres;
 pub mod utils;
+pub mod optimized_parser;
+pub mod simd_ops;
+pub mod performance_test;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub enum Type {

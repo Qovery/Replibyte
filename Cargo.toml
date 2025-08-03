@@ -1,3 +1,4 @@
 [workspace]
 exclude = ["db/*", "assets/*"]
 members = ["dump-parser", "replibyte", "subset"]
+resolver = "2"

@@ -1,6 +1,6 @@
 [package]
 name = "dump-parser"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,6 +8,10 @@ edition = "2021"
 [dependencies]
 bson = "2.2"
 serde = "1.0"
+memmap2 = "0.7"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
 
 ########## WARNING #############
 # DO NOT UPGRADE THE CRC CRATE #
@@ -17,3 +21,7 @@ serde = "1.0"
 # crc-rs ^2.0  ECMA: https://github.com/akhilles/crc-catalog/blob/2.0.1/src/catalog.rs#L104 (INCOMPATIBLE)
 crc = "1.8"
 ################################
+
+[[bench]]
+name = "parser_benchmarks"
+harness = false
