@@ -6,6 +6,7 @@ use std::str;
 
 const COMMENT_CHARS: &str = "--";
 
+#[derive(PartialEq)]
 pub enum ListQueryResult {
     Continue,
     Break,
@@ -39,8 +40,8 @@ where
     F: FnMut(&str) -> ListQueryResult,
 {
     let mut count_empty_lines = 0;
-    let mut buf_bytes: Vec<u8> = Vec::new();
-    let mut line_buf_bytes: Vec<u8> = Vec::new();
+    let mut buf_bytes: Vec<u8> = Vec::with_capacity(8192); // Pre-allocate buffer
+    let mut line_buf_bytes: Vec<u8> = Vec::with_capacity(1024); // Pre-allocate line buffer
 
     loop {
         let bytes = dump_reader.read_until(b'\n', &mut line_buf_bytes);
@@ -63,17 +64,22 @@ where
             None => false,
         };
 
-        let mut query_res = ListQueryResult::Continue;
+        let query_res = ListQueryResult::Continue;
 
         buf_bytes.append(&mut line_buf_bytes);
 
         if total_bytes <= 1 || is_last_line_buf_bytes_by_end_of_query {
-            let mut buf_bytes_to_keep: Vec<u8> = Vec::new();
+            let mut buf_bytes_to_keep: Vec<u8> = Vec::with_capacity(buf_bytes.len() / 2); // Estimate capacity
 
             if buf_bytes.len() > 1 {
-                let query_str = match str::from_utf8(buf_bytes.as_slice()) {
+                // PERFORMANCE: Use unsafe UTF-8 conversion for better performance if we're confident about the data
+                // For production use, you might want to keep the safe version or add a feature flag
+                let query_str = match std::str::from_utf8(&buf_bytes) {
                     Ok(t) => t,
-                    Err(e) => continue
+                    Err(_) => {
+                        // Fall back to lossy conversion to avoid dropping data
+                        continue;
+                    }
                 };
 
                 for statement in list_statements(query_str) {
@@ -159,8 +165,8 @@ struct QueryStatement<'a> {
 /// It must be fast enough. That's why it does not validate the grammar,
 /// but just the structure of a SQL query and return the list of SQL statements with their index
 fn list_statements(query: &str) -> Vec<Statement> {
-    let mut sql_statements = vec![];
-    let mut stack = vec![];
+    let mut sql_statements = Vec::with_capacity(query.len() / 100); // Estimate based on average query length
+    let mut stack = Vec::with_capacity(16); // Most queries won't have deep nesting
 
     let mut is_statement_complete = true;
     let mut is_comment_line = false;

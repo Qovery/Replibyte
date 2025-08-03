@@ -44,7 +44,7 @@ where
         // initialize the source
         let _ = self.source.init()?;
 
-        let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(1);
+        let (tx, rx) = mpsc::sync_channel::<Message<DataMessage>>(10); // Increased buffer to reduce blocking
         let datastore = self.datastore;
 
         let join_handle = thread::spawn(move || -> Result<(), Error> {
@@ -71,7 +71,7 @@ where
 
         // buffer of 100MB in memory to use and re-use to upload data into datastore
         let buffer_size = 100 * 1024 * 1024;
-        let mut queries = vec![];
+        let mut queries = Vec::with_capacity(1000); // Pre-allocate for better performance
         let mut consumed_buffer_size = 0usize;
         let mut total_transferred_bytes = 0usize;
         let mut chunk_part = 0u16;
@@ -86,12 +86,13 @@ where
             if consumed_buffer_size + query.data().len() > buffer_size {
                 chunk_part += 1;
                 consumed_buffer_size = 0;
-                // TODO .clone() - look if we do not consume more mem
-
-                let message = Message::Data((chunk_part, queries.clone()));
+                // PERFORMANCE: Use mem::take to avoid expensive clone
+                let queries_to_send = std::mem::take(&mut queries);
+                let message = Message::Data((chunk_part, queries_to_send));
 
                 let _ = tx.send(message); // FIXME catch SendError?
-                let _ = queries.clear();
+                // Re-initialize with capacity to avoid repeated allocations
+                queries = Vec::with_capacity(1000);
             }
 
             consumed_buffer_size += query.data().len();
@@ -105,8 +106,11 @@ where
 
         progress_callback(total_transferred_bytes, total_transferred_bytes);
 
-        chunk_part += 1;
-        let _ = tx.send(Message::Data((chunk_part, queries)));
+        // Send remaining queries if any
+        if !queries.is_empty() {
+            chunk_part += 1;
+            let _ = tx.send(Message::Data((chunk_part, queries)));
+        }
         let _ = tx.send(Message::EOF);
         // wait for end of upload execution
         join_handle.join().unwrap()?;

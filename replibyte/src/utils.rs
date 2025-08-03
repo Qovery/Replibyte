@@ -4,6 +4,9 @@ use std::process::Child;
 use std::time::{SystemTime, UNIX_EPOCH};
 use which::which;
 
+pub mod buffer_pool;
+pub mod advanced_pool;
+
 pub fn epoch_millis() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
