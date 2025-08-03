@@ -2,6 +2,8 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
+// pub mod optimized; // Temporarily disabled due to API compatibility issues
+
 use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
     Into as KeywordInto, Key, NoKeyword, Not, Null, Only, Primary, References, Replace, Table,
@@ -653,25 +655,6 @@ fn peeking_take_while(
     s
 }
 
-fn parse_quoted_ident(chars: &mut Peekable<Chars<'_>>, quote_end: char) -> (String, Option<char>) {
-    let mut last_char = None;
-    let mut s = String::new();
-    while let Some(ch) = chars.next() {
-        if ch == quote_end {
-            if chars.peek() == Some(&quote_end) {
-                chars.next();
-                s.push(ch);
-            } else {
-                last_char = Some(quote_end);
-                break;
-            }
-        } else {
-            s.push(ch);
-        }
-    }
-
-    (s, last_char)
-}
 
 pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usize) -> bool {
     if let Some(token) = tokens.get(pos) {

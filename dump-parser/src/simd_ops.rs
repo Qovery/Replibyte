@@ -1,6 +1,5 @@
 /// SIMD operations module for high-performance parsing
 /// Provides cross-platform SIMD optimizations with fallbacks
-
 /// Fast case-insensitive pattern finding using SIMD when available
 pub fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || haystack.len() < needle.len() {

@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::str;
 
-const COMMENT_CHARS: &str = "--";
 
 #[derive(PartialEq)]
 pub enum ListQueryResult {
@@ -148,15 +147,11 @@ enum Statement<'a> {
 }
 
 struct CommentStatement<'a> {
-    start_index: usize,
-    end_index: usize,
     statement: &'a str,
 }
 
 struct QueryStatement<'a> {
     valid: bool,
-    start_index: usize,
-    end_index: usize,
     statement: &'a str,
 }
 
@@ -180,8 +175,6 @@ fn list_statements(query: &str) -> Vec<Statement> {
         match byte_char {
             char if is_comment_line && char == b'\n' => {
                 sql_statements.push(Statement::CommentLine(CommentStatement {
-                    start_index,
-                    end_index: idx,
                     statement: &query[start_index..idx],
                 }));
 
@@ -262,8 +255,6 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 // end of query
                 sql_statements.push(Statement::Query(QueryStatement {
                     valid: stack.is_empty(),
-                    start_index,
-                    end_index: idx + 1,
                     statement: &query[start_index..idx + 1],
                 }));
 
@@ -294,14 +285,10 @@ fn list_statements(query: &str) -> Vec<Statement> {
         if !is_statement_complete {
             sql_statements.push(Statement::Query(QueryStatement {
                 valid: stack.is_empty(),
-                start_index,
-                end_index,
                 statement: &query[start_index..end_index + 1],
             }));
         } else if is_comment_line {
             sql_statements.push(Statement::CommentLine(CommentStatement {
-                start_index,
-                end_index,
                 statement: &query[start_index..end_index + 1],
             }));
         } else {

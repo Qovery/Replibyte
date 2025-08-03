@@ -8,7 +8,6 @@ use crate::DumpFileError;
 /// High-performance SQL parser with zero-copy string processing
 pub struct OptimizedSqlParser {
     buffer: Vec<u8>,
-    statement_buffer: Vec<u8>,
     line_buffer: Vec<u8>,
     stack: Vec<u8>,
     capacity: usize,
@@ -18,7 +17,6 @@ impl OptimizedSqlParser {
     pub fn new(capacity: usize) -> Self {
         Self {
             buffer: Vec::with_capacity(capacity),
-            statement_buffer: Vec::with_capacity(capacity / 4),
             line_buffer: Vec::with_capacity(1024),
             stack: Vec::with_capacity(16),
             capacity,

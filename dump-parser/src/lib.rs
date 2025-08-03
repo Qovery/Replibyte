@@ -1,3 +1,17 @@
+#![allow(clippy::manual_is_ascii_check)]
+#![allow(clippy::redundant_closure)]
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::match_like_matches_macro)]
+#![allow(clippy::comparison_chain)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::get_first)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::eq_op)]
+#![allow(clippy::partialeq_to_none)]
+#![allow(clippy::ptr_arg)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
+
 use std::io::{BufReader, Read};
 
 use crate::errors::DumpFileError;

@@ -2,6 +2,8 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
+// pub mod optimized; // Temporarily disabled due to API compatibility issues
+
 use crate::mysql::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Insert, Into as KeywordInto,
     Key, NoKeyword, Not, Null, Primary, References, Table,
@@ -119,7 +121,7 @@ impl Token {
         Token::Word(Word {
             value: word.to_string(),
             quote_style,
-            keyword: if quote_style == None {
+            keyword: if quote_style.is_none() {
                 match word_uppercase.as_str() {
                     "ALTER" => Alter,
                     "CREATE" => Create,
@@ -1114,4 +1116,10 @@ VALUES ('Romaric', true);
             ]
         );
     }
+}
+
+/// Tokenize a MySQL query string for benchmarking compatibility  
+pub fn tokenize(query: &str) -> Result<Vec<Token>, TokenizerError> {
+    let mut tokenizer = Tokenizer::new(query);
+    tokenizer.tokenize()
 }
