@@ -1,9 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use dump_parser::mysql::optimized::OptimizedMySQLParser;
+// use dump_parser::mysql::optimized::OptimizedMySQLParser; // Temporarily disabled
 use dump_parser::mysql::{
     get_column_names_from_insert_into_query as mysql_get_columns, tokenize as mysql_tokenize,
 };
-use dump_parser::postgres::optimized::OptimizedPostgresParser;
+// use dump_parser::postgres::optimized::OptimizedPostgresParser; // Temporarily disabled  
 use dump_parser::postgres::{get_column_names_from_insert_into_query, tokenize};
 
 /// Generate realistic test SQL queries for benchmarking
@@ -68,14 +68,14 @@ fn benchmark_postgres_tokenization(c: &mut Criterion) {
             });
         });
 
-        // Benchmark optimized tokenizer
-        group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
-            let mut parser = OptimizedPostgresParser::new(query.len() * 2);
-            b.iter(|| {
-                let result = parser.tokenize_optimized(black_box(query));
-                black_box(result);
-            });
-        });
+        // Benchmark optimized tokenizer - temporarily disabled
+        // group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
+        //     let mut parser = OptimizedPostgresParser::new(query.len() * 2);
+        //     b.iter(|| {
+        //         let result = parser.tokenize_optimized(black_box(query));
+        //         black_box(result);
+        //     });
+        // });
     }
 
     group.finish();
@@ -96,14 +96,14 @@ fn benchmark_mysql_tokenization(c: &mut Criterion) {
             });
         });
 
-        // Benchmark optimized tokenizer
-        group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
-            let mut parser = OptimizedMySQLParser::new(query.len() * 2);
-            b.iter(|| {
-                let result = parser.tokenize_optimized(black_box(query));
-                black_box(result);
-            });
-        });
+        // Benchmark optimized tokenizer - temporarily disabled
+        // group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
+        //     let mut parser = OptimizedMySQLParser::new(query.len() * 2);
+        //     b.iter(|| {
+        //         let result = parser.tokenize_optimized(black_box(query));
+        //         black_box(result);
+        //     });
+        // });
     }
 
     group.finish();
@@ -130,14 +130,14 @@ fn benchmark_postgres_column_extraction(c: &mut Criterion) {
             });
         });
 
-        // Benchmark optimized column extraction
-        group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
-            let mut parser = OptimizedPostgresParser::new(query.len() * 2);
-            b.iter(|| {
-                let result = parser.extract_insert_columns_fast(black_box(query));
-                black_box(result);
-            });
-        });
+        // Benchmark optimized column extraction - temporarily disabled
+        // group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
+        //     let mut parser = OptimizedPostgresParser::new(query.len() * 2);
+        //     b.iter(|| {
+        //         let result = parser.extract_insert_columns_fast(black_box(query));
+        //         black_box(result);
+        //     });
+        // });
     }
 
     group.finish();
@@ -164,14 +164,14 @@ fn benchmark_mysql_column_extraction(c: &mut Criterion) {
             });
         });
 
-        // Benchmark optimized column extraction
-        group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
-            let mut parser = OptimizedMySQLParser::new(query.len() * 2);
-            b.iter(|| {
-                let result = parser.extract_insert_columns_fast(black_box(query));
-                black_box(result);
-            });
-        });
+        // Benchmark optimized column extraction - temporarily disabled
+        // group.bench_with_input(BenchmarkId::new("optimized", i), query, |b, query| {
+        //     let mut parser = OptimizedMySQLParser::new(query.len() * 2);
+        //     b.iter(|| {
+        //         let result = parser.extract_insert_columns_fast(black_box(query));
+        //         black_box(result);
+        //     });
+        // });
     }
 
     group.finish();
@@ -201,16 +201,16 @@ fn benchmark_memory_allocation_patterns(c: &mut Criterion) {
         });
     });
 
-    // Benchmark reuse patterns
-    group.bench_function("parser_reuse", |b| {
-        let mut parser = OptimizedPostgresParser::new(test_query.len() * 2);
-        b.iter(|| {
-            for _ in 0..10 {
-                let result = parser.tokenize_optimized(black_box(test_query));
-                black_box(result);
-            }
-        });
-    });
+    // Benchmark reuse patterns - temporarily disabled
+    // group.bench_function("parser_reuse", |b| {
+    //     let mut parser = OptimizedPostgresParser::new(test_query.len() * 2);
+    //     b.iter(|| {
+    //         for _ in 0..10 {
+    //             let result = parser.tokenize_optimized(black_box(test_query));
+    //             black_box(result);
+    //         }
+    //     });
+    // });
 
     group.finish();
 }
@@ -220,25 +220,25 @@ fn benchmark_simd_operations(c: &mut Criterion) {
 
     let test_data = "SELECT * FROM users WHERE name = 'John' INSERT INTO products VALUES (1, 'test') UPDATE users SET name = 'Jane'".repeat(1000);
 
-    // Benchmark pattern finding
-    group.bench_function("pattern_finding", |b| {
-        let mut parser = OptimizedPostgresParser::new(test_data.len());
-        b.iter(|| {
-            let result = parser.tokenize_optimized(black_box(&test_data));
-            black_box(result);
-        });
-    });
+    // Benchmark pattern finding - temporarily disabled
+    // group.bench_function("pattern_finding", |b| {
+    //     let mut parser = OptimizedPostgresParser::new(test_data.len());
+    //     b.iter(|| {
+    //         let result = parser.tokenize_optimized(black_box(&test_data));
+    //         black_box(result);
+    //     });
+    // });
 
-    // Benchmark whitespace skipping
-    let whitespace_heavy =
-        format!("   \t\n\r   INSERT   \t\n   INTO   \t\n   users   \t\n   VALUES   \t\n   ");
-    group.bench_function("whitespace_skipping", |b| {
-        let mut parser = OptimizedPostgresParser::new(whitespace_heavy.len());
-        b.iter(|| {
-            let result = parser.tokenize_optimized(black_box(&whitespace_heavy));
-            black_box(result);
-        });
-    });
+    // Benchmark whitespace skipping - temporarily disabled
+    // let whitespace_heavy =
+    //     format!("   \t\n\r   INSERT   \t\n   INTO   \t\n   users   \t\n   VALUES   \t\n   ");
+    // group.bench_function("whitespace_skipping", |b| {
+    //     let mut parser = OptimizedPostgresParser::new(whitespace_heavy.len());
+    //     b.iter(|| {
+    //         let result = parser.tokenize_optimized(black_box(&whitespace_heavy));
+    //         black_box(result);
+    //     });
+    // });
 
     group.finish();
 }
