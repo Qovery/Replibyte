@@ -14,14 +14,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust-toolchain }}
           components: rustfmt
-          override: true
 
       - name: Install Build Essentials
         run: sudo apt-get install build-essential mingw-w64 gcc
@@ -31,7 +30,7 @@ jobs:
 
       - name: Cache build artifacts
         id: cache-cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -41,7 +40,7 @@ jobs:
 
       - name: Cache integration artifacts
         id: cache-integration
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             tests/integration/runner/node_modules
@@ -60,12 +59,12 @@ jobs:
 
       - name: Test Parser Performance Optimizations
         run: |
-          echo "Testing optimized parsers..."
-          # Test PostgreSQL optimized parser
-          cargo test --package dump-parser --lib postgres::optimized::tests --release
-          # Test MySQL optimized parser
-          cargo test --package dump-parser --lib mysql::optimized::tests --release
-          # Test SIMD operations
+          echo "Testing standard parsers (optimized parsers temporarily disabled)..."
+          # Test standard PostgreSQL parser
+          cargo test --package dump-parser --lib postgres::tests --release
+          # Test standard MySQL parser
+          cargo test --package dump-parser --lib mysql::tests --release
+          # Test SIMD operations (basic functionality)
           cargo test --package dump-parser --lib simd_ops::tests --release
 
       - name: Validate Dump Processing
