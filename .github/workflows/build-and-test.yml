@@ -50,7 +50,7 @@ jobs:
         run: cargo build --release --all-features
 
       - name: Start Postgres, MySQL, MongoDB and MinIO Containers
-        run: docker-compose -f "docker-compose-dev.yml" up -d --build
+        run: docker compose -f "docker-compose-dev.yml" up -d --build
 
       - name: Test RepliByte
         env:
@@ -120,4 +120,4 @@ jobs:
 
       - name: Stop Postgres, MySQL, MongoDB and MinIO Containers
         if: always()
-        run: docker-compose -f "docker-compose-dev.yml" down --remove-orphans
+        run: docker compose -f "docker-compose-dev.yml" down --remove-orphans

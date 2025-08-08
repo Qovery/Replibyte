@@ -147,7 +147,7 @@ strategy:
 cargo test --package dump-parser --lib --release
 
 # Run integration tests (requires Docker)
-docker-compose -f docker-compose-dev.yml up -d
+docker compose -f docker-compose-dev.yml up -d
 cargo test --all-features
 
 # Run validation script
