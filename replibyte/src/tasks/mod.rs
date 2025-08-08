@@ -2,6 +2,7 @@ use std::io::Error;
 
 pub mod full_dump;
 pub mod full_restore;
+pub mod streaming_dump;
 
 pub type TransferredBytes = usize;
 pub type MaxBytes = usize;

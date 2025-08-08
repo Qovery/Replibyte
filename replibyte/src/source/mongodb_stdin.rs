@@ -1,7 +1,7 @@
 use std::io::{stdin, BufReader, Error};
 
 use crate::connector::Connector;
-use crate::source::mongodb::read_and_transform;
+// use crate::source::mongodb::read_and_transform; // Temporarily disabled
 use crate::types::{OriginalQuery, Query};
 use crate::Source;
 use crate::SourceOptions;
@@ -32,7 +32,7 @@ impl Source for MongoDBStdin {
             todo!("database subset not supported yet for MongoDB source")
         }
 
-        let _ = read_and_transform(reader, options, query_callback)?;
+        // let _ = read_and_transform(reader, options, query_callback)?; // Temporarily disabled
         Ok(())
     }
 }

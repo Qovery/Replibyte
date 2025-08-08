@@ -2,6 +2,8 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
+// pub mod optimized; // Temporarily disabled due to API compatibility issues
+
 use crate::postgres::Keyword::{
     Add, Alter, Constraint, Copy, Create, Database, Foreign, From, Function, Insert,
     Into as KeywordInto, Key, NoKeyword, Not, Null, Only, Primary, References, Replace, Table,
@@ -540,23 +542,21 @@ impl<'a> Tokenizer<'a> {
     fn tokenize_number_literal(
         &self,
         chars: &mut Peekable<Chars<'_>>,
-        sign: Option<char>
+        sign: Option<char>,
     ) -> Result<Option<Token>, TokenizerError> {
         let mut s = match sign {
             Some(ch) if ch == '+' || ch == '-' => {
                 String::from(ch) + &peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
             }
             Some(_) => panic!("invalid sign"),
-            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9'))
+            None => peeking_take_while(chars, |ch| matches!(ch, '0'..='9')),
         };
 
         // match binary literal that starts with 0x
         if s == "0" && chars.peek() == Some(&'x') {
             chars.next();
-            let s2 = peeking_take_while(
-                chars,
-                |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'),
-            );
+            let s2 =
+                peeking_take_while(chars, |ch| matches!(ch, '0'..='9' | 'A'..='F' | 'a'..='f'));
             return Ok(Some(Token::HexStringLiteral(s2)));
         }
 
@@ -653,26 +653,6 @@ fn peeking_take_while(
     }
 
     s
-}
-
-fn parse_quoted_ident(chars: &mut Peekable<Chars<'_>>, quote_end: char) -> (String, Option<char>) {
-    let mut last_char = None;
-    let mut s = String::new();
-    while let Some(ch) = chars.next() {
-        if ch == quote_end {
-            if chars.peek() == Some(&quote_end) {
-                chars.next();
-                s.push(ch);
-            } else {
-                last_char = Some(quote_end);
-                break;
-            }
-        } else {
-            s.push(ch);
-        }
-    }
-
-    (s, last_char)
 }
 
 pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usize) -> bool {
@@ -772,7 +752,7 @@ pub fn get_column_values_str_from_insert_into_query(tokens: &Vec<Token>) -> Vec<
                     let mut long_value = value.to_owned();
                     long_value.push('L');
                     long_value
-                },
+                }
             }),
             _ => None,
         })
@@ -1062,4 +1042,9 @@ VALUES ('Romaric', true);
             ]
         );
     }
+}
+
+pub fn tokenize(query: &str) -> Result<Vec<Token>, TokenizerError> {
+    let mut tokenizer = Tokenizer::new(query);
+    tokenizer.tokenize()
 }

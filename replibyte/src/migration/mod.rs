@@ -89,12 +89,12 @@ impl<'a> Migrator<'a> {
                     }
                 }
                 Ok(())
-            },
+            }
             Err(err) => {
                 // raw_index_file returns an error when we don't have a metadata.json file, in this case we don't need to run migrations.
                 info!("migrate: skip migrate '{}'", err.to_string());
                 Ok(())
-            },
+            }
         }
     }
 

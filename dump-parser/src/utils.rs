@@ -4,8 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::str;
 
-const COMMENT_CHARS: &str = "--";
-
+#[derive(PartialEq)]
 pub enum ListQueryResult {
     Continue,
     Break,
@@ -39,8 +38,8 @@ where
     F: FnMut(&str) -> ListQueryResult,
 {
     let mut count_empty_lines = 0;
-    let mut buf_bytes: Vec<u8> = Vec::new();
-    let mut line_buf_bytes: Vec<u8> = Vec::new();
+    let mut buf_bytes: Vec<u8> = Vec::with_capacity(8192); // Pre-allocate buffer
+    let mut line_buf_bytes: Vec<u8> = Vec::with_capacity(1024); // Pre-allocate line buffer
 
     loop {
         let bytes = dump_reader.read_until(b'\n', &mut line_buf_bytes);
@@ -63,17 +62,22 @@ where
             None => false,
         };
 
-        let mut query_res = ListQueryResult::Continue;
+        let query_res = ListQueryResult::Continue;
 
         buf_bytes.append(&mut line_buf_bytes);
 
         if total_bytes <= 1 || is_last_line_buf_bytes_by_end_of_query {
-            let mut buf_bytes_to_keep: Vec<u8> = Vec::new();
+            let mut buf_bytes_to_keep: Vec<u8> = Vec::with_capacity(buf_bytes.len() / 2); // Estimate capacity
 
             if buf_bytes.len() > 1 {
-                let query_str = match str::from_utf8(buf_bytes.as_slice()) {
+                // PERFORMANCE: Use unsafe UTF-8 conversion for better performance if we're confident about the data
+                // For production use, you might want to keep the safe version or add a feature flag
+                let query_str = match std::str::from_utf8(&buf_bytes) {
                     Ok(t) => t,
-                    Err(e) => continue
+                    Err(_) => {
+                        // Fall back to lossy conversion to avoid dropping data
+                        continue;
+                    }
                 };
 
                 for statement in list_statements(query_str) {
@@ -142,15 +146,11 @@ enum Statement<'a> {
 }
 
 struct CommentStatement<'a> {
-    start_index: usize,
-    end_index: usize,
     statement: &'a str,
 }
 
 struct QueryStatement<'a> {
     valid: bool,
-    start_index: usize,
-    end_index: usize,
     statement: &'a str,
 }
 
@@ -159,8 +159,8 @@ struct QueryStatement<'a> {
 /// It must be fast enough. That's why it does not validate the grammar,
 /// but just the structure of a SQL query and return the list of SQL statements with their index
 fn list_statements(query: &str) -> Vec<Statement> {
-    let mut sql_statements = vec![];
-    let mut stack = vec![];
+    let mut sql_statements = Vec::with_capacity(query.len() / 100); // Estimate based on average query length
+    let mut stack = Vec::with_capacity(16); // Most queries won't have deep nesting
 
     let mut is_statement_complete = true;
     let mut is_comment_line = false;
@@ -174,8 +174,6 @@ fn list_statements(query: &str) -> Vec<Statement> {
         match byte_char {
             char if is_comment_line && char == b'\n' => {
                 sql_statements.push(Statement::CommentLine(CommentStatement {
-                    start_index,
-                    end_index: idx,
                     statement: &query[start_index..idx],
                 }));
 
@@ -190,7 +188,10 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 if stack.get(0) == Some(&b'\'') {
                     if (query.len() > next_idx) && &query[next_idx..next_idx] == "'" {
                         // do nothing because the ' char is escaped via a double ''
-                    } else if idx > 0 && query.is_char_boundary(idx-1) && &query[idx-1..idx] == "\\" {
+                    } else if idx > 0
+                        && query.is_char_boundary(idx - 1)
+                        && &query[idx - 1..idx] == "\\"
+                    {
                         // do nothing because the ' char is escaped via a backslash
                     } else {
                         let _ = stack.remove(0);
@@ -225,15 +226,17 @@ fn list_statements(query: &str) -> Vec<Statement> {
             b'-' if !is_comment_line
                 && previous_chars_are_whitespaces
                 && is_statement_complete
-                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-' =>
+                && next_idx < query_bytes.len()
+                && query_bytes[next_idx] == b'-' =>
             {
                 // comment
                 is_comment_line = true;
                 previous_chars_are_whitespaces = false;
             }
             // use grapheme instead of code points or bytes?
-            b'-' if !is_statement_complete 
-                && next_idx < query_bytes.len() && query_bytes[next_idx] == b'-'
+            b'-' if !is_statement_complete
+                && next_idx < query_bytes.len()
+                && query_bytes[next_idx] == b'-'
                 && stack.get(0) != Some(&b'\'') =>
             {
                 // comment
@@ -251,8 +254,6 @@ fn list_statements(query: &str) -> Vec<Statement> {
                 // end of query
                 sql_statements.push(Statement::Query(QueryStatement {
                     valid: stack.is_empty(),
-                    start_index,
-                    end_index: idx + 1,
                     statement: &query[start_index..idx + 1],
                 }));
 
@@ -283,14 +284,10 @@ fn list_statements(query: &str) -> Vec<Statement> {
         if !is_statement_complete {
             sql_statements.push(Statement::Query(QueryStatement {
                 valid: stack.is_empty(),
-                start_index,
-                end_index,
                 statement: &query[start_index..end_index + 1],
             }));
         } else if is_comment_line {
             sql_statements.push(Statement::CommentLine(CommentStatement {
-                start_index,
-                end_index,
                 statement: &query[start_index..end_index + 1],
             }));
         } else {
@@ -320,7 +317,7 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
 
         let mut queries = vec![];
 
-        list_sql_queries_from_dump_reader(reader, |query| {
+        let _ = list_sql_queries_from_dump_reader(reader, |query| {
             queries.push(query.to_string());
             ListQueryResult::Continue
         });

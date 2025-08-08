@@ -425,8 +425,8 @@ fn get_username(url: &Url) -> Result<String, Error> {
 fn get_password(url: &Url) -> Result<String, Error> {
     match url.password() {
         Some(password) => Ok(percent_decode_str(&password)
-			.decode_utf8_lossy()
-			.to_string()),
+            .decode_utf8_lossy()
+            .to_string()),
         None => Ok(String::new()), // no password
     }
 }
@@ -621,7 +621,7 @@ mod tests {
         )
     }
 
-	#[test]
+    #[test]
     fn parse_postgres_connection_uri_with_password_with_special_chars_db() {
         assert_eq!(
             parse_connection_uri("postgres://root:%aqdz^e@localhost:5432/db").unwrap(),

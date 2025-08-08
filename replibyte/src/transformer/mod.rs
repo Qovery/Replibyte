@@ -76,11 +76,7 @@ pub trait Transformer {
     }
 
     fn table_and_column_name(&self) -> String {
-        format!(
-            "{}.{}",
-            self.table_name(),
-            self.column_name()
-        )
+        format!("{}.{}", self.table_name(), self.column_name())
     }
 
     fn transform(&self, column: Column) -> Column;

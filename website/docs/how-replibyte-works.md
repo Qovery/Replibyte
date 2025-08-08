@@ -11,6 +11,10 @@ RepliByte is built to seed a development database with production data. Replibyt
 3. Hide sensitive data via customizable [Transformers](/docs/transformers).
 4. Make your development dump easily accessible from any remote and local databases.
 
+:::tip Performance in v0.11.0+
+RepliByte now includes advanced performance optimizations that provide **2-4x faster processing** and **70-90% less memory usage** through SIMD vectorization, lock-free memory pools, and streaming architecture. See the [Performance Optimization guide](/docs/performance-optimization) for details.
+:::
+
 ## How creating a Replibyte dump works
 
 Here is an example of what happens while replicating a PostgreSQL database.

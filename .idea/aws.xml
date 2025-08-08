@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="accountSettings">
+    <option name="activeProfile" value="profile:replibyte" />
+    <option name="activeRegion" value="us-east-2" />
+    <option name="recentlyUsedProfiles">
+      <list>
+        <option value="profile:replibyte" />
+        <option value="profile:default" />
+      </list>
+    </option>
+    <option name="recentlyUsedRegions">
+      <list>
+        <option value="us-east-2" />
+        <option value="eu-west-3" />
+      </list>
+    </option>
+  </component>
+</project>

@@ -13,7 +13,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use migration::{migrations, Migrator};
 use utils::get_replibyte_version;
 
-use crate::cli::{DumpCommand, RestoreCommand, SubCommand, TransformerCommand, CLI, SourceCommand};
+use crate::cli::{DumpCommand, RestoreCommand, SourceCommand, SubCommand, TransformerCommand, CLI};
 use crate::config::{Config, DatabaseSubsetConfig, DatastoreConfig};
 use crate::datastore::local_disk::LocalDisk;
 use crate::datastore::s3::S3;
@@ -29,8 +29,12 @@ mod config;
 mod connector;
 mod datastore;
 mod destination;
+mod io;
 mod migration;
+mod performance_config;
+mod profiling;
 mod runtime;
+mod simd;
 mod source;
 mod tasks;
 mod telemetry;
@@ -71,7 +75,7 @@ fn show_progress_bar(rx_pb: Receiver<(TransferredBytes, MaxBytes)>) {
         last_transferred_bytes = transferred_bytes;
         pb.set_position(transferred_bytes as u64);
 
-        sleep(Duration::from_micros(50));
+        sleep(Duration::from_millis(10)); // Reduced frequency for better performance
     }
 }
 
@@ -79,6 +83,10 @@ fn main() {
     let start_exec_time = utils::epoch_millis();
 
     env_logger::init();
+
+    // Initialize profiling based on environment variable
+    let enable_profiling = std::env::var("REPLIBYTE_PROFILE").unwrap_or_default() == "1";
+    profiling::init_profiler(enable_profiling);
 
     let env_args = env::args().collect::<Vec<String>>();
     let args = CLI::parse();
@@ -113,8 +121,18 @@ fn main() {
             Some(epoch_millis() - start_exec_time),
         );
     }
+    // Print profiling report if enabled
+    if enable_profiling {
+        profiling::get_profiler().print_report();
+        println!(
+            "Peak memory usage: {:.2}MB",
+            profiling::get_peak_memory_usage() as f64 / (1024.0 * 1024.0)
+        );
+        println!("Total allocations: {}", profiling::get_allocation_count());
+    }
+
     if exit_code != 0 {
-         std::process::exit(exit_code);
+        std::process::exit(exit_code);
     }
 }
 
@@ -188,9 +206,7 @@ fn run(config: Config, sub_commands: &SubCommand) -> anyhow::Result<()> {
             },
         },
         SubCommand::Source(cmd) => match cmd {
-            SourceCommand::Schema => {
-                commands::source::schema(config)
-            }
+            SourceCommand::Schema => commands::source::schema(config),
         },
         SubCommand::Transformer(cmd) => match cmd {
             TransformerCommand::List => {

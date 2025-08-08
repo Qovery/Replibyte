@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-version = "0.10.0"
+version = "0.11.0"
 name = "replibyte"
 authors = ["Qovery Team", "Fab", "Benny", "Contributos"]
 
@@ -9,6 +9,8 @@ authors = ["Qovery Team", "Fab", "Benny", "Contributos"]
 [dependencies]
 dump-parser = { path = "../dump-parser" }
 subset = { path = "../subset" }
+bytes = "1.5"
+memmap2 = "0.9"
 rand = "0.8.5"
 anyhow = "1.0.56"
 serde_yaml = "0.8"
@@ -53,3 +55,11 @@ wasmer-wasi = { version = "2.2" }
 # FIXME same as above
 #[features]
 #wasm = ["wasmer", "wasmer-wasi"]
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["html_reports"] }
+tempfile = "3.3"
+
+[[bench]]
+name = "performance_benchmarks"
+harness = false

@@ -185,7 +185,7 @@ impl<'a> Subset for PostgresSubset<'a> {
     fn read<F: FnMut(String), P: FnMut(Progress)>(
         &self,
         mut data: F,
-        mut progress: P,
+        progress: P,
     ) -> Result<(), Error> {
         let temp_dir = tempfile::tempdir()?;
 
