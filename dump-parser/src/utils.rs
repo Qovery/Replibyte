@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::str;
 
-
 #[derive(PartialEq)]
 pub enum ListQueryResult {
     Continue,
@@ -318,7 +317,7 @@ Etiam augue augue, bibendum et molestie non, finibus non nulla. Etiam quis rhonc
 
         let mut queries = vec![];
 
-        list_sql_queries_from_dump_reader(reader, |query| {
+        let _ = list_sql_queries_from_dump_reader(reader, |query| {
             queries.push(query.to_string());
             ListQueryResult::Continue
         });

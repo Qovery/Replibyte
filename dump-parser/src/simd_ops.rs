@@ -274,7 +274,7 @@ mod tests {
     fn test_whitespace_skipping() {
         let data = b"   \t\n\r   SELECT";
         let pos = skip_whitespace_simd(data, 0);
-        assert_eq!(pos, 7);
+        assert_eq!(pos, 9);
         assert_eq!(&data[pos..pos + 6], b"SELECT");
     }
 

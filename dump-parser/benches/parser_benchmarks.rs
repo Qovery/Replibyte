@@ -3,7 +3,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use dump_parser::mysql::{
     get_column_names_from_insert_into_query as mysql_get_columns, tokenize as mysql_tokenize,
 };
-// use dump_parser::postgres::optimized::OptimizedPostgresParser; // Temporarily disabled  
+// use dump_parser::postgres::optimized::OptimizedPostgresParser; // Temporarily disabled
 use dump_parser::postgres::{get_column_names_from_insert_into_query, tokenize};
 
 /// Generate realistic test SQL queries for benchmarking
@@ -125,7 +125,8 @@ fn benchmark_postgres_column_extraction(c: &mut Criterion) {
         // Benchmark original column extraction
         group.bench_with_input(BenchmarkId::new("original", i), query, |b, query| {
             b.iter(|| {
-                let result = get_column_names_from_insert_into_query(black_box(query));
+                let tokens = tokenize(black_box(query)).unwrap();
+                let result = get_column_names_from_insert_into_query(black_box(&tokens));
                 black_box(result);
             });
         });
@@ -159,7 +160,8 @@ fn benchmark_mysql_column_extraction(c: &mut Criterion) {
         // Benchmark original column extraction
         group.bench_with_input(BenchmarkId::new("original", i), query, |b, query| {
             b.iter(|| {
-                let result = mysql_get_columns(black_box(query));
+                let tokens = mysql_tokenize(black_box(query)).unwrap();
+                let result = mysql_get_columns(black_box(&tokens));
                 black_box(result);
             });
         });

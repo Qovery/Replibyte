@@ -164,7 +164,7 @@ transformers:
     table: "users"
     columns: ["email"]
     transformer:
-      random: {}
+      random: {{}}
 "#,
         dumps_dir.to_str().unwrap()
     );
@@ -289,7 +289,7 @@ transformers:
     table: "users"
     columns: ["email"]
     transformer:
-      random: {}
+      random: {{}}
 "#,
         dumps_dir.to_str().unwrap()
     );
@@ -387,7 +387,7 @@ transformers:
     table: "users"
     columns: ["name"]
     transformer:
-      random: {}
+      random: {{}}
 
   - name: "redact_sensitive"
     database: "testdb"

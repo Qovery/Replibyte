@@ -655,7 +655,6 @@ fn peeking_take_while(
     s
 }
 
-
 pub fn match_keyword_at_position(keyword: Keyword, tokens: &Vec<Token>, pos: usize) -> bool {
     if let Some(token) = tokens.get(pos) {
         return match token {
@@ -1043,4 +1042,9 @@ VALUES ('Romaric', true);
             ]
         );
     }
+}
+
+pub fn tokenize(query: &str) -> Result<Vec<Token>, TokenizerError> {
+    let mut tokenizer = Tokenizer::new(query);
+    tokenizer.tokenize()
 }
